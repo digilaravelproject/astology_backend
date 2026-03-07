@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\UserController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -17,6 +18,11 @@ Route::prefix('admin')->group(function () {
     // Protected routes
     Route::middleware('admin')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('admin.dashboard');
+        
+        // User management routes
+        Route::resource('users', UserController::class)->names('admin.users');
+        Route::post('users/{id}/toggle-status', [UserController::class, 'toggleStatus'])->name('admin.users.toggle-status');
+        
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
     });
 });
