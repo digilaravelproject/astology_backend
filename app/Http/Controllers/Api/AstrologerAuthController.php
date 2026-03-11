@@ -4,8 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\AstrologerSignupRequest;
+use App\Http\Requests\UpdateAstrologerProfilePhotoRequest;
+use App\Http\Requests\UpdateAstrologerProfileRequest;
+use App\Http\Requests\UpdateAstrologerSkillRequest;
+use App\Http\Requests\UpdateAstrologerOtherDetailsRequest;
 use App\Models\User;
 use App\Models\Astrologer;
+use App\Models\AstrologerSkill;
+use App\Models\AstrologerOtherDetail;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -334,5 +340,218 @@ class AstrologerAuthController extends Controller
                 'message' => 'An error occurred while fetching profile.',
             ], 500);
         }
+    }
+
+    public function updateProfilePhoto(UpdateAstrologerProfilePhotoRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        // Ensure astrologer profile exists
+        if (!$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+
+        // Store new profile photo
+        $file = $request->file('profile_photo');
+        if (!$file) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No profile_photo file was uploaded. Make sure you send a multipart/form-data request.',
+            ], 422);
+        }
+
+        $filename = time() . '_' . $user->id . '_profile_photo.' . $file->getClientOriginalExtension();
+        $path = 'astrologers/' . $user->id . '/profile_photo';
+
+        // Delete existing file if present
+        if ($astrologer->profile_photo && Storage::disk('public')->exists($astrologer->profile_photo)) {
+            Storage::disk('public')->delete($astrologer->profile_photo);
+        }
+
+        $storedPath = Storage::disk('public')->putFileAs($path, $file, $filename);
+        $astrologer->profile_photo = $storedPath;
+        $astrologer->save();
+
+        $user->load('astrologer');
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Profile photo updated successfully.',
+            'data' => [
+                'user' => $user,
+                'astrologer' => $astrologer,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Update authenticated astrologer profile (basic info + documents).
+     *
+     * @param UpdateAstrologerProfileRequest $request
+     * @return JsonResponse
+     */
+    public function updateProfile(UpdateAstrologerProfileRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+
+        DB::beginTransaction();
+        try {
+            $validated = $request->validated();
+
+            // Update user fields
+            $user->fill([
+                'name' => $validated['full_name'] ?? $user->name,
+                'email' => $validated['email'] ?? $user->email,
+                'phone' => $validated['phone'] ?? $user->phone,
+                'city' => $validated['city'] ?? $user->city,
+                'country' => $validated['country'] ?? $user->country,
+            ]);
+            $user->save();
+
+            // Update astrologer fields
+            if (isset($validated['id_proof_number'])) {
+                $astrologer->id_proof_number = $validated['id_proof_number'];
+            }
+            if (isset($validated['date_of_birth'])) {
+                $astrologer->date_of_birth = $validated['date_of_birth'];
+            }
+
+            // Handle optional file uploads
+            $fileFields = ['profile_photo', 'id_proof', 'certificate'];
+            foreach ($fileFields as $field) {
+                if ($request->hasFile($field)) {
+                    $file = $request->file($field);
+                    $filename = time() . '_' . $user->id . '_' . $field . '.' . $file->getClientOriginalExtension();
+                    $path = 'astrologers/' . $user->id . '/' . $field;
+
+                    // Delete old file if exists
+                    if ($astrologer->{$field} && Storage::disk('public')->exists($astrologer->{$field})) {
+                        Storage::disk('public')->delete($astrologer->{$field});
+                    }
+
+                    $astrologer->{$field} = Storage::disk('public')->putFileAs($path, $file, $filename);
+                }
+            }
+
+            $astrologer->save();
+            DB::commit();
+
+            $user->load('astrologer');
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Profile updated successfully.',
+                'data' => [
+                    'user' => $user,
+                    'astrologer' => $astrologer,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Update profile error: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred while updating the profile.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Store or update astrologer skill details.
+     *
+     * @param UpdateAstrologerSkillRequest $request
+     * @return JsonResponse
+     */
+    public function updateSkill(UpdateAstrologerSkillRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $validated = $request->validated();
+
+        $skill = AstrologerSkill::updateOrCreate(
+            ['astrologer_id' => $astrologer->id],
+            [
+                'category' => $validated['category'] ?? null,
+                'primary_skills' => $validated['primary_skills'] ?? null,
+                'all_skills' => $validated['all_skills'] ?? null,
+                'languages' => $validated['languages'] ?? null,
+                'experience_years' => $validated['experience_years'] ?? null,
+                'daily_contribution_hours' => $validated['daily_contribution_hours'] ?? null,
+                'heard_about' => $validated['heard_about'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Skill details saved successfully.',
+            'data' => [
+                'skill' => $skill,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Store or update astrologer other details.
+     *
+     * @param UpdateAstrologerOtherDetailsRequest $request
+     * @return JsonResponse
+     */
+    public function updateOtherDetails(UpdateAstrologerOtherDetailsRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $validated = $request->validated();
+
+        $otherDetails = AstrologerOtherDetail::updateOrCreate(
+            ['astrologer_id' => $astrologer->id],
+            [
+                'gender' => $validated['gender'] ?? null,
+                'current_address' => $validated['current_address'] ?? null,
+                'bio' => $validated['bio'] ?? null,
+                'date_of_birth' => $validated['date_of_birth'] ?? null,
+                'website_link' => $validated['website_link'] ?? null,
+                'instagram_username' => $validated['instagram_username'] ?? null,
+            ]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Other details saved successfully.',
+            'data' => [
+                'other_details' => $otherDetails,
+            ],
+        ], 200);
     }
 }

@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\AstrologerSkill;
+use App\Models\AstrologerOtherDetail;
 
 class Astrologer extends Model
 {
@@ -40,5 +42,21 @@ class Astrologer extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Get the skill details for the astrologer.
+     */
+    public function skill()
+    {
+        return $this->hasOne(AstrologerSkill::class);
+    }
+
+    /**
+     * Get the other details for the astrologer.
+     */
+    public function otherDetails()
+    {
+        return $this->hasOne(AstrologerOtherDetail::class);
     }
 }

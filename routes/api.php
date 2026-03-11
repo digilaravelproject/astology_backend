@@ -16,6 +16,20 @@ Route::prefix('v1')->group(function () {
         
         // Get astrologer profile endpoint
         Route::get('/profile/{userId}', [AstrologerAuthController::class, 'getProfile']);
+
+        // Update astrologer profile endpoint (requires authentication)
+        Route::middleware('auth:sanctum')->put('/profile', [AstrologerAuthController::class, 'updateProfile']);
+
+        // Update astrologer skill details (requires authentication)
+        Route::middleware('auth:sanctum')->put('/profile/skills', [AstrologerAuthController::class, 'updateSkill']);
+
+        // Update astrologer other details (requires authentication)
+        Route::middleware('auth:sanctum')->put('/profile/other-details', [AstrologerAuthController::class, 'updateOtherDetails']);
+
+        // Update profile photo endpoint (requires authentication)
+        // Use POST + _method=PUT if you want to upload multipart/form-data from clients that don't support PUT file uploads.
+        Route::middleware('auth:sanctum')->post('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
+        Route::middleware('auth:sanctum')->put('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
     });
 
     Route::prefix('user')->group(function () {
