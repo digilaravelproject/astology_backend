@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Astrologer;
 use App\Models\AstrologerSkill;
 use App\Models\AstrologerOtherDetail;
+use App\Models\AstrologerCommunity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -552,6 +553,127 @@ class AstrologerAuthController extends Controller
             'data' => [
                 'other_details' => $otherDetails,
             ],
+        ], 200);
+    }
+
+    /**
+     * Get logged in astrologer's followers (community) with count.
+     */
+    public function getFollowers(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+
+        $query = AstrologerCommunity::with('user')->where('astrologer_id', $astrologer->id);
+        $count = $query->count();
+        $followers = $query->get();
+
+        $data = $followers->map(function ($record) {
+            return [
+                'user_id' => $record->user?->id,
+                'name' => $record->user?->name,
+                'email' => $record->user?->email,
+                'phone' => $record->user?->phone,
+                'is_liked' => $record->is_liked,
+                'liked_at' => $record->liked_at,
+                'followed_at' => $record->created_at,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'count' => $count,
+            'data' => $data,
+        ], 200);
+    }
+
+    /**
+     * Toggle like/unlike on a follower.
+     */
+    public function toggleFollowerLike(Request $request, $userId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $follower = User::find($userId);
+
+        if (!$follower) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Follower user not found.',
+            ], 404);
+        }
+
+        $community = AstrologerCommunity::firstOrNew([
+            'astrologer_id' => $astrologer->id,
+            'user_id' => $follower->id,
+        ]);
+
+        $community->is_liked = !$community->is_liked;
+        $community->liked_at = $community->is_liked ? Carbon::now() : null;
+        $community->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $community->is_liked ? 'Follower liked.' : 'Follower unliked.',
+            'data' => [
+                'user_id' => $follower->id,
+                'is_liked' => $community->is_liked,
+                'liked_at' => $community->liked_at,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Get favorite (liked) followers for logged in astrologer.
+     */
+    public function getFavorites(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $favorites = AstrologerCommunity::with('user')
+            ->where('astrologer_id', $astrologer->id)
+            ->where('is_liked', true)
+            ->get();
+
+        $data = $favorites->map(function ($record) {
+            return [
+                'user_id' => $record->user?->id,
+                'name' => $record->user?->name,
+                'email' => $record->user?->email,
+                'phone' => $record->user?->phone,
+                'liked_at' => $record->liked_at,
+                'followed_at' => $record->created_at,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'count' => $data->count(),
+            'data' => $data,
         ], 200);
     }
 }

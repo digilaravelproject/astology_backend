@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\AstrologerSkill;
 use App\Models\AstrologerOtherDetail;
+use App\Models\AstrologerCommunity;
 
 class Astrologer extends Model
 {
@@ -58,5 +59,21 @@ class Astrologer extends Model
     public function otherDetails()
     {
         return $this->hasOne(AstrologerOtherDetail::class);
+    }
+
+    /**
+     * Get the community members (followers) for the astrologer.
+     */
+    public function community()
+    {
+        return $this->hasMany(AstrologerCommunity::class);
+    }
+
+    /**
+     * Get only the liked/favorite community members.
+     */
+    public function favoriteCommunity()
+    {
+        return $this->hasMany(AstrologerCommunity::class)->where('is_liked', true);
     }
 }

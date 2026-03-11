@@ -30,6 +30,11 @@ Route::prefix('v1')->group(function () {
         // Use POST + _method=PUT if you want to upload multipart/form-data from clients that don't support PUT file uploads.
         Route::middleware('auth:sanctum')->post('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
         Route::middleware('auth:sanctum')->put('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
+
+        // Community (followers / favorites) endpoints
+        Route::middleware('auth:sanctum')->get('/community/followers', [AstrologerAuthController::class, 'getFollowers']);
+        Route::middleware('auth:sanctum')->post('/community/followers/{userId}/toggle-like', [AstrologerAuthController::class, 'toggleFollowerLike']);
+        Route::middleware('auth:sanctum')->get('/community/favorites', [AstrologerAuthController::class, 'getFavorites']);
     });
 
     Route::prefix('user')->group(function () {

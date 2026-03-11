@@ -73,4 +73,12 @@ class User extends Authenticatable
     {
         return $this->hasOne(\App\Models\Astrologer::class);
     }
+
+    /**
+     * Get the community records where this user is a follower.
+     */
+    public function astrologerCommunityRecords()
+    {
+        return $this->hasMany(\App\Models\AstrologerCommunity::class);
+    }
 }
