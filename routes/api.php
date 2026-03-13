@@ -3,6 +3,9 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AstrologerAuthController;
+use App\Http\Controllers\Api\BlogController;
+use App\Http\Controllers\Api\FoundersWordController;
+use App\Http\Controllers\Api\RemedyController;
 use App\Http\Controllers\Api\UserAuthController;
 
 Route::prefix('v1')->group(function () {
@@ -52,5 +55,17 @@ Route::prefix('v1')->group(function () {
         // Update authenticated user profile (requires auth)
         Route::middleware('auth:sanctum')->put('/profileInAppUpdate', [UserAuthController::class, 'updateInAppProfile']);
         Route::middleware('auth:sanctum')->post('/profile/photo', [UserAuthController::class, 'updateProfilePhoto']);
+
+        // Founder words endpoints (public)
+        Route::get('/founders-words', [FoundersWordController::class, 'index']);
+        Route::get('/founders-words/{id}', [FoundersWordController::class, 'show']);
+
+        // Remedies endpoints (public)
+        Route::get('/remedies', [RemedyController::class, 'index']);
+        Route::get('/remedies/{id}', [RemedyController::class, 'show']);
+
+        // Blogs endpoints (public)
+        Route::get('/blogs', [BlogController::class, 'index']);
+        Route::get('/blogs/{id}', [BlogController::class, 'show']);
     });
 });
