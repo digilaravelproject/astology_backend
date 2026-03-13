@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\UpdateUserProfilePhotoRequest;
 use App\Http\Requests\UpdateUserProfileRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 
@@ -239,6 +241,100 @@ class UserAuthController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'An error occurred while updating profile.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Update authenticated user profile photo.
+     */
+    public function updateProfilePhoto(UpdateUserProfilePhotoRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authenticated user not found or not a regular user.',
+            ], 404);
+        }
+
+        $file = $request->file('profile_photo');
+
+        if (!$file) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'No profile_photo file was uploaded. Make sure you send a multipart/form-data request.',
+            ], 422);
+        }
+
+        $filename = time() . '_' . $user->id . '_profile_photo.' . $file->getClientOriginalExtension();
+        $path = 'users/' . $user->id . '/profile_photo';
+
+        // Delete existing file if present
+        if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
+            Storage::disk('public')->delete($user->profile_photo);
+        }
+
+        $storedPath = Storage::disk('public')->putFileAs($path, $file, $filename);
+        $user->profile_photo = $storedPath;
+        $user->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Profile photo updated successfully.',
+            'data' => [
+                'user' => $user,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Update in-app user profile (authenticated).
+     *
+     * This endpoint is used when a logged-in user edits their profile in the app.
+     */
+    public function updateInAppProfile(UpdateUserProfileRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authenticated user not found or not a regular user.',
+            ], 404);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $user->update([
+                'name' => $request->input('name'),
+                'phone' => $request->input('phone'),
+                'gender' => $request->input('gender'),
+                'date_of_birth' => $request->input('date_of_birth'),
+                'time_of_birth' => $request->input('time_of_birth'),
+                'place_of_birth' => $request->input('place_of_birth'),
+                'languages' => $request->input('languages'),
+                'profile_completed' => true,
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Profile updated successfully.',
+                'data' => [
+                    'user' => $user,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Update in-app profile error: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred while updating the profile.',
             ], 500);
         }
     }

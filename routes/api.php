@@ -48,5 +48,9 @@ Route::prefix('v1')->group(function () {
         
         // Update user profile endpoint (after OTP verification)
         Route::put('/profile/{userId}', [UserAuthController::class, 'updateProfile']);
+
+        // Update authenticated user profile (requires auth)
+        Route::middleware('auth:sanctum')->put('/profileInAppUpdate', [UserAuthController::class, 'updateInAppProfile']);
+        Route::middleware('auth:sanctum')->post('/profile/photo', [UserAuthController::class, 'updateProfilePhoto']);
     });
 });

@@ -26,6 +26,7 @@ class User extends Authenticatable
         'phone',
         'city',
         'country',
+        'profile_photo',
         'gender',
         'date_of_birth',
         'time_of_birth',
