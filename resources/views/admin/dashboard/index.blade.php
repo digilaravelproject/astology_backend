@@ -1,387 +1,170 @@
 @extends('admin.layouts.app')
 
-@section('styles')
-<style>
-    /* Stats Grid */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-        margin-bottom: 40px;
-    }
-
-    .stat-card {
-        background: white;
-        padding: 25px;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-        border-top: 3px solid #d63384;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.12);
-    }
-
-    .stat-card.total-users {
-        border-top-color: #4ecdc4;
-    }
-
-    .stat-card.total-astrologers {
-        border-top-color: #f95a8f;
-    }
-
-    .stat-card.pending {
-        border-top-color: #ffa500;
-    }
-
-    .stat-card.approved {
-        border-top-color: #51cf66;
-    }
-
-    .stat-icon {
-        width: 50px;
-        height: 50px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        margin-bottom: 15px;
-    }
-
-    .total-users .stat-icon {
-        background: rgba(78, 205, 196, 0.1);
-        color: #4ecdc4;
-    }
-
-    .total-astrologers .stat-icon {
-        background: rgba(249, 90, 143, 0.1);
-        color: #f95a8f;
-    }
-
-    .pending .stat-icon {
-        background: rgba(255, 165, 0, 0.1);
-        color: #ffa500;
-    }
-
-    .approved .stat-icon {
-        background: rgba(81, 207, 102, 0.1);
-        color: #51cf66;
-    }
-
-    .stat-label {
-        font-size: 13px;
-        color: #666;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 8px;
-    }
-
-    .stat-number {
-        font-size: 36px;
-        font-weight: 700;
-        background: linear-gradient(135deg, #f95a8f 0%, #d63384 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-
-    /* Content Grid */
-    .content-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        margin-bottom: 40px;
-    }
-
-    /* Table Section */
-    .table-section {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-        overflow: hidden;
-    }
-
-    .table-header {
-        padding: 20px 25px;
-        border-bottom: 1px solid #e0e0e0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .table-header h3 {
-        font-size: 16px;
-        font-weight: 600;
-        color: #222;
-    }
-
-    .view-all-btn {
-        color: #d63384;
-        text-decoration: none;
-        font-size: 13px;
-        font-weight: 600;
-        transition: color 0.3s ease;
-    }
-
-    .view-all-btn:hover {
-        color: #f95a8f;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    table thead {
-        background: #f9f9f9;
-    }
-
-    table th {
-        padding: 15px 25px;
-        text-align: left;
-        font-size: 12px;
-        font-weight: 600;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    table td {
-        padding: 15px 25px;
-        border-bottom: 1px solid #e0e0e0;
-        font-size: 14px;
-    }
-
-    table tbody tr:hover {
-        background: #f5f9ff;
-    }
-
-    table tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    .status-badge {
-        display: inline-block;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .status-pending {
-        background: rgba(255, 165, 0, 0.1);
-        color: #ffa500;
-    }
-
-    .status-approved {
-        background: rgba(81, 207, 102, 0.1);
-        color: #51cf66;
-    }
-
-    .status-verified {
-        background: rgba(78, 205, 196, 0.1);
-        color: #4ecdc4;
-    }
-
-    .user-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .user-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #f95a8f 0%, #d63384 100%);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        font-size: 14px;
-    }
-
-    .user-details h4 {
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 2px;
-    }
-
-    .user-details p {
-        font-size: 12px;
-        color: #999;
-    }
-
-    .empty-state {
-        padding: 40px 20px;
-        text-align: center;
-        color: #999;
-    }
-
-    .empty-state-icon {
-        font-size: 40px;
-        margin-bottom: 10px;
-        opacity: 0.5;
-    }
-
-    @media (max-width: 1024px) {
-        .content-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
-
-        table {
-            font-size: 12px;
-        }
-
-        table th, table td {
-            padding: 10px 12px;
-        }
-
-        .stat-number {
-            font-size: 28px;
-        }
-    }
-</style>
-@endsection
-
 @section('content')
-<div class="page-header">
-    <div>
-        <h1>Dashboard</h1>
-        <p>Welcome back, {{ $admin->name }}! Here's your platform overview.</p>
-    </div>
+<!-- Page Header -->
+<div class="mb-8">
+    <h1 class="text-2xl md:text-3xl font-bold text-dark mb-1">Dashboard</h1>
+    <p class="text-sm text-gray">Welcome back, {{ $admin->name }}! Here's your platform overview.</p>
 </div>
 
 <!-- Stats Grid -->
-<div class="stats-grid">
-    <div class="stat-card total-users">
-        <div class="stat-icon"><i class="fas fa-users"></i></div>
-        <div class="stat-label">Total Users</div>
-        <div class="stat-number">{{ $totalUsers }}</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
+
+    <!-- Total Users -->
+    <div class="bg-white p-6 rounded-lg shadow-md border-t-[3px] border-secondary hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="w-12 h-12 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center text-2xl mb-4">
+            <i class="fas fa-users"></i>
+        </div>
+        <div class="text-xs font-semibold text-gray uppercase tracking-wide mb-2">Total Users</div>
+        <div class="text-4xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent">
+            {{ $totalUsers }}
+        </div>
     </div>
 
-    <div class="stat-card total-astrologers">
-        <div class="stat-icon"><i class="fas fa-star"></i></div>
-        <div class="stat-label">Total Astrologers</div>
-        <div class="stat-number">{{ $totalAstrologers }}</div>
+    <!-- Total Astrologers -->
+    <div class="bg-white p-6 rounded-lg shadow-md border-t-[3px] border-primary-light hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="w-12 h-12 rounded-lg bg-primary-light/10 text-primary-light flex items-center justify-center text-2xl mb-4">
+            <i class="fas fa-star"></i>
+        </div>
+        <div class="text-xs font-semibold text-gray uppercase tracking-wide mb-2">Total Astrologers</div>
+        <div class="text-4xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent">
+            {{ $totalAstrologers }}
+        </div>
     </div>
 
-    <div class="stat-card pending">
-        <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
-        <div class="stat-label">Pending Approvals</div>
-        <div class="stat-number">{{ $pendingAstrologers }}</div>
+    <!-- Pending Approvals -->
+    <div class="bg-white p-6 rounded-lg shadow-md border-t-[3px] border-accent hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="w-12 h-12 rounded-lg bg-accent/10 text-accent flex items-center justify-center text-2xl mb-4">
+            <i class="fas fa-hourglass-half"></i>
+        </div>
+        <div class="text-xs font-semibold text-gray uppercase tracking-wide mb-2">Pending Approvals</div>
+        <div class="text-4xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent">
+            {{ $pendingAstrologers }}
+        </div>
     </div>
 
-    <div class="stat-card approved">
-        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-        <div class="stat-label">Approved Astrologers</div>
-        <div class="stat-number">{{ $approvedAstrologers }}</div>
+    <!-- Approved Astrologers -->
+    <div class="bg-white p-6 rounded-lg shadow-md border-t-[3px] border-success hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="w-12 h-12 rounded-lg bg-success/10 text-success flex items-center justify-center text-2xl mb-4">
+            <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="text-xs font-semibold text-gray uppercase tracking-wide mb-2">Approved Astrologers</div>
+        <div class="text-4xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent">
+            {{ $approvedAstrologers }}
+        </div>
     </div>
 </div>
 
-<!-- Recent Data -->
-<div class="content-grid">
+<!-- Recent Data Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
     <!-- Recent Users -->
-    <div class="table-section">
-        <div class="table-header">
-            <h3>Recent Users</h3>
-            <a href="{{ route('admin.users.index') }}?type=user" class="view-all-btn">View All &rarr;</a>
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-lighter flex justify-between items-center">
+            <h3 class="text-base font-semibold text-dark">Recent Users</h3>
+            <a href="{{ route('admin.users.index') }}?type=user" class="text-primary text-sm font-semibold hover:text-primary-light transition-colors">
+                View All &rarr;
+            </a>
         </div>
 
         @if($recentUsers->count() > 0)
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Joined</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($recentUsers as $user)
-                            <tr>
-                                <td>
-                                    <div class="user-info">
-                                        <div class="user-avatar">{{ strtoupper(substr($user->name, 0, 1)) }}</div>
-                                        <div class="user-details">
-                                            <h4>{{ $user->name }}</h4>
-                                            <p>{{ $user->email ?? 'N/A' }}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>{{ $user->phone ?? 'N/A' }}</td>
-                                <td>{{ $user->created_at->format('M d, Y') }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Name</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Phone</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Joined</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($recentUsers as $user)
+                    <tr class="border-b border-gray-lighter last:border-0 hover:bg-info/5 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-9 h-9 rounded-full bg-linear-to-br from-primary-light to-primary text-white flex items-center justify-center font-semibold text-sm">
+                                    {{ strtoupper(substr($user->name, 0, 1)) }}
+                                </div>
+                                <div>
+                                    <div class="text-sm font-semibold text-dark">{{ $user->name }}</div>
+                                    <div class="text-xs text-text-muted">{{ $user->email ?? 'N/A' }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-text-secondary">{{ $user->phone ?? 'N/A' }}</td>
+                        <td class="px-6 py-4 text-sm text-text-secondary">{{ $user->created_at->format('M d, Y') }}</td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
         @else
-            <div class="empty-state">
-                <div class="empty-state-icon"><i class="fas fa-clipboard-list"></i></div>
-                <p>No users yet</p>
-            </div>
+        <div class="py-10 text-center text-text-muted">
+            <div class="text-4xl mb-3 opacity-50"><i class="fas fa-clipboard-list"></i></div>
+            <p>No users yet</p>
+        </div>
         @endif
     </div>
 
     <!-- Recent Astrologers -->
-    <div class="table-section">
-        <div class="table-header">
-            <h3>Recent Astrologers</h3>
-            <a href="{{ route('admin.users.index') }}?type=astrologer" class="view-all-btn">View All &rarr;</a>
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-lighter flex justify-between items-center">
+            <h3 class="text-base font-semibold text-dark">Recent Astrologers</h3>
+            <a href="{{ route('admin.users.index') }}?type=astrologer" class="text-primary text-sm font-semibold hover:text-primary-light transition-colors">
+                View All &rarr;
+            </a>
         </div>
 
         @if($recentAstrologers->count() > 0)
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Experience</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($recentAstrologers as $astrologer)
-                            <tr>
-                                <td>
-                                    <div class="user-info">
-                                        <div class="user-avatar">{{ strtoupper(substr($astrologer->user->name, 0, 1)) }}</div>
-                                        <div class="user-details">
-                                            <h4>{{ $astrologer->user->name }}</h4>
-                                            <p>{{ $astrologer->user->phone }}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>{{ $astrologer->years_of_experience }} years</td>
-                                <td>
-                                    <span class="status-badge status-{{ $astrologer->status }}">
-                                        {{ ucfirst($astrologer->status) }}
-                                    </span>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-light">
+                    <tr>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Name</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Experience</th>
+                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($recentAstrologers as $astrologer)
+                    <tr class="border-b border-gray-lighter last:border-0 hover:bg-info/5 transition-colors">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-linear-to-br from-primary-light to-primary text-white flex items-center justify-center font-semibold text-sm">
+                                    {{ strtoupper(substr($astrologer->user->name, 0, 1)) }}
+                                </div>
+                                <div>
+                                    <div class="text-sm font-semibold text-dark">{{ $astrologer->user->name }}</div>
+                                    <div class="text-xs text-text-muted">{{ $astrologer->user->phone }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-text-secondary">{{ $astrologer->years_of_experience }} years</td>
+                        <td class="px-6 py-4">
+                            @if($astrologer->status === 'pending')
+                                <span class="inline-block px-3 py-1.5 rounded-full text-xs font-semibold bg-accent/10 text-accent">
+                                    Pending
+                                </span>
+                            @elseif($astrologer->status === 'approved')
+                                <span class="inline-block px-3 py-1.5 rounded-full text-xs font-semibold bg-success/10 text-success">
+                                    Approved
+                                </span>
+                            @else
+                                <span class="inline-block px-3 py-1.5 rounded-full text-xs font-semibold bg-secondary/10 text-secondary">
+                                    {{ ucfirst($astrologer->status) }}
+                                </span>
+                            @endif
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
         @else
-            <div class="empty-state">
-                <div class="empty-state-icon"><i class="fas fa-star"></i></div>
-                <p>No astrologers yet</p>
-            </div>
+        <div class="py-10 text-center text-text-muted">
+            <div class="text-4xl mb-3 opacity-50"><i class="fas fa-star"></i></div>
+            <p>No astrologers yet</p>
+        </div>
         @endif
     </div>
 </div>

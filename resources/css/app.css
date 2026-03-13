@@ -1,11 +1,79 @@
 @import 'tailwindcss';
+@config '../../tailwind.config.js';
 
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+:root {
+    /* Fonts */
+    --font-sans: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-heading: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+    /* Primary Colors */
+    --color-primary: #d63384;
+    --color-primary-light: #f95a8f;
+    --color-primary-dark: #b02a6f;
+
+    /* Secondary Colors */
+    --color-secondary: #4ecdc4;
+    --color-secondary-light: #6ee7df;
+    --color-secondary-dark: #3ab5ad;
+
+    /* Accent Colors */
+    --color-accent: #ffa500;
+    --color-accent-light: #ffb733;
+    --color-accent-dark: #cc8400;
+
+    /* Success */
+    --color-success: #51cf66;
+    --color-success-light: #69d77a;
+    --color-success-dark: #40a352;
+
+    /* Danger */
+    --color-danger: #ff6b6b;
+    --color-danger-light: #ff8585;
+    --color-danger-dark: #ee5a52;
+
+    /* Warning */
+    --color-warning: #ffa500;
+    --color-warning-light: #ffb733;
+    --color-warning-dark: #cc8400;
+
+    /* Info */
+    --color-info: #339af0;
+    --color-info-light: #5cadff;
+    --color-info-dark: #1c7ed6;
+
+    /* Neutral Colors */
+    --color-dark: #222222;
+    --color-gray: #666666;
+    --color-gray-light: #999999;
+    --color-gray-lighter: #e0e0e0;
+    --color-light: #f5f7fa;
+    --color-white: #ffffff;
+
+    /* Sidebar */
+    --color-sidebar-bg: #ffffff;
+    --color-sidebar-hover: #fdf2f6;
+    --color-sidebar-active: #d63384;
+
+    /* Text Colors */
+    --color-text-primary: #222222;
+    --color-text-secondary: #555555;
+    --color-text-muted: #999999;
+
+    /* Border Radius */
+    --radius-sm: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 20px;
+    --radius-full: 9999px;
+
+    /* Shadows */
+    --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 5px 20px rgba(0, 0, 0, 0.12);
+    --shadow-header: 0 2px 10px rgba(0, 0, 0, 0.1);
 }

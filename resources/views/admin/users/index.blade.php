@@ -1,235 +1,49 @@
 @extends('admin.layouts.app')
 
-@section('styles')
-<style>
-    .filter-section {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        margin-bottom: 25px;
-    }
-
-    .filter-form {
-        display: flex;
-        gap: 15px;
-        align-items: flex-end;
-        flex-wrap: wrap;
-    }
-
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-        flex: 1;
-        min-width: 200px;
-    }
-
-    .form-group label {
-        font-size: 13px;
-        font-weight: 600;
-        color: #555;
-    }
-
-    .form-control {
-        padding: 10px 15px;
-        border: 1px solid #ddd;
-        border-radius: 6px;
-        font-size: 14px;
-        outline: none;
-        transition: border-color 0.3s;
-    }
-
-    .form-control:focus {
-        border-color: #d63384;
-    }
-
-    .btn {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        text-decoration: none;
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .btn-primary {
-        background: #d63384;
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: #c22975;
-    }
-
-    .btn-outline {
-        background: transparent;
-        border: 1px solid #ddd;
-        color: #555;
-    }
-
-    .btn-outline:hover {
-        background: #f5f5f5;
-    }
-    
-    .btn-sm {
-        padding: 6px 12px;
-        font-size: 12px;
-    }
-    
-    .btn-danger {
-        background: #ff6b6b;
-        color: white;
-    }
-    
-    .btn-danger:hover {
-        background: #ee5a52;
-    }
-    
-    .btn-success {
-        background: #51cf66;
-        color: white;
-    }
-    
-    .btn-success:hover {
-        background: #40c057;
-    }
-
-    .users-table-container {
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-        overflow: auto;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    th, td {
-        padding: 15px 20px;
-        text-align: left;
-        border-bottom: 1px solid #eee;
-    }
-
-    th {
-        background: #f8f9fa;
-        font-size: 13px;
-        font-weight: 600;
-        color: #555;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    td {
-        font-size: 14px;
-        vertical-align: middle;
-    }
-
-    tbody tr:hover {
-        background: #fcfcfc;
-    }
-
-    .badge {
-        padding: 5px 10px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .badge-user {
-        background: #e3f2fd;
-        color: #1976d2;
-    }
-
-    .badge-astrologer {
-        background: #f3e5f5;
-        color: #7b1fa2;
-    }
-    
-    .status-badge {
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .status-pending { background: rgba(255, 165, 0, 0.1); color: #ffa500; }
-    .status-approved { background: rgba(81, 207, 102, 0.1); color: #51cf66; }
-    .status-rejected { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
-
-    .actions {
-        display: flex;
-        gap: 8px;
-    }
-
-    .pagination-wrapper {
-        padding: 20px;
-        display: flex;
-        justify-content: center;
-    }
-    
-    .pagination {
-        display: flex;
-        list-style: none;
-        gap: 5px;
-    }
-    
-    .pagination li a, .pagination li span {
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        text-decoration: none;
-        color: #333;
-    }
-    
-    .pagination li.active span {
-        background: #d63384;
-        color: white;
-        border-color: #d63384;
-    }
-</style>
-@endsection
-
 @section('content')
-<div class="page-header">
+<!-- Page Header -->
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
     <div>
-        <h1>Manage Users</h1>
-        <p>Total {{ $users->total() }} records found</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-dark mb-1">Manage Users</h1>
+        <p class="text-sm text-gray">Total {{ $users->total() }} records found</p>
     </div>
-    <div>
-        <a href="{{ route('admin.users.create') }}" class="btn btn-primary">
-            <i class="fas fa-plus"></i> Add User
-        </a>
-    </div>
+    <a href="{{ route('admin.users.create') }}"
+       class="inline-flex items-center gap-2 px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all duration-300 hover:-translate-y-0.5 shadow-md hover:shadow-lg">
+        <i class="fas fa-plus"></i>
+        <span>Add User</span>
+    </a>
 </div>
 
-<div class="filter-section">
-    <form action="{{ route('admin.users.index') }}" method="GET" class="filter-form">
-        <div class="form-group">
-            <label>Search</label>
-            <input type="text" name="search" class="form-control" placeholder="Name, Email or Phone" value="{{ request('search') }}">
+<!-- Filter Section -->
+<div class="bg-white p-5 rounded-xl shadow-md mb-6">
+    <form action="{{ route('admin.users.index') }}" method="GET" class="flex flex-col lg:flex-row gap-4 items-end">
+
+        <!-- Search -->
+        <div class="flex-1 min-w-[200px]">
+            <label class="block text-xs font-semibold text-gray uppercase tracking-wide mb-2">Search</label>
+            <input type="text"
+                   name="search"
+                   placeholder="Name, Email or Phone"
+                   value="{{ request('search') }}"
+                   class="w-full px-4 py-2.5 border border-gray-lighter rounded-lg text-sm outline-none transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20">
         </div>
 
-        <div class="form-group">
-            <label>User Type</label>
-            <select name="type" class="form-control">
+        <!-- User Type -->
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-xs font-semibold text-gray uppercase tracking-wide mb-2">User Type</label>
+            <select name="type"
+                    class="w-full px-4 py-2.5 border border-gray-lighter rounded-lg text-sm outline-none transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white">
                 <option value="">All Types</option>
                 <option value="user" {{ request('type') == 'user' ? 'selected' : '' }}>User</option>
                 <option value="astrologer" {{ request('type') == 'astrologer' ? 'selected' : '' }}>Astrologer</option>
             </select>
         </div>
 
-        <div class="form-group">
-            <label>Astrologer Status</label>
-            <select name="status" class="form-control">
+        <!-- Astrologer Status -->
+        <div class="flex-1 min-w-[180px]">
+            <label class="block text-xs font-semibold text-gray uppercase tracking-wide mb-2">Astrologer Status</label>
+            <select name="status"
+                    class="w-full px-4 py-2.5 border border-gray-lighter rounded-lg text-sm outline-none transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20 bg-white">
                 <option value="">All Statuses</option>
                 <option value="pending" {{ request('status') == 'pending' ? 'selected' : '' }}>Pending</option>
                 <option value="approved" {{ request('status') == 'approved' ? 'selected' : '' }}>Approved</option>
@@ -237,94 +51,177 @@
             </select>
         </div>
 
-        <button type="submit" class="btn btn-primary">Filter</button>
-        <a href="{{ route('admin.users.index') }}" class="btn btn-outline">Clear</a>
+        <!-- Buttons -->
+        <div class="flex gap-3">
+            <button type="submit"
+                    class="px-5 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg hover:bg-primary-dark transition-all duration-300">
+                <i class="fas fa-filter mr-1"></i> Filter
+            </button>
+            <a href="{{ route('admin.users.index') }}"
+               class="px-5 py-2.5 border border-gray-lighter text-gray text-sm font-semibold rounded-lg hover:bg-light transition-all duration-300">
+                <i class="fas fa-times mr-1"></i> Clear
+            </a>
+        </div>
     </form>
 </div>
 
-<div class="users-table-container">
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>User Details</th>
-                <th>Type</th>
-                <th>Astrologer Info</th>
-                <th>Joined Date</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse($users as $user)
+<!-- Users Table -->
+<div class="bg-white rounded-xl shadow-md overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-light border-b border-gray-lighter">
                 <tr>
-                    <td>#{{ $user->id }}</td>
-                    <td>
-                        <div style="font-weight: 600;">{{ $user->name }}</div>
-                        <div style="font-size: 13px; color: #666;">📞 {{ $user->phone ?? 'N/A' }}</div>
-                        <div style="font-size: 13px; color: #666;">✉️ {{ $user->email ?? 'N/A' }}</div>
-                    </td>
-                    <td>
-                        <span class="badge badge-{{ $user->user_type }}">
-                            {{ ucfirst($user->user_type) }}
-                        </span>
-                    </td>
-                    <td>
-                        @if($user->user_type === 'astrologer' && $user->astrologer)
-                            <div style="margin-bottom: 5px;">
-                                Exp: {{ $user->astrologer->years_of_experience ?? 0 }} yrs
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">ID</th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">User Details</th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Type</th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Astrologer Info</th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Joined</th>
+                    <th class="px-5 py-4 text-left text-xs font-semibold text-gray uppercase tracking-wide">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-lighter">
+                @forelse($users as $user)
+                <tr class="hover:bg-info/5 transition-colors duration-200">
+                    <!-- ID -->
+                    <td class="px-5 py-4 text-sm font-medium text-dark">#{{ $user->id }}</td>
+
+                    <!-- User Details -->
+                    <td class="px-5 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full bg-linear-to-br from-primary-light to-primary text-white flex items-center justify-center font-semibold text-sm shrink-0">
+                                {{ strtoupper(substr($user->name, 0, 1)) }}
                             </div>
-                            <span class="status-badge status-{{ $user->astrologer->status }}">
-                                {{ ucfirst($user->astrologer->status) }}
+                            <div>
+                                <div class="text-sm font-semibold text-dark">{{ $user->name }}</div>
+                                <div class="text-xs text-text-muted flex items-center gap-1 mt-0.5">
+                                    <i class="fas fa-phone text-[10px]"></i> {{ $user->phone ?? 'N/A' }}
+                                </div>
+                                <div class="text-xs text-text-muted flex items-center gap-1">
+                                    <i class="fas fa-envelope text-[10px]"></i> {{ $user->email ?? 'N/A' }}
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <!-- Type Badge -->
+                    <td class="px-5 py-4">
+                        @if($user->user_type === 'astrologer')
+                            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
+                                <i class="fas fa-star text-[10px]"></i> Astrologer
                             </span>
                         @else
-                            <span style="color: #aaa;">-</span>
+                            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold bg-info/10 text-info">
+                                <i class="fas fa-user text-[10px]"></i> User
+                            </span>
                         @endif
                     </td>
-                    <td>{{ $user->created_at->format('M d, Y') }}</td>
-                    <td>
-                        <div class="actions">
-                            @if($user->user_type === 'astrologer' && $user->astrologer)
-                                <form action="{{ route('admin.users.toggle-status', $user->id) }}" method="POST" style="margin: 0;">
-                                    @csrf
-                                    @if($user->astrologer->status !== 'approved')
-                                        <input type="hidden" name="status" value="approved">
-                                        <button type="submit" class="btn btn-sm btn-success" title="Approve">
-                                            <i class="fas fa-check"></i>
-                                        </button>
-                                    @endif
-                                    @if($user->astrologer->status !== 'rejected')
-                                        <input type="hidden" name="status" value="rejected">
-                                        <button type="submit" class="btn btn-sm btn-danger" style="background:#dc3545" title="Reject">
-                                            <i class="fas fa-times"></i>
-                                        </button>
-                                    @endif
-                                </form>
+
+                    <!-- Astrologer Info -->
+                    <td class="px-5 py-4">
+                        @if($user->user_type === 'astrologer' && $user->astrologer)
+                            <div class="text-sm text-text-secondary mb-1">
+                                <i class="fas fa-briefcase text-xs text-gray-light mr-1"></i>
+                                {{ $user->astrologer->years_of_experience ?? 0 }} yrs exp
+                            </div>
+                            @php $status = $user->astrologer->status; @endphp
+                            @if($status === 'pending')
+                                <span class="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-accent/10 text-accent">
+                                    <i class="fas fa-clock text-[10px] mr-1"></i>Pending
+                                </span>
+                            @elseif($status === 'approved')
+                                <span class="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-success/10 text-success">
+                                    <i class="fas fa-check text-[10px] mr-1"></i>Approved
+                                </span>
+                            @elseif($status === 'rejected')
+                                <span class="inline-block px-2.5 py-1 rounded-full text-xs font-semibold bg-danger/10 text-danger">
+                                    <i class="fas fa-times text-[10px] mr-1"></i>Rejected
+                                </span>
                             @endif
-                            <a href="{{ route('admin.users.edit', $user->id) }}" class="btn btn-sm btn-outline" title="Edit">
-                                <i class="fas fa-edit"></i>
+                        @else
+                            <span class="text-gray-light">—</span>
+                        @endif
+                    </td>
+
+                    <!-- Joined Date -->
+                    <td class="px-5 py-4 text-sm text-text-secondary">
+                        <i class="fas fa-calendar text-xs text-gray-light mr-1"></i>
+                        {{ $user->created_at->format('M d, Y') }}
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="px-5 py-4">
+                        <div class="flex items-center gap-2">
+                            @if($user->user_type === 'astrologer' && $user->astrologer)
+                                @if($user->astrologer->status !== 'approved')
+                                    <form action="{{ route('admin.users.toggle-status', $user->id) }}" method="POST" class="inline">
+                                        @csrf
+                                        <input type="hidden" name="status" value="approved">
+                                        <button type="submit"
+                                                title="Approve"
+                                                class="w-8 h-8 flex items-center justify-center rounded-lg bg-success/10 text-success hover:bg-success hover:text-white transition-all duration-300">
+                                            <i class="fas fa-check text-xs"></i>
+                                        </button>
+                                    </form>
+                                @endif
+                                @if($user->astrologer->status !== 'rejected')
+                                    <form action="{{ route('admin.users.toggle-status', $user->id) }}" method="POST" class="inline">
+                                        @csrf
+                                        <input type="hidden" name="status" value="rejected">
+                                        <button type="submit"
+                                                title="Reject"
+                                                class="w-8 h-8 flex items-center justify-center rounded-lg bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all duration-300">
+                                            <i class="fas fa-ban text-xs"></i>
+                                        </button>
+                                    </form>
+                                @endif
+                            @endif
+
+                            <!-- Edit -->
+                            <a href="{{ route('admin.users.edit', $user->id) }}"
+                               title="Edit"
+                               class="w-8 h-8 flex items-center justify-center rounded-lg bg-info/10 text-info hover:bg-info hover:text-white transition-all duration-300">
+                                <i class="fas fa-edit text-xs"></i>
                             </a>
-                            <form action="{{ route('admin.users.destroy', $user->id) }}" method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this user?');">
+
+                            <!-- Delete -->
+                            <form action="{{ route('admin.users.destroy', $user->id) }}"
+                                  method="POST"
+                                  class="inline"
+                                  x-data
+                                  @submit.prevent="if(confirm('Are you sure you want to delete this user?')) $el.submit()">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-danger" title="Delete">
-                                    <i class="fas fa-trash"></i>
+                                <button type="submit"
+                                        title="Delete"
+                                        class="w-8 h-8 flex items-center justify-center rounded-lg bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all duration-300">
+                                    <i class="fas fa-trash text-xs"></i>
                                 </button>
                             </form>
                         </div>
                     </td>
                 </tr>
-            @empty
+                @empty
                 <tr>
-                    <td colspan="6" style="text-align: center; padding: 30px; color: #999;">
-                        No users found matching the criteria.
+                    <td colspan="6" class="px-5 py-16 text-center">
+                        <div class="text-5xl text-gray-lighter mb-4">
+                            <i class="fas fa-users-slash"></i>
+                        </div>
+                        <p class="text-gray font-medium">No users found matching the criteria.</p>
+                        <a href="{{ route('admin.users.index') }}" class="inline-block mt-4 text-primary text-sm font-semibold hover:underline">
+                            Clear filters &rarr;
+                        </a>
                     </td>
                 </tr>
-            @endforelse
-        </tbody>
-    </table>
-    
-    <div class="pagination-wrapper">
-        {{ $users->links('pagination::bootstrap-4') }}
+                @endforelse
+            </tbody>
+        </table>
     </div>
+
+    <!-- Pagination -->
+    @if($users->hasPages())
+    <div class="px-5 py-4 border-t border-gray-lighter bg-light/50">
+        {{ $users->links() }}
+    </div>
+    @endif
 </div>
 @endsection
