@@ -26,6 +26,41 @@ Route::prefix('admin')->group(function () {
         // User management routes
         Route::resource('users', UserController::class)->names('admin.users');
         Route::post('users/{id}/toggle-status', [UserController::class, 'toggleStatus'])->name('admin.users.toggle-status');
+        Route::get('users-wallet', function() { return view('admin.users.wallet'); })->name('admin.users.wallet');
+        Route::get('users-referrals', function() { return view('admin.users.referrals'); })->name('admin.users.referrals');
+
+        // Astrologer Management
+        Route::prefix('astrologers')->group(function() {
+            Route::get('/', function() { return view('admin.astrologers.index'); })->name('admin.astrologers.index');
+            Route::get('/performance', function() { return view('admin.astrologers.performance'); })->name('admin.astrologers.performance');
+            Route::get('/reviews', function() { return view('admin.astrologers.reviews'); })->name('admin.astrologers.reviews');
+            Route::get('/live', function() { return view('admin.astrologers.live'); })->name('admin.astrologers.live');
+        });
+
+        // Order Management
+        Route::prefix('orders')->group(function() {
+            Route::get('/', function() { return view('admin.orders.index'); })->name('admin.orders.index');
+            Route::get('/by-astrologer', function() { return view('admin.orders.by-astrologer'); })->name('admin.orders.by-astrologer');
+        });
+
+        // Blog Management
+        Route::prefix('blogs')->group(function() {
+            Route::get('/', function() { return view('admin.blogs.index'); })->name('admin.blogs.index');
+            Route::get('/create', function() { return view('admin.blogs.create'); })->name('admin.blogs.create');
+        });
+
+        // Plan Management
+        Route::prefix('plans')->group(function() {
+            Route::get('/', function() { return view('admin.plans.index'); })->name('admin.plans.index');
+            Route::get('/create', function() { return view('admin.plans.create'); })->name('admin.plans.create');
+            Route::get('/subscriptions', function() { return view('admin.plans.subscriptions'); })->name('admin.plans.subscriptions');
+        });
+
+        // Reports & Analytics
+        Route::get('reports', function() { return view('admin.reports.index'); })->name('admin.reports.index');
+
+        // Settings
+        Route::get('settings', function() { return view('admin.settings.index'); })->name('admin.settings.index');
 
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
     });
