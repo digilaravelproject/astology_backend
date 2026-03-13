@@ -1,388 +1,227 @@
 @extends('admin.layouts.app')
 
-@section('styles')
-<style>
-    /* Stats Grid */
-    .stats-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-        gap: 20px;
-        margin-bottom: 40px;
-    }
-
-    .stat-card {
-        background: white;
-        padding: 25px;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-        transition: all 0.3s ease;
-        border-top: 3px solid #d63384;
-    }
-
-    .stat-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.12);
-    }
-
-    .stat-card.total-users {
-        border-top-color: #4ecdc4;
-    }
-
-    .stat-card.total-astrologers {
-        border-top-color: #f95a8f;
-    }
-
-    .stat-card.pending {
-        border-top-color: #ffa500;
-    }
-
-    .stat-card.approved {
-        border-top-color: #51cf66;
-    }
-
-    .stat-icon {
-        width: 50px;
-        height: 50px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 24px;
-        margin-bottom: 15px;
-    }
-
-    .total-users .stat-icon {
-        background: rgba(78, 205, 196, 0.1);
-        color: #4ecdc4;
-    }
-
-    .total-astrologers .stat-icon {
-        background: rgba(249, 90, 143, 0.1);
-        color: #f95a8f;
-    }
-
-    .pending .stat-icon {
-        background: rgba(255, 165, 0, 0.1);
-        color: #ffa500;
-    }
-
-    .approved .stat-icon {
-        background: rgba(81, 207, 102, 0.1);
-        color: #51cf66;
-    }
-
-    .stat-label {
-        font-size: 13px;
-        color: #666;
-        font-weight: 500;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 8px;
-    }
-
-    .stat-number {
-        font-size: 36px;
-        font-weight: 700;
-        background: linear-gradient(135deg, #f95a8f 0%, #d63384 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-    }
-
-    /* Content Grid */
-    .content-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-        margin-bottom: 40px;
-    }
-
-    /* Table Section */
-    .table-section {
-        background: white;
-        border-radius: 12px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-        overflow: hidden;
-    }
-
-    .table-header {
-        padding: 20px 25px;
-        border-bottom: 1px solid #e0e0e0;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .table-header h3 {
-        font-size: 16px;
-        font-weight: 600;
-        color: #222;
-    }
-
-    .view-all-btn {
-        color: #d63384;
-        text-decoration: none;
-        font-size: 13px;
-        font-weight: 600;
-        transition: color 0.3s ease;
-    }
-
-    .view-all-btn:hover {
-        color: #f95a8f;
-    }
-
-    table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    table thead {
-        background: #f9f9f9;
-    }
-
-    table th {
-        padding: 15px 25px;
-        text-align: left;
-        font-size: 12px;
-        font-weight: 600;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        border-bottom: 1px solid #e0e0e0;
-    }
-
-    table td {
-        padding: 15px 25px;
-        border-bottom: 1px solid #e0e0e0;
-        font-size: 14px;
-    }
-
-    table tbody tr:hover {
-        background: #f5f9ff;
-    }
-
-    table tbody tr:last-child td {
-        border-bottom: none;
-    }
-
-    .status-badge {
-        display: inline-block;
-        padding: 6px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .status-pending {
-        background: rgba(255, 165, 0, 0.1);
-        color: #ffa500;
-    }
-
-    .status-approved {
-        background: rgba(81, 207, 102, 0.1);
-        color: #51cf66;
-    }
-
-    .status-verified {
-        background: rgba(78, 205, 196, 0.1);
-        color: #4ecdc4;
-    }
-
-    .user-info {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .user-avatar {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #f95a8f 0%, #d63384 100%);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        font-size: 14px;
-    }
-
-    .user-details h4 {
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 2px;
-    }
-
-    .user-details p {
-        font-size: 12px;
-        color: #999;
-    }
-
-    .empty-state {
-        padding: 40px 20px;
-        text-align: center;
-        color: #999;
-    }
-
-    .empty-state-icon {
-        font-size: 40px;
-        margin-bottom: 10px;
-        opacity: 0.5;
-    }
-
-    @media (max-width: 1024px) {
-        .content-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-
-    @media (max-width: 768px) {
-        .stats-grid {
-            grid-template-columns: 1fr;
-        }
-
-        table {
-            font-size: 12px;
-        }
-
-        table th, table td {
-            padding: 10px 12px;
-        }
-
-        .stat-number {
-            font-size: 28px;
-        }
-    }
-</style>
-@endsection
-
 @section('content')
-<div class="page-header">
+<!-- Page Header -->
+<div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
     <div>
-        <h1>Dashboard</h1>
-        <p>Welcome back, {{ $admin->name }}! Here's your platform overview.</p>
+        <h1 class="text-2xl md:text-3xl font-bold text-dark mb-1">Dashboard Overview</h1>
+        <p class="text-sm text-gray font-medium">Monitoring platform performance and user activity.</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <span class="px-3 py-1.5 bg-white border border-gray-lighter rounded-lg text-xs font-bold text-gray uppercase shadow-sm">
+            <i class="fas fa-calendar-alt mr-2 text-primary"></i> 13 Mar 2024
+        </span>
     </div>
 </div>
 
-<!-- Stats Grid -->
-<div class="stats-grid">
-    <div class="stat-card total-users">
-        <div class="stat-icon"><i class="fas fa-users"></i></div>
-        <div class="stat-label">Total Users</div>
-        <div class="stat-number">{{ $totalUsers }}</div>
+<!-- Row 1 - Core Stats -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <!-- Total Users -->
+    <div class="bg-white p-6 rounded-2xl shadow-md border-b-4 border-primary hover:shadow-xl transition-all group">
+        <div class="flex justify-between items-start mb-4">
+            <div class="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary text-2xl group-hover:scale-110 transition-transform">
+                <i class="fas fa-users"></i>
+            </div>
+            <span class="text-xs font-bold text-success bg-success/10 px-2 py-1 rounded-full">+12.5%</span>
+        </div>
+        <div class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Users</div>
+        <div class="text-3xl font-black text-dark">2,847</div>
     </div>
 
-    <div class="stat-card total-astrologers">
-        <div class="stat-icon"><i class="fas fa-star"></i></div>
-        <div class="stat-label">Total Astrologers</div>
-        <div class="stat-number">{{ $totalAstrologers }}</div>
+    <!-- Total Astrologers -->
+    <div class="bg-white p-6 rounded-2xl shadow-md border-b-4 border-secondary hover:shadow-xl transition-all group">
+        <div class="flex justify-between items-start mb-4">
+            <div class="w-12 h-12 bg-secondary/10 rounded-xl flex items-center justify-center text-secondary text-2xl group-hover:scale-110 transition-transform">
+                <i class="fas fa-user-tie"></i>
+            </div>
+            <span class="text-xs font-bold text-primary bg-primary/10 px-2 py-1 rounded-full">89 Active</span>
+        </div>
+        <div class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Total Astrologers</div>
+        <div class="text-3xl font-black text-dark">156</div>
     </div>
 
-    <div class="stat-card pending">
-        <div class="stat-icon"><i class="fas fa-hourglass-half"></i></div>
-        <div class="stat-label">Pending Approvals</div>
-        <div class="stat-number">{{ $pendingAstrologers }}</div>
+    <!-- Today Revenue -->
+    <div class="bg-white p-6 rounded-2xl shadow-md border-b-4 border-success hover:shadow-xl transition-all group">
+        <div class="flex justify-between items-start mb-4">
+            <div class="w-12 h-12 bg-success/10 rounded-xl flex items-center justify-center text-success text-2xl group-hover:scale-110 transition-transform">
+                <i class="fas fa-wallet"></i>
+            </div>
+            <span class="text-xs font-bold text-success bg-success/10 px-2 py-1 rounded-full"><i class="fas fa-arrow-up"></i> 8%</span>
+        </div>
+        <div class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Today Revenue</div>
+        <div class="text-3xl font-black text-dark">₹45,230</div>
     </div>
 
-    <div class="stat-card approved">
-        <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
-        <div class="stat-label">Approved Astrologers</div>
-        <div class="stat-number">{{ $approvedAstrologers }}</div>
+    <!-- Today Orders -->
+    <div class="bg-white p-6 rounded-2xl shadow-md border-b-4 border-info hover:shadow-xl transition-all group">
+        <div class="flex justify-between items-start mb-4">
+            <div class="w-12 h-12 bg-info/10 rounded-xl flex items-center justify-center text-info text-2xl group-hover:scale-110 transition-transform">
+                <i class="fas fa-shopping-bag"></i>
+            </div>
+            <span class="text-xs font-bold text-info bg-info/10 px-2 py-1 rounded-full">127 Total</span>
+        </div>
+        <div class="text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">Today Orders</div>
+        <div class="text-3xl font-black text-dark">127</div>
     </div>
 </div>
 
-<!-- Recent Data -->
-<div class="content-grid">
-    <!-- Recent Users -->
-    <div class="table-section">
-        <div class="table-header">
-            <h3>Recent Users</h3>
-            <a href="{{ route('admin.users.index') }}?type=user" class="view-all-btn">View All &rarr;</a>
+<!-- Row 2 - Secondary Stats -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+    <!-- Active Subscriptions -->
+    <div class="bg-light/40 p-5 rounded-xl border border-gray-lighter flex items-center gap-4">
+        <div class="w-10 h-10 bg-white shadow-sm rounded-lg flex items-center justify-center text-primary"><i class="fas fa-gem"></i></div>
+        <div>
+            <div class="text-xs font-bold text-gray uppercase tracking-tighter">Active Subscriptions</div>
+            <div class="text-xl font-black text-dark">1,234</div>
         </div>
+    </div>
+    <!-- Live Astrologers -->
+    <div class="bg-light/40 p-5 rounded-xl border border-gray-lighter flex items-center gap-4">
+        <div class="relative">
+            <div class="w-10 h-10 bg-white shadow-sm rounded-lg flex items-center justify-center text-success"><i class="fas fa-broadcast-tower"></i></div>
+            <span class="absolute -top-1 -right-1 w-3 h-3 bg-success border-2 border-white rounded-full animate-pulse"></span>
+        </div>
+        <div>
+            <div class="text-xs font-bold text-gray uppercase tracking-tighter">Live Now</div>
+            <div class="text-xl font-black text-dark">23</div>
+        </div>
+    </div>
+    <!-- Pending Payouts -->
+    <div class="bg-light/40 p-5 rounded-xl border border-gray-lighter flex items-center gap-4">
+        <div class="w-10 h-10 bg-white shadow-sm rounded-lg flex items-center justify-center text-danger"><i class="fas fa-hand-holding-usd"></i></div>
+        <div>
+            <div class="text-xs font-bold text-gray uppercase tracking-tighter">Pending Payouts</div>
+            <div class="text-xl font-black text-danger">₹1,23,450</div>
+        </div>
+    </div>
+    <!-- Total Wallet -->
+    <div class="bg-light/40 p-5 rounded-xl border border-gray-lighter flex items-center gap-4">
+        <div class="w-10 h-10 bg-white shadow-sm rounded-lg flex items-center justify-center text-info"><i class="fas fa-piggy-bank"></i></div>
+        <div>
+            <div class="text-xs font-bold text-gray uppercase tracking-tighter">Total Wallet Balance</div>
+            <div class="text-xl font-black text-dark">₹8,45,670</div>
+        </div>
+    </div>
+</div>
 
-        @if($recentUsers->count() > 0)
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Joined</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($recentUsers as $user)
-                            <tr>
-                                <td>
-                                    <div class="user-info">
-                                        <div class="user-avatar">{{ strtoupper(substr($user->name, 0, 1)) }}</div>
-                                        <div class="user-details">
-                                            <h4>{{ $user->name }}</h4>
-                                            <p>{{ $user->email ?? 'N/A' }}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>{{ $user->phone ?? 'N/A' }}</td>
-                                <td>{{ $user->created_at->format('M d, Y') }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @else
-            <div class="empty-state">
-                <div class="empty-state-icon"><i class="fas fa-clipboard-list"></i></div>
-                <p>No users yet</p>
-            </div>
-        @endif
+<!-- Row 3 - Recent Orders & Top Astrologers -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+    <!-- Recent Orders Table -->
+    <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-lighter overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-lighter flex justify-between items-center">
+            <h3 class="font-black text-dark uppercase tracking-wide text-sm">Recent Orders</h3>
+            <a href="{{ route('admin.orders.index') }}" class="text-primary text-xs font-bold hover:underline">View All</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead class="bg-light/50">
+                    <tr>
+                        <th class="px-6 py-3 text-[10px] font-black text-gray uppercase">Order ID</th>
+                        <th class="px-6 py-3 text-[10px] font-black text-gray uppercase">Customer</th>
+                        <th class="px-6 py-3 text-[10px] font-black text-gray uppercase">Astrologer</th>
+                        <th class="px-6 py-3 text-[10px] font-black text-gray uppercase">Amount</th>
+                        <th class="px-6 py-3 text-[10px] font-black text-gray uppercase text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-lighter">
+                    @foreach(['ORD-5501' => ['Rahul Sharma', 'Aarti Sharma', '₹500', 'Success'], 'ORD-5502' => ['Priya Patel', 'Vikram Joshi', '₹800', 'Ongoing'], 'ORD-5503' => ['Amit Kumar', 'Sneha Gupta', '₹300', 'Failed'], 'ORD-5504' => ['Sneha Gupta', 'Aarti Sharma', '₹450', 'Success'], 'ORD-5505' => ['Vikram Singh', 'Raj Malhotra', '₹600', 'Success']] as $id => $data)
+                    <tr class="hover:bg-light/30 transition-colors">
+                        <td class="px-6 py-4 text-xs font-bold text-dark">{{ $id }}</td>
+                        <td class="px-6 py-4 text-xs font-semibold text-gray">{{ $data[0] }}</td>
+                        <td class="px-6 py-4 text-xs font-semibold text-primary">{{ $data[1] }}</td>
+                        <td class="px-6 py-4 text-xs font-black text-dark">{{ $data[2] }}</td>
+                        <td class="px-6 py-4 text-center">
+                            @if($data[3] == 'Success')
+                                <span class="px-2 py-1 bg-success/10 text-success text-[10px] font-black rounded uppercase">Success</span>
+                            @elseif($data[3] == 'Ongoing')
+                                <span class="px-2 py-1 bg-info/10 text-info text-[10px] font-black rounded uppercase">Ongoing</span>
+                            @else
+                                <span class="px-2 py-1 bg-danger/10 text-danger text-[10px] font-black rounded uppercase">Failed</span>
+                            @endif
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
     </div>
 
-    <!-- Recent Astrologers -->
-    <div class="table-section">
-        <div class="table-header">
-            <h3>Recent Astrologers</h3>
-            <a href="{{ route('admin.users.index') }}?type=astrologer" class="view-all-btn">View All &rarr;</a>
+    <!-- Top Astrologers -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-lighter overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-lighter">
+            <h3 class="font-black text-dark uppercase tracking-wide text-sm">Top 5 Astrologers</h3>
         </div>
+        <div class="p-6 space-y-6">
+            @foreach(['Aarti Sharma' => ['124 Orders', '₹2.4L'], 'Vikram Joshi' => ['98 Orders', '₹1.8L'], 'Sneha Gupta' => ['85 Orders', '₹1.5L'], 'Raj Malhotra' => ['72 Orders', '₹1.2L'], 'Pooja Reddy' => ['65 Orders', '₹1.1L']] as $name => $stats)
+            <div class="flex items-center justify-between group cursor-pointer">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black group-hover:bg-primary group-hover:text-white transition-all">{{ substr($name, 0, 1) }}</div>
+                    <div>
+                        <div class="text-xs font-black text-dark">{{ $name }}</div>
+                        <div class="text-[10px] text-gray italic">{{ $stats[0] }}</div>
+                    </div>
+                </div>
+                <div class="text-xs font-black text-success">{{ $stats[1] }}</div>
+            </div>
+            @endforeach
+        </div>
+    </div>
+</div>
 
-        @if($recentAstrologers->count() > 0)
-            <div style="overflow-x: auto;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Experience</th>
-                            <th>Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($recentAstrologers as $astrologer)
-                            <tr>
-                                <td>
-                                    <div class="user-info">
-                                        <div class="user-avatar">{{ strtoupper(substr($astrologer->user->name, 0, 1)) }}</div>
-                                        <div class="user-details">
-                                            <h4>{{ $astrologer->user->name }}</h4>
-                                            <p>{{ $astrologer->user->phone }}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td>{{ $astrologer->years_of_experience }} years</td>
-                                <td>
-                                    <span class="status-badge status-{{ $astrologer->status }}">
-                                        {{ ucfirst($astrologer->status) }}
-                                    </span>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
+<!-- Row 4 - Registrations & Subscriptions -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+    <!-- Recent User Registrations -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-lighter overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-lighter flex justify-between items-center bg-light/20">
+            <h3 class="font-black text-dark uppercase tracking-wide text-sm">New Registrations</h3>
+            <span class="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded">Last 5</span>
+        </div>
+        <div class="p-4 space-y-3">
+            @foreach(['Anjali Verma' => 'anjali.v@gmail.com', 'Raj Malhotra' => 'raj.m@yahoo.com', 'Pooja Reddy' => 'pooja.r@gmail.com', 'Arjun Nair' => 'arjun.n@outlook.com', 'Kavita Joshi' => 'kavita.j@gmail.com'] as $user => $email)
+            <div class="flex items-center justify-between p-3 hover:bg-light/50 rounded-xl transition-all border border-transparent hover:border-gray-lighter">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-linear-to-br from-primary-light to-primary text-white flex items-center justify-center text-[10px] font-black">{{ substr($user, 0, 1) }}</div>
+                    <div>
+                        <div class="text-xs font-bold text-dark">{{ $user }}</div>
+                        <div class="text-[10px] text-gray">{{ $email }}</div>
+                    </div>
+                </div>
+                <div class="text-[10px] font-bold text-gray uppercase tracking-tighter">12 Mar 2024</div>
             </div>
-        @else
-            <div class="empty-state">
-                <div class="empty-state-icon"><i class="fas fa-star"></i></div>
-                <p>No astrologers yet</p>
+            @endforeach
+        </div>
+    </div>
+
+    <!-- Expiring Soon -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-lighter overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-lighter flex justify-between items-center bg-danger/5">
+            <h3 class="font-black text-dark uppercase tracking-wide text-sm flex items-center gap-2">
+                <i class="fas fa-exclamation-triangle text-danger text-xs animate-pulse"></i> Expiring Subscriptions
+            </h3>
+        </div>
+        <div class="p-4 space-y-3">
+            @php
+                $expiringItems = [
+                    ['plan' => 'Premium Monthly', 'user' => 'Rahul Sharma', 'days' => '2 Days'],
+                    ['plan' => 'Basic Yearly', 'user' => 'Priya Patel', 'days' => '4 Days'],
+                    ['plan' => 'Premium Yearly', 'user' => 'Amit Kumar', 'days' => '5 Days'],
+                    ['plan' => 'Basic Monthly', 'user' => 'Sneha Gupta', 'days' => '6 Days'],
+                    ['plan' => 'Premium Monthly', 'user' => 'Vikram Singh', 'days' => '7 Days'],
+                ];
+            @endphp
+            @foreach($expiringItems as $item)
+            <div class="flex items-center justify-between p-3 rounded-xl border-l-[3px] border-danger/30 bg-light/20">
+                <div>
+                    <div class="text-xs font-black text-dark">{{ $item['plan'] }}</div>
+                    <div class="text-[10px] text-gray font-semibold italic">User: {{ $item['user'] }}</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-[10px] font-black text-danger uppercase tracking-tighter">Expires in</div>
+                    <div class="text-xs font-bold text-dark">{{ $item['days'] }}</div>
+                </div>
             </div>
-        @endif
+            @endforeach
+        </div>
     </div>
 </div>
 @endsection
