@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateAstrologerProfilePhotoRequest;
 use App\Http\Requests\UpdateAstrologerProfileRequest;
 use App\Http\Requests\UpdateAstrologerSkillRequest;
 use App\Http\Requests\UpdateAstrologerOtherDetailsRequest;
+use App\Http\Requests\UpdateAstrologerHomeRequest;
 use App\Models\User;
 use App\Models\Astrologer;
 use App\Models\AstrologerSkill;
@@ -471,6 +472,76 @@ class AstrologerAuthController extends Controller
                 'message' => 'An error occurred while updating the profile.',
             ], 500);
         }
+    }
+
+    /**
+     * Get the astrologer home status (availability + pricing) for the authenticated astrologer.
+     *
+     * @return JsonResponse
+     */
+    public function getHomeStatus(): JsonResponse
+    {
+        $user = auth()->user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'astrologer' => $astrologer->only([
+                    'chat_enabled',
+                    'call_enabled',
+                    'video_call_enabled',
+                    'chat_rate_per_minute',
+                    'call_rate_per_minute',
+                    'video_call_rate_per_minute',
+                    'po_at_5_enabled',
+                    'po_at_5_rate_per_minute',
+                    'po_at_5_sessions',
+                    'updated_at',
+                ]),
+            ],
+        ], 200);
+    }
+
+    /**
+     * Update astrologer home status and pricing toggles.
+     *
+     * @param UpdateAstrologerHomeRequest $request
+     * @return JsonResponse
+     */
+    public function updateHomeStatus(UpdateAstrologerHomeRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $validated = $request->validated();
+
+        // Update only fields provided by the request
+        $astrologer->fill($validated);
+        $astrologer->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Home status updated successfully.',
+            'data' => [
+                'astrologer' => $astrologer,
+            ],
+        ], 200);
     }
 
     /**

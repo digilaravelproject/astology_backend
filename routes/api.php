@@ -23,6 +23,10 @@ Route::prefix('v1')->group(function () {
         // Update astrologer profile endpoint (requires authentication)
         Route::middleware('auth:sanctum')->put('/profile', [AstrologerAuthController::class, 'updateProfile']);
 
+        // Home status (availability + pricing) endpoints (requires authentication)
+        Route::middleware('auth:sanctum')->get('/home', [AstrologerAuthController::class, 'getHomeStatus']);
+        Route::middleware('auth:sanctum')->put('/home', [AstrologerAuthController::class, 'updateHomeStatus']);
+
         // Update astrologer skill details (requires authentication)
         Route::middleware('auth:sanctum')->put('/profile/skills', [AstrologerAuthController::class, 'updateSkill']);
 

@@ -27,6 +27,15 @@ class Astrologer extends Model
         'otp_expires_at',
         'otp_verified_at',
         'status',
+        'chat_enabled',
+        'call_enabled',
+        'video_call_enabled',
+        'chat_rate_per_minute',
+        'call_rate_per_minute',
+        'video_call_rate_per_minute',
+        'po_at_5_enabled',
+        'po_at_5_rate_per_minute',
+        'po_at_5_sessions',
     ];
 
     protected $casts = [
@@ -35,6 +44,15 @@ class Astrologer extends Model
         'date_of_birth' => 'date',
         'otp_expires_at' => 'datetime',
         'otp_verified_at' => 'datetime',
+        'chat_enabled' => 'boolean',
+        'call_enabled' => 'boolean',
+        'video_call_enabled' => 'boolean',
+        'chat_rate_per_minute' => 'decimal:2',
+        'call_rate_per_minute' => 'decimal:2',
+        'video_call_rate_per_minute' => 'decimal:2',
+        'po_at_5_enabled' => 'boolean',
+        'po_at_5_rate_per_minute' => 'decimal:2',
+        'po_at_5_sessions' => 'integer',
     ];
 
     /**
