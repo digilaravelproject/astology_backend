@@ -21,5 +21,8 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // Seed notices for the notice board.
+        $this->call(NoticeSeeder::class);
     }
 }

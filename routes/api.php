@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\AstrologerAuthController;
 use App\Http\Controllers\Api\BlogController;
 use App\Http\Controllers\Api\FoundersWordController;
 use App\Http\Controllers\Api\RemedyController;
+use App\Http\Controllers\Api\NoticeController;
+use App\Http\Controllers\Api\TrainingVideoController;
 use App\Http\Controllers\Api\UserAuthController;
 
 Route::prefix('v1')->group(function () {
@@ -42,6 +44,10 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth:sanctum')->get('/community/followers', [AstrologerAuthController::class, 'getFollowers']);
         Route::middleware('auth:sanctum')->post('/community/followers/{userId}/toggle-like', [AstrologerAuthController::class, 'toggleFollowerLike']);
         Route::middleware('auth:sanctum')->get('/community/favorites', [AstrologerAuthController::class, 'getFavorites']);
+
+        // Training videos (public)
+        Route::get('/training-videos', [TrainingVideoController::class, 'index']);
+        Route::get('/training-videos/{id}', [TrainingVideoController::class, 'show']);
     });
 
     Route::prefix('user')->group(function () {
@@ -71,5 +77,9 @@ Route::prefix('v1')->group(function () {
         // Blogs endpoints (public)
         Route::get('/blogs', [BlogController::class, 'index']);
         Route::get('/blogs/{id}', [BlogController::class, 'show']);
+
+        // Notices endpoints (public)
+        Route::get('/notices', [NoticeController::class, 'index']);
+
     });
 });
