@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\UpdateUserProfilePhotoRequest;
 use App\Http\Requests\UpdateUserProfileRequest;
+use App\Models\Astrologer;
+use App\Models\AstrologerCommunity;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -338,4 +340,167 @@ class UserAuthController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Follow / unfollow an astrologer (toggle follow state).
+     */
+    public function toggleFollowAstrologer(Request $request, $astrologerId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authenticated user not found or not a regular user.',
+            ], 404);
+        }
+
+        $astrologer = Astrologer::find($astrologerId);
+        if (!$astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer not found.',
+            ], 404);
+        }
+
+        $community = AstrologerCommunity::where('astrologer_id', $astrologer->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        // If already following, unfollow by deleting the relationship record.
+        if ($community && $community->is_liked) {
+            $community->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Astrologer unfollowed.',
+                'data' => [
+                    'astrologer_id' => $astrologer->id,
+                    'is_following' => false,
+                    'followed_at' => null,
+                ],
+            ], 200);
+        }
+
+        // Otherwise create (or update) the follow relationship.
+        if (! $community) {
+            $community = new AstrologerCommunity([
+                'astrologer_id' => $astrologer->id,
+                'user_id' => $user->id,
+            ]);
+        }
+
+        $community->is_liked = true;
+        $community->liked_at = Carbon::now();
+        $community->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Astrologer followed.',
+            'data' => [
+                'astrologer_id' => $astrologer->id,
+                'is_following' => true,
+                'followed_at' => $community->liked_at,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Block an astrologer (will stop follow and record blocked status).
+     */
+    public function blockAstrologer(Request $request, $astrologerId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authenticated user not found or not a regular user.',
+            ], 404);
+        }
+
+        $astrologer = Astrologer::find($astrologerId);
+        if (!$astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer not found.',
+            ], 404);
+        }
+
+        $community = AstrologerCommunity::firstOrNew([
+            'astrologer_id' => $astrologer->id,
+            'user_id' => $user->id,
+        ]);
+
+        $community->is_liked = false;
+        $community->liked_at = null;
+        $community->is_blocked = true;
+        $community->blocked_at = Carbon::now();
+        $community->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Astrologer blocked.',
+            'data' => [
+                'astrologer_id' => $astrologer->id,
+                'is_blocked' => true,
+                'blocked_at' => $community->blocked_at,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Report an astrologer with a reason.
+     */
+    public function reportAstrologer(Request $request, $astrologerId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authenticated user not found or not a regular user.',
+            ], 404);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $astrologer = Astrologer::find($astrologerId);
+        if (!$astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer not found.',
+            ], 404);
+        }
+
+        $community = AstrologerCommunity::firstOrNew([
+            'astrologer_id' => $astrologer->id,
+            'user_id' => $user->id,
+        ]);
+
+        $community->report_reason = $request->input('reason');
+        $community->reported_at = Carbon::now();
+        $community->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Astrologer reported successfully.',
+            'data' => [
+                'astrologer_id' => $astrologer->id,
+                'report_reason' => $community->report_reason,
+                'reported_at' => $community->reported_at,
+            ],
+        ], 200);
+    }
 }
+

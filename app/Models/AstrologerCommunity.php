@@ -16,11 +16,18 @@ class AstrologerCommunity extends Model
         'user_id',
         'is_liked',
         'liked_at',
+        'is_blocked',
+        'blocked_at',
+        'report_reason',
+        'reported_at',
     ];
 
     protected $casts = [
         'is_liked' => 'boolean',
         'liked_at' => 'datetime',
+        'is_blocked' => 'boolean',
+        'blocked_at' => 'datetime',
+        'reported_at' => 'datetime',
     ];
 
     public function astrologer()

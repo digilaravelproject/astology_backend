@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AstrologerAuthController;
 use App\Http\Controllers\Api\BlogController;
+use App\Http\Controllers\Api\AstrologerController;
 use App\Http\Controllers\Api\FoundersWordController;
 use App\Http\Controllers\Api\RemedyController;
 use App\Http\Controllers\Api\NoticeController;
@@ -80,6 +81,19 @@ Route::prefix('v1')->group(function () {
 
         // Notices endpoints (public)
         Route::get('/notices', [NoticeController::class, 'index']);
+
+        // Astrologers endpoints (public)
+        Route::get('/astrologers', [AstrologerController::class, 'index']);
+        Route::get('/astrologers/{id}', [AstrologerController::class, 'show']);
+
+        // Follow / unfollow astrologer (requires auth)
+        Route::middleware('auth:sanctum')->post('/astrologers/{id}/follow', [UserAuthController::class, 'toggleFollowAstrologer']);
+
+        // Block astrologer (requires auth)
+        Route::middleware('auth:sanctum')->post('/astrologers/{id}/block', [UserAuthController::class, 'blockAstrologer']);
+
+        // Report astrologer (requires auth)
+        Route::middleware('auth:sanctum')->post('/astrologers/{id}/report', [UserAuthController::class, 'reportAstrologer']);
 
     });
 });
