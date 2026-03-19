@@ -16,7 +16,10 @@ class UserController extends Controller
      */
     public function index(Request $request)
     {
-        $query = User::query()->latest();
+        // Default to regular users unless a specific type is requested
+        $type = $request->input('type', 'user');
+
+        $query = User::query()->latest()->where('user_type', $type);
 
         // Filtering logic
         if ($request->filled('search')) {
@@ -28,23 +31,21 @@ class UserController extends Controller
             });
         }
 
-        if ($request->filled('type')) {
-            $query->where('user_type', $request->input('type'));
-        }
-
         if ($request->filled('status')) {
             $status = $request->input('status');
-            $query->whereHas('astrologer', function($q) use ($status) {
-                $q->where('status', $status);
-            });
+            if (in_array($status, ['active', 'inactive'])) {
+                $query->where('profile_completed', $status === 'active');
+            }
         }
 
-        // Include astrologer relationship
-        $query->with('astrologer');
+        // Include relationships we show on the list
+        $query->with(['astrologer', 'wallet']);
 
         $users = $query->paginate(15)->appends($request->all());
 
-        return view('admin.users.index', compact('users'));
+        $totalUsers = User::where('user_type', 'user')->count();
+
+        return view('admin.users.index', compact('users', 'totalUsers', 'type'));
     }
 
     /**
@@ -94,6 +95,15 @@ class UserController extends Controller
     {
         $user = User::with('astrologer')->findOrFail($id);
         return view('admin.users.form', compact('user'));
+    }
+
+    /**
+     * Display the specified resource.
+     */
+    public function show($id)
+    {
+        $user = User::with(['astrologer', 'wallet'])->findOrFail($id);
+        return view('admin.users.show', compact('user'));
     }
 
     /**

@@ -101,11 +101,11 @@
                                     <i class="fas fa-circle text-[6px]"></i> User Wallet
                                 </a>
                             </li>
-                            <li>
+                            <?php /*<li>
                                 <a href="{{ route('admin.users.referrals') }}" 
                                    class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.users.referrals') ? 'text-primary' : 'text-gray hover:text-primary' }}">
                                     <i class="fas fa-circle text-[6px]"></i> Referral Tracking
-                                </a>
+                                </a> */?>
                             </li>
                         </ul>
                     </li>
@@ -204,6 +204,64 @@
                                 <a href="{{ route('admin.blogs.create') }}" 
                                    class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.blogs.create') ? 'text-primary' : 'text-gray hover:text-primary' }}">
                                     <i class="fas fa-circle text-[6px]"></i> Create Blog
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- Matrimony -->
+                    <li x-data="{ open: {{ request()->routeIs('admin.matrimonies.*') ? 'true' : 'false' }} }">
+                        <button @click="open = !open" 
+                                class="w-full flex items-center justify-between px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                       {{ request()->routeIs('admin.matrimonies.*')
+                                          ? 'bg-sidebar-hover text-primary'
+                                          : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-heart w-5 text-center text-base"></i>
+                                <span>Matrimony</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-[10px] transition-transform duration-300" :class="open ? 'rotate-90' : ''"></i>
+                        </button>
+                        <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
+                            <li>
+                                <a href="{{ route('admin.matrimonies.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.matrimonies.index') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> All Profiles
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.matrimonies.create') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.matrimonies.create') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Create Profile
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- Remedies -->
+                    <li x-data="{ open: {{ request()->routeIs('admin.remedies.*') ? 'true' : 'false' }} }">
+                        <button @click="open = !open" 
+                                class="w-full flex items-center justify-between px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                       {{ request()->routeIs('admin.remedies.*')
+                                          ? 'bg-sidebar-hover text-primary'
+                                          : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-prescription-bottle-alt w-5 text-center text-base"></i>
+                                <span>Remedies</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-[10px] transition-transform duration-300" :class="open ? 'rotate-90' : ''"></i>
+                        </button>
+                        <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
+                            <li>
+                                <a href="{{ route('admin.remedies.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.remedies.index') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> All Remedies
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.remedies.create') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.remedies.create') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Add Remedy
                                 </a>
                             </li>
                         </ul>

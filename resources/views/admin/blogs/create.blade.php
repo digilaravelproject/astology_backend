@@ -24,15 +24,19 @@
             <p class="text-sm text-gray font-medium mt-2 italic">Crafting educational experiences for the global spiritual community.</p>
         </div>
         <div class="flex gap-4">
-            <button class="px-8 py-4 bg-white border-2 border-gray-lighter text-dark text-[11px] font-black uppercase rounded-2xl hover:bg-light transition-all">Save Architecture</button>
-            <button class="px-10 py-4 bg-dark text-white text-[11px] font-black uppercase rounded-2xl hover:bg-primary transition-all shadow-xl shadow-dark/20 flex items-center gap-3">
-                <i class="fas fa-paper-plane"></i> Finalize & Post
+            <button form="blogForm" type="submit" class="px-8 py-4 bg-white border-2 border-gray-lighter text-dark text-[11px] font-black uppercase rounded-2xl hover:bg-light transition-all">Save Draft</button>
+            <button form="blogForm" type="submit" class="px-10 py-4 bg-dark text-white text-[11px] font-black uppercase rounded-2xl hover:bg-primary transition-all shadow-xl shadow-dark/20 flex items-center gap-3">
+                <i class="fas fa-paper-plane"></i> Publish
             </button>
         </div>
     </div>
 
     <!-- Blog Form -->
-    <form action="#" method="POST" class="max-w-[1200px]">
+    <form id="blogForm" action="{{ isset($blog) && $blog->id ? route('admin.blogs.update', $blog->id) : route('admin.blogs.store') }}" method="POST" class="max-w-[1200px]">
+        @csrf
+        @if(isset($blog) && $blog->id)
+            @method('PUT')
+        @endif
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-10">
             
             <!-- Mid Column: Article & SEO -->
@@ -48,33 +52,20 @@
                     <div class="space-y-8">
                         <div class="group">
                             <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3 group-focus-within:text-dark transition-colors">Manifesto Title</label>
-                            <input type="text" placeholder="e.g. The Quantum Mechanics of Mercury Retrograde..." class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-lg font-black text-dark placeholder:text-gray-light focus:bg-white focus:border-primary/20 focus:ring-0 transition-all">
+                            <input type="text" name="title" value="{{ old('title', $blog->title ?? '') }}" placeholder="e.g. The Quantum Mechanics of Mercury Retrograde..." class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-lg font-black text-dark placeholder:text-gray-light focus:bg-white focus:border-primary/20 focus:ring-0 transition-all">
+                            @error('title') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div class="group">
-                                <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Knowledge Segment</label>
-                                <div class="relative">
-                                    <select class="w-full bg-light/30 border-none px-6 py-5 rounded-[24px] text-xs font-black text-dark appearance-none cursor-pointer focus:bg-white transition-all">
-                                        <option>Select Category</option>
-                                        <option>Vedic Science</option>
-                                        <option>Tarot Logic</option>
-                                        <option>Vastu Architecture</option>
-                                        <option>Daily Horoscope</option>
-                                    </select>
-                                    <i class="fas fa-chevron-down absolute right-6 top-1/2 -translate-y-1/2 text-gray-light pointer-events-none"></i>
-                                </div>
+                                <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Subtitle</label>
+                                <input type="text" name="subtitle" value="{{ old('subtitle', $blog->subtitle ?? '') }}" placeholder="Add a subtitle or summary..." class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-xs font-black text-dark placeholder:text-gray-light focus:bg-white focus:border-primary/20 focus:ring-0 transition-all">
+                                @error('subtitle') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                             </div>
                             <div class="group">
-                                <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Attributed Curator</label>
-                                <div class="relative">
-                                    <select class="w-full bg-light/30 border-none px-6 py-5 rounded-[24px] text-xs font-black text-dark appearance-none cursor-pointer focus:bg-white transition-all">
-                                        <option>Admin Executive</option>
-                                        <option>Aarti Sharma</option>
-                                        <option>Pt. Rahul Vyas</option>
-                                    </select>
-                                    <i class="fas fa-user-edit absolute right-6 top-1/2 -translate-y-1/2 text-gray-light pointer-events-none"></i>
-                                </div>
+                                <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Author</label>
+                                <input type="text" name="author" value="{{ old('author', $blog->author ?? '') }}" placeholder="e.g. Dr. Vinay Bajrangi" class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-xs font-black text-dark placeholder:text-gray-light focus:bg-white focus:border-primary/20 focus:ring-0 transition-all">
+                                @error('author') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                             </div>
                         </div>
                     </div>
@@ -86,12 +77,10 @@
                         <span class="w-8 h-px bg-info/30"></span> 02. Narrative Body
                     </h2>
                     
-                    <div class="min-h-[400px] bg-light/20 border-2 border-dashed border-gray-lighter rounded-[32px] p-10 flex flex-col items-center justify-center text-center group hover:bg-white hover:border-info/30 transition-all">
-                        <div class="w-20 h-20 bg-white shadow-xl rounded-3xl flex items-center justify-center text-info text-2xl mb-6 transform group-hover:scale-110 transition-all">
-                            <i class="fas fa-pen-nib"></i>
-                        </div>
-                        <h4 class="text-xl font-bold text-dark mb-2">Editor Initialized</h4>
-                        <p class="text-sm text-gray font-medium max-w-sm italic">Rich text ecosystem ready for deep-dive spiritual composition.</p>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Article Content</label>
+                        <textarea name="content" rows="16" class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-sm font-medium text-dark placeholder:text-gray-light focus:bg-white focus:border-primary/20 focus:ring-0 transition-all">{{ old('content', $blog->content ?? '') }}</textarea>
+                        @error('content') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                     </div>
                 </div>
 
@@ -167,6 +156,27 @@
                                 <i class="fas fa-plus text-[10px]"></i>
                             </button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Publish Settings -->
+                <div class="bg-white p-8 rounded-[48px] border border-gray-lighter shadow-sm">
+                    <h2 class="text-[10px] font-black text-dark uppercase tracking-[0.3em] mb-6">Publication Settings</h2>
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="text-xs font-black text-gray uppercase tracking-widest mb-2">Status</div>
+                            <div class="flex items-center gap-3">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="is_active" value="1" {{ old('is_active', $blog->is_active ?? false) == 1 ? 'checked' : '' }} class="form-radio h-4 w-4 text-primary" />
+                                    <span class="text-xs font-bold text-dark">Active</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="radio" name="is_active" value="0" {{ old('is_active', $blog->is_active ?? false) == 0 ? 'checked' : '' }} class="form-radio h-4 w-4 text-gray" />
+                                    <span class="text-xs font-bold text-dark">Inactive</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="text-xs font-black text-gray uppercase tracking-widest">Created: {{ optional($blog->created_at)->format('d M Y') ?? 'N/A' }}</div>
                     </div>
                 </div>
 

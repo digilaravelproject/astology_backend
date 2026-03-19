@@ -76,6 +76,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the wallet associated with the user.
+     */
+    public function wallet()
+    {
+        return $this->hasOne(\App\Models\Wallet::class);
+    }
+
+    /**
      * Get the community records where this user is a follower.
      */
     public function astrologerCommunityRecords()

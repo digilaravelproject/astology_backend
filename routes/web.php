@@ -26,16 +26,19 @@ Route::prefix('admin')->group(function () {
         // User management routes
         Route::resource('users', UserController::class)->names('admin.users');
         Route::post('users/{id}/toggle-status', [UserController::class, 'toggleStatus'])->name('admin.users.toggle-status');
-        Route::get('users-wallet', function() { return view('admin.users.wallet'); })->name('admin.users.wallet');
+        Route::get('users-wallet', [\App\Http\Controllers\Admin\WalletController::class, 'index'])->name('admin.users.wallet');
+        Route::post('users-wallet/topup', [\App\Http\Controllers\Admin\WalletController::class, 'topup'])->name('admin.users.wallet.topup');
+        Route::get('users-wallet/{user}/transactions', [\App\Http\Controllers\Admin\WalletController::class, 'transactions'])->name('admin.users.wallet.transactions');
+        Route::get('users-wallet/export', [\App\Http\Controllers\Admin\WalletController::class, 'exportCsv'])->name('admin.users.wallet.export');
         Route::get('users-referrals', function() { return view('admin.users.referrals'); })->name('admin.users.referrals');
 
         // Astrologer Management
-        Route::prefix('astrologers')->group(function() {
-            Route::get('/', function() { return view('admin.astrologers.index'); })->name('admin.astrologers.index');
-            Route::get('/performance', function() { return view('admin.astrologers.performance'); })->name('admin.astrologers.performance');
-            Route::get('/reviews', function() { return view('admin.astrologers.reviews'); })->name('admin.astrologers.reviews');
-            Route::get('/live', function() { return view('admin.astrologers.live'); })->name('admin.astrologers.live');
-        });
+        Route::resource('astrologers', \App\Http\Controllers\Admin\AstrologerController::class)->names('admin.astrologers');
+
+        // Legacy / additional pages (keep if still used elsewhere)
+        Route::get('astrologers/performance', function() { return view('admin.astrologers.performance'); })->name('admin.astrologers.performance');
+        Route::get('astrologers/reviews', function() { return view('admin.astrologers.reviews'); })->name('admin.astrologers.reviews');
+        Route::get('astrologers/live', function() { return view('admin.astrologers.live'); })->name('admin.astrologers.live');
 
         // Order Management
         Route::prefix('orders')->group(function() {
@@ -44,11 +47,14 @@ Route::prefix('admin')->group(function () {
         });
 
         // Blog Management
-        Route::prefix('blogs')->group(function() {
-            Route::get('/', function() { return view('admin.blogs.index'); })->name('admin.blogs.index');
-            Route::get('/create', function() { return view('admin.blogs.create'); })->name('admin.blogs.create');
-        });
+        Route::resource('blogs', \App\Http\Controllers\Admin\BlogController::class)->names('admin.blogs');
 
+        // Matrimony Management
+        Route::resource('matrimonies', \App\Http\Controllers\Admin\MatrimonyController::class)->names('admin.matrimonies');
+        Route::post('matrimonies/{id}/toggle-status', [\App\Http\Controllers\Admin\MatrimonyController::class, 'toggleStatus'])->name('admin.matrimonies.toggle-status');
+        // Remedy Management
+        Route::resource('remedies', \App\Http\Controllers\Admin\RemedyController::class)->names('admin.remedies');
+        Route::post('remedies/{id}/toggle-status', [\App\Http\Controllers\Admin\RemedyController::class, 'toggleStatus'])->name('admin.remedies.toggle-status');
         // Plan Management
         Route::prefix('plans')->group(function() {
             Route::get('/', function() { return view('admin.plans.index'); })->name('admin.plans.index');

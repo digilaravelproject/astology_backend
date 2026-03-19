@@ -14,6 +14,7 @@ class TrainingVideoController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        
         $query = TrainingVideo::where('is_active', true);
 
         if ($request->filled('type')) {

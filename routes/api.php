@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\RemedyController;
 use App\Http\Controllers\Api\NoticeController;
 use App\Http\Controllers\Api\TrainingVideoController;
 use App\Http\Controllers\Api\UserAuthController;
+use App\Http\Controllers\Api\MatrimonyController;
+use App\Http\Controllers\Api\WalletController;
 
 Route::prefix('v1')->group(function () {
     Route::prefix('astrologer')->group(function () {
@@ -94,6 +96,19 @@ Route::prefix('v1')->group(function () {
 
         // Report astrologer (requires auth)
         Route::middleware('auth:sanctum')->post('/astrologers/{id}/report', [UserAuthController::class, 'reportAstrologer']);
+
+        // Wallet endpoints (requires auth)
+        Route::middleware('auth:sanctum')->get('/wallet', [WalletController::class, 'show']);
+        Route::middleware('auth:sanctum')->post('/wallet/topup', [WalletController::class, 'createTopup']);
+        Route::middleware('auth:sanctum')->post('/wallet/topup/verify', [WalletController::class, 'verifyTopup']);
+        Route::middleware('auth:sanctum')->get('/wallet/transactions', [WalletController::class, 'transactions']);
+        Route::middleware('auth:sanctum')->get('/wallet/transactions/{id}', [WalletController::class, 'transactionDetail']);
+
+        // Matrimony endpoints (requires auth)
+        Route::middleware('auth:sanctum')->post('/matrimony/profile', [MatrimonyController::class, 'createProfile']);
+        Route::middleware('auth:sanctum')->get('/matrimony/profiles', [MatrimonyController::class, 'listProfiles']);
+        Route::middleware('auth:sanctum')->get('/matrimony/profiles/{id}', [MatrimonyController::class, 'showProfile']);
+        Route::middleware('auth:sanctum')->get('/matrimony/search', [MatrimonyController::class, 'searchProfiles']);
 
     });
 });
