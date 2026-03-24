@@ -310,7 +310,8 @@ class AstrologerAuthController extends Controller
     public function getProfile($userId): JsonResponse
     {
         try {
-            $user = User::with('astrologer')->find($userId);
+            // Eager load astrologer profile and related skill + other details
+            $user = User::with(['astrologer.skill', 'astrologer.otherDetails'])->find($userId);
 
             if (!$user) {
                 return response()->json([
@@ -331,6 +332,11 @@ class AstrologerAuthController extends Controller
                 'data' => [
                     'user' => $user,
                     'astrologer' => $user->astrologer,
+                    'skill' => $user->astrologer->skill ?? null,
+                    'other_details' => $user->astrologer->otherDetails ?? null,
+                    // convenience top-level values
+                    'website_link' => optional($user->astrologer->otherDetails)->website_link,
+                    'instagram_username' => optional($user->astrologer->otherDetails)->instagram_username,
                 ],
             ], 200);
 
