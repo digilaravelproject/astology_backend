@@ -84,10 +84,26 @@ class User extends Authenticatable
     }
 
     /**
+     * Get the notifications for this user.
+     */
+    public function notifications()
+    {
+        return $this->hasMany(\App\Models\AppNotification::class);
+    }
+
+    /**
      * Get the community records where this user is a follower.
      */
     public function astrologerCommunityRecords()
     {
         return $this->hasMany(\App\Models\AstrologerCommunity::class);
+    }
+
+    /**
+     * Get reviews made by this user.
+     */
+    public function reviews()
+    {
+        return $this->hasMany(\App\Models\AstrologerReview::class);
     }
 }

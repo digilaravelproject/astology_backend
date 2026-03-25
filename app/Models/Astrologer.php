@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\AstrologerSkill;
 use App\Models\AstrologerOtherDetail;
 use App\Models\AstrologerCommunity;
+use App\Models\AstrologerBankAccount;
 
 class Astrologer extends Model
 {
@@ -41,6 +42,7 @@ class Astrologer extends Model
     protected $casts = [
         'areas_of_expertise' => 'array',
         'languages' => 'array',
+        'availability' => 'array',
         'date_of_birth' => 'date',
         'otp_expires_at' => 'datetime',
         'otp_verified_at' => 'datetime',
@@ -93,5 +95,23 @@ class Astrologer extends Model
     public function favoriteCommunity()
     {
         return $this->hasMany(AstrologerCommunity::class)->where('is_liked', true);
+    }
+
+    /**
+     * Get reviews for this astrologer.
+     */
+    public function reviews()
+    {
+        return $this->hasMany(AstrologerReview::class);
+    }
+
+    public function phoneNumbers()
+    {
+        return $this->hasMany(AstrologerPhoneNumber::class);
+    }
+
+    public function bankAccounts()
+    {
+        return $this->hasMany(AstrologerBankAccount::class);
     }
 }

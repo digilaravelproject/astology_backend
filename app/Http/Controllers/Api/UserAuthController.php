@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateUserProfileRequest;
 use App\Models\Astrologer;
 use App\Models\AstrologerCommunity;
 use App\Models\User;
+use App\Services\NotificationHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -60,6 +61,14 @@ class UserAuthController extends Controller
             $user->save();
 
             DB::commit();
+
+            // Notify user about generated OTP (for audit/confirmation record).
+            NotificationHelper::send(
+                $user->id,
+                'OTP generated',
+                "A new OTP code was generated for your login.",
+                ['phone' => $phone]
+            );
 
             // For development/testing (no external SMS), return OTP in response.
             return response()->json([
@@ -120,6 +129,13 @@ class UserAuthController extends Controller
         $user->otp_expires_at = null;
         $user->otp_verified_at = Carbon::now();
         $user->save();
+
+        NotificationHelper::send(
+            $user->id,
+            'OTP verified',
+            'You have successfully verified your OTP and are now logged in.',
+            ['phone' => $phone]
+        );
 
         // Issue Sanctum token
         $token = $user->createToken('auth_token')->plainTextToken;
@@ -228,6 +244,13 @@ class UserAuthController extends Controller
 
             DB::commit();
 
+            NotificationHelper::send(
+                $user->id,
+                'Profile updated',
+                'Your profile has been successfully updated.',
+                []
+            );
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Profile updated successfully.',
@@ -282,6 +305,13 @@ class UserAuthController extends Controller
         $user->profile_photo = $storedPath;
         $user->save();
 
+        NotificationHelper::send(
+            $user->id,
+            'Profile photo updated',
+            'Your profile photo has been successfully updated.',
+            []
+        );
+
         return response()->json([
             'status' => 'success',
             'message' => 'Profile photo updated successfully.',
@@ -322,6 +352,13 @@ class UserAuthController extends Controller
             ]);
 
             DB::commit();
+
+            NotificationHelper::send(
+                $user->id,
+                'Profile updated',
+                'Your profile has been successfully updated.',
+                []
+            );
 
             return response()->json([
                 'status' => 'success',
@@ -371,6 +408,13 @@ class UserAuthController extends Controller
         if ($community && $community->is_liked) {
             $community->delete();
 
+            NotificationHelper::send(
+                $user->id,
+                'Astrologer unfollowed',
+                "You have unfollowed astrologer {$astrologer->user->name}.",
+                ['astrologer_id' => $astrologer->id]
+            );
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Astrologer unfollowed.',
@@ -393,6 +437,22 @@ class UserAuthController extends Controller
         $community->is_liked = true;
         $community->liked_at = Carbon::now();
         $community->save();
+
+        // Notify user
+        NotificationHelper::send(
+            $user->id,
+            'Astrologer followed',
+            "You are now following astrologer {$astrologer->user->name}.",
+            ['astrologer_id' => $astrologer->id]
+        );
+
+        // Notify astrologer
+        NotificationHelper::send(
+            $astrologer->user->id,
+            'New follower',
+            "{$user->name} has started following you.",
+            ['user_id' => $user->id]
+        );
 
         return response()->json([
             'status' => 'success',
@@ -437,6 +497,20 @@ class UserAuthController extends Controller
         $community->is_blocked = true;
         $community->blocked_at = Carbon::now();
         $community->save();
+
+        NotificationHelper::send(
+            $user->id,
+            'Astrologer blocked',
+            "You have blocked astrologer {$astrologer->user->name}.",
+            ['astrologer_id' => $astrologer->id]
+        );
+
+        NotificationHelper::send(
+            $astrologer->user->id,
+            'You were blocked',
+            "User {$user->name} has blocked you.",
+            ['user_id' => $user->id]
+        );
 
         return response()->json([
             'status' => 'success',
@@ -491,6 +565,20 @@ class UserAuthController extends Controller
         $community->report_reason = $request->input('reason');
         $community->reported_at = Carbon::now();
         $community->save();
+
+        NotificationHelper::send(
+            $user->id,
+            'Astrologer reported',
+            "You have reported astrologer {$astrologer->user->name}.",
+            ['astrologer_id' => $astrologer->id, 'reason' => $community->report_reason]
+        );
+
+        NotificationHelper::send(
+            $astrologer->user->id,
+            'You were reported',
+            "Your account has been reported by user {$user->name}.",
+            ['user_id' => $user->id, 'reason' => $community->report_reason]
+        );
 
         return response()->json([
             'status' => 'success',

@@ -12,6 +12,8 @@ use App\Http\Controllers\Api\TrainingVideoController;
 use App\Http\Controllers\Api\UserAuthController;
 use App\Http\Controllers\Api\MatrimonyController;
 use App\Http\Controllers\Api\WalletController;
+use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\NotificationController;
 
 Route::prefix('v1')->group(function () {
     Route::prefix('astrologer')->group(function () {
@@ -47,6 +49,21 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth:sanctum')->get('/community/followers', [AstrologerAuthController::class, 'getFollowers']);
         Route::middleware('auth:sanctum')->post('/community/followers/{userId}/toggle-like', [AstrologerAuthController::class, 'toggleFollowerLike']);
         Route::middleware('auth:sanctum')->get('/community/favorites', [AstrologerAuthController::class, 'getFavorites']);
+
+        // Astrologer phone numbers (requires authentication)
+        Route::middleware('auth:sanctum')->post('/phone-numbers', [AstrologerAuthController::class, 'addPhoneNumber']);
+        Route::middleware('auth:sanctum')->get('/phone-numbers', [AstrologerAuthController::class, 'getPhoneNumbers']);
+        Route::middleware('auth:sanctum')->post('/phone-numbers/{id}/verify', [AstrologerAuthController::class, 'verifyPhoneNumber']);
+        Route::middleware('auth:sanctum')->post('/phone-numbers/{id}/set-default', [AstrologerAuthController::class, 'setDefaultPhoneNumber']);
+
+        // Astrologer bank accounts (requires authentication)
+        Route::middleware('auth:sanctum')->get('/bank-accounts', [AstrologerAuthController::class, 'getBankAccounts']);
+        Route::middleware('auth:sanctum')->post('/bank-accounts', [AstrologerAuthController::class, 'addBankAccount']);
+        Route::middleware('auth:sanctum')->post('/bank-accounts/{id}/set-default', [AstrologerAuthController::class, 'setDefaultBankAccount']);
+
+        // Astrologer availability (requires authentication)
+        Route::middleware('auth:sanctum')->get('/availability', [AstrologerAuthController::class, 'getAvailability']);
+        Route::middleware('auth:sanctum')->put('/availability', [AstrologerAuthController::class, 'setAvailability']);
 
         // Training videos (public)
         Route::get('/training-videos', [TrainingVideoController::class, 'index']);
@@ -100,6 +117,18 @@ Route::prefix('v1')->group(function () {
         // Wallet endpoints (requires auth)
         Route::middleware('auth:sanctum')->get('/wallet', [WalletController::class, 'show']);
         Route::middleware('auth:sanctum')->post('/wallet/topup', [WalletController::class, 'createTopup']);
+
+        // Reviews endpoints
+        Route::middleware('auth:sanctum')->post('/reviews', [ReviewController::class, 'store']);
+        Route::middleware('auth:sanctum')->post('/reviews/{reviewId}/reply', [ReviewController::class, 'reply']);
+        Route::get('/reviews', [ReviewController::class, 'index']);
+
+        // Notification endpoints
+        Route::get('/notifications/count', [NotificationController::class, 'count']);
+        Route::get('/notifications', [NotificationController::class, 'list']);
+        Route::get('/notifications/{id}', [NotificationController::class, 'show']);
+        Route::middleware('auth:sanctum')->put('/notifications/{id}/mark-read', [NotificationController::class, 'markRead']);
+
         Route::middleware('auth:sanctum')->post('/wallet/topup/verify', [WalletController::class, 'verifyTopup']);
         Route::middleware('auth:sanctum')->get('/wallet/transactions', [WalletController::class, 'transactions']);
         Route::middleware('auth:sanctum')->get('/wallet/transactions/{id}', [WalletController::class, 'transactionDetail']);
