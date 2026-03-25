@@ -64,6 +64,17 @@
             </form>
         </div>
         <div class="w-full sm:w-48">
+            <label class="text-[10px] font-black text-gray uppercase tracking-widest mb-2 block">Type</label>
+            <form method="GET" action="{{ route('admin.blogs.index') }}">
+                <select name="type" onchange="this.form.submit()" class="w-full bg-light/50 border border-gray-lighter px-4 py-3.5 rounded-2xl text-xs font-bold focus:outline-none focus:border-dark transition-all appearance-none cursor-pointer">
+                    <option value="">All Types</option>
+                    @foreach(\App\Models\Blog::types() as $value => $label)
+                        <option value="{{ $value }}" {{ request('type') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </form>
+        </div>
+        <div class="w-full sm:w-48">
             <label class="text-[10px] font-black text-gray uppercase tracking-widest mb-2 block">Status</label>
             <form method="GET" action="{{ route('admin.blogs.index') }}">
                 <select name="status" onchange="this.form.submit()" class="w-full bg-light/50 border border-gray-lighter px-4 py-3.5 rounded-2xl text-xs font-bold focus:outline-none focus:border-dark transition-all appearance-none cursor-pointer">
@@ -106,7 +117,9 @@
                                 </div>
                             </td>
                             <td class="px-6 py-5">
-                                <div class="text-xs font-black text-dark">{{ \Illuminate\Support\Str::limit($blog->subtitle ?? '-', 30) }}</div>
+                                <div class="text-[10px] font-black text-gray uppercase tracking-widest">Type</div>
+                                <div class="text-sm font-black text-dark">{{ \App\Models\Blog::types()[$blog->type] ?? ucfirst($blog->type) }}</div>
+                                <div class="mt-2 text-[9px] text-gray">Tags: {{ $blog->blog_tags ? implode(', ', $blog->blog_tags) : '-' }}</div>
                             </td>
                             <td class="px-6 py-5">
                                 <div class="text-xs font-bold text-dark italic underline decoration-primary/20 decoration-2 underline-offset-4">{{ $blog->author ?? '-' }}</div>

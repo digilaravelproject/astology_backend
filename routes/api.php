@@ -65,6 +65,14 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth:sanctum')->get('/availability', [AstrologerAuthController::class, 'getAvailability']);
         Route::middleware('auth:sanctum')->put('/availability', [AstrologerAuthController::class, 'setAvailability']);
 
+        // Astrologer sleep hours (requires authentication)
+        Route::middleware('auth:sanctum')->get('/sleep-hours', [AstrologerAuthController::class, 'getSleepHours']);
+        Route::middleware('auth:sanctum')->post('/sleep-hours', [AstrologerAuthController::class, 'setSleepHours']);
+
+        // Astrologer logout/delete account (requires authentication)
+        Route::middleware('auth:sanctum')->post('/logout', [AstrologerAuthController::class, 'logout']);
+        Route::middleware('auth:sanctum')->delete('/delete-account', [AstrologerAuthController::class, 'deleteAccount']);
+
         // Training videos (public)
         Route::get('/training-videos', [TrainingVideoController::class, 'index']);
         Route::get('/training-videos/{id}', [TrainingVideoController::class, 'show']);
@@ -96,6 +104,7 @@ Route::prefix('v1')->group(function () {
 
         // Blogs endpoints (public)
         Route::get('/blogs', [BlogController::class, 'index']);
+        Route::get('/blogs/search', [BlogController::class, 'search']);
         Route::get('/blogs/{id}', [BlogController::class, 'show']);
 
         // Notices endpoints (public)
@@ -140,4 +149,12 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth:sanctum')->get('/matrimony/search', [MatrimonyController::class, 'searchProfiles']);
 
     });
+
+    // Static Pages endpoints (public)
+    Route::get('/static-pages', [\App\Http\Controllers\Api\StaticPageController::class, 'index']);
+    Route::get('/static-pages/{type}', [\App\Http\Controllers\Api\StaticPageController::class, 'show']);
+    Route::get('/faqs', [\App\Http\Controllers\Api\StaticPageController::class, 'getFaqs']);
+    Route::get('/privacy-policy', [\App\Http\Controllers\Api\StaticPageController::class, 'getPrivacyPolicy']);
+    Route::get('/terms-and-conditions', [\App\Http\Controllers\Api\StaticPageController::class, 'getTermsAndConditions']);
+    Route::get('/payment-policy', [\App\Http\Controllers\Api\StaticPageController::class, 'getPaymentPolicy']);
 });

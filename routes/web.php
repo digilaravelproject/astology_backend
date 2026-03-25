@@ -55,6 +55,10 @@ Route::prefix('admin')->group(function () {
         // Remedy Management
         Route::resource('remedies', \App\Http\Controllers\Admin\RemedyController::class)->names('admin.remedies');
         Route::post('remedies/{id}/toggle-status', [\App\Http\Controllers\Admin\RemedyController::class, 'toggleStatus'])->name('admin.remedies.toggle-status');
+
+        // Static Pages Management
+        Route::resource('static_pages', \App\Http\Controllers\Admin\StaticPageController::class)->names('admin.static_pages');
+
         // Plan Management
         Route::prefix('plans')->group(function() {
             Route::get('/', function() { return view('admin.plans.index'); })->name('admin.plans.index');

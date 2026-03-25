@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Blog;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class BlogController extends Controller
 {
@@ -45,6 +46,50 @@ class BlogController extends Controller
             'status' => 'success',
             'data' => [
                 'blog' => $blog,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Search blogs (by query, type, tags)
+     */
+    public function search(Request $request): JsonResponse
+    {
+        $search = $request->query('q');
+        $type = $request->query('type');
+        $tags = $request->query('tags');
+
+        $query = Blog::where('is_active', true);
+
+        if ($search) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('subtitle', 'like', "%{$search}%")
+                    ->orWhere('author', 'like', "%{$search}%")
+                    ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+        if ($type) {
+            $query->where('type', $type);
+        }
+
+        if ($tags) {
+            $tagArray = is_string($tags) ? explode(',', $tags) : (array) $tags;
+            foreach ($tagArray as $tagItem) {
+                $tagItem = trim($tagItem);
+                if ($tagItem !== '') {
+                    $query->whereJsonContains('blog_tags', $tagItem);
+                }
+            }
+        }
+
+        $blogs = $query->orderByDesc('created_at')->get();
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'blogs' => $blogs,
             ],
         ], 200);
     }

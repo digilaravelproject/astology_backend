@@ -37,6 +37,9 @@ class Astrologer extends Model
         'po_at_5_enabled',
         'po_at_5_rate_per_minute',
         'po_at_5_sessions',
+        'sleep_start_time',
+        'sleep_end_time',
+        'sleep_duration_minutes',
     ];
 
     protected $casts = [
@@ -45,6 +48,9 @@ class Astrologer extends Model
         'availability' => 'array',
         'date_of_birth' => 'date',
         'otp_expires_at' => 'datetime',
+        'sleep_start_time' => 'datetime:H:i',
+        'sleep_end_time' => 'datetime:H:i',
+        'sleep_duration_minutes' => 'integer',
         'otp_verified_at' => 'datetime',
         'chat_enabled' => 'boolean',
         'call_enabled' => 'boolean',

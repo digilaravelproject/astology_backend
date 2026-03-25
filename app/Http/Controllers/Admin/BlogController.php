@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Blog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class BlogController extends Controller
 {
@@ -30,6 +31,11 @@ class BlogController extends Controller
             }
         }
 
+        if ($request->filled('type')) {
+            $type = $request->input('type');
+            $query->where('type', $type);
+        }
+
         $blogs = $query->orderByDesc('created_at')->paginate(15)->withQueryString();
 
         $total = Blog::count();
@@ -51,9 +57,20 @@ class BlogController extends Controller
             'subtitle' => 'nullable|string|max:255',
             'content' => 'nullable|string',
             'author' => 'nullable|string|max:255',
+            'type' => 'required|in:article,news,update,education,announcement',
+            'blog_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
+            'blog_tags' => 'nullable|array',
+            'blog_tags.*' => 'string|max:50',
             'is_active' => 'sometimes|boolean',
         ]);
 
+        if ($request->hasFile('blog_image')) {
+            $file = $request->file('blog_image');
+            $filename = 'blog_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $data['blog_image'] = Storage::disk('public')->putFileAs('blogs/images', $file, $filename);
+        }
+
+        $data['blog_tags'] = $request->input('blog_tags', []);
         $data['is_active'] = $request->has('is_active') ? (bool) $request->input('is_active') : false;
 
         Blog::create($data);
@@ -76,9 +93,24 @@ class BlogController extends Controller
             'subtitle' => 'nullable|string|max:255',
             'content' => 'nullable|string',
             'author' => 'nullable|string|max:255',
+            'type' => 'required|in:article,news,update,education,announcement',
+            'blog_image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:10240',
+            'blog_tags' => 'nullable|array',
+            'blog_tags.*' => 'string|max:50',
             'is_active' => 'sometimes|boolean',
         ]);
 
+        if ($request->hasFile('blog_image')) {
+            // delete old image if exists
+            if ($blog->blog_image && Storage::disk('public')->exists($blog->blog_image)) {
+                Storage::disk('public')->delete($blog->blog_image);
+            }
+            $file = $request->file('blog_image');
+            $filename = 'blog_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
+            $data['blog_image'] = Storage::disk('public')->putFileAs('blogs/images', $file, $filename);
+        }
+
+        $data['blog_tags'] = $request->input('blog_tags', []);
         $data['is_active'] = $request->has('is_active') ? (bool) $request->input('is_active') : false;
 
         $blog->update($data);

@@ -891,6 +891,121 @@ class AstrologerAuthController extends Controller
     }
 
     /**
+     * Get astrologer sleep hours settings.
+     */
+    public function getSleepHours(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $astrologer = $user->astrologer;
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'sleep_start_time' => $astrologer->sleep_start_time ? $astrologer->sleep_start_time->format('H:i') : null,
+                'sleep_end_time' => $astrologer->sleep_end_time ? $astrologer->sleep_end_time->format('H:i') : null,
+                'sleep_duration_minutes' => $astrologer->sleep_duration_minutes,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Set astrologer sleep hours.
+     */
+    public function setSleepHours(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'sleep_start_time' => 'required|date_format:H:i',
+            'sleep_end_time' => 'required|date_format:H:i',
+        ]);
+
+        $startTime = DateTime::createFromFormat('H:i', $validated['sleep_start_time']);
+        $endTime = DateTime::createFromFormat('H:i', $validated['sleep_end_time']);
+
+        if (!$startTime || !$endTime) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid time format. Use HH:MM (24h).'], 422);
+        }
+
+        $duration = ($endTime->format('U') - $startTime->format('U')) / 60;
+        if ($duration <= 0) {
+            $duration = (($endTime->format('U') + 24 * 3600) - $startTime->format('U')) / 60;
+        }
+
+        if ($duration > 12 * 60) {
+            return response()->json(['status' => 'error', 'message' => 'Sleep duration should not exceed 12 hours.'], 422);
+        }
+
+        $astrologer = $user->astrologer;
+        $astrologer->sleep_start_time = $validated['sleep_start_time'];
+        $astrologer->sleep_end_time = $validated['sleep_end_time'];
+        $astrologer->sleep_duration_minutes = (int) $duration;
+        $astrologer->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Sleep hours updated successfully.',
+            'data' => [
+                'sleep_start_time' => $astrologer->sleep_start_time->format('H:i'),
+                'sleep_end_time' => $astrologer->sleep_end_time->format('H:i'),
+                'sleep_duration_minutes' => $astrologer->sleep_duration_minutes,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Logout astrologer (revoke current token).
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        if ($request->user()->currentAccessToken()) {
+            $request->user()->currentAccessToken()->delete();
+        }
+
+        return response()->json(['status' => 'success', 'message' => 'Logged out successfully.'], 200);
+    }
+
+    /**
+     * Delete astrologer account and all related data.
+     */
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            // Revoke all tokens
+            $user->tokens()->delete();
+
+            // Delete the user, cascading via FK to astrologer + child records
+            $user->delete();
+
+            DB::commit();
+
+            return response()->json(['status' => 'success', 'message' => 'Astrologer account deleted successfully.'], 200);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Astrologer delete account error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to delete astrologer account.'], 500);
+        }
+    }
+
+    /**
      * Add astrologer bank account.
      */
     public function addBankAccount(Request $request): JsonResponse

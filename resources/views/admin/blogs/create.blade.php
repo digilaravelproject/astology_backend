@@ -2,7 +2,7 @@
 
 @section('content')
 <div x-data="{ 
-    tags: ['Astrology', 'Jupiter', '2024'], 
+    tags: @json(old('blog_tags', $blog->blog_tags ?? [])), 
     newTag: '',
     addTag() {
         if (this.newTag.trim() !== '' && !this.tags.includes(this.newTag.trim())) {
@@ -32,7 +32,7 @@
     </div>
 
     <!-- Blog Form -->
-    <form id="blogForm" action="{{ isset($blog) && $blog->id ? route('admin.blogs.update', $blog->id) : route('admin.blogs.store') }}" method="POST" class="max-w-[1200px]">
+    <form id="blogForm" action="{{ isset($blog) && $blog->id ? route('admin.blogs.update', $blog->id) : route('admin.blogs.store') }}" method="POST" enctype="multipart/form-data" class="max-w-[1200px]">
         @csrf
         @if(isset($blog) && $blog->id)
             @method('PUT')
@@ -54,6 +54,16 @@
                             <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3 group-focus-within:text-dark transition-colors">Manifesto Title</label>
                             <input type="text" name="title" value="{{ old('title', $blog->title ?? '') }}" placeholder="e.g. The Quantum Mechanics of Mercury Retrograde..." class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-lg font-black text-dark placeholder:text-gray-light focus:bg-white focus:border-primary/20 focus:ring-0 transition-all">
                             @error('title') <span class="text-xs text-danger">{{ $message }}</span> @enderror
+                        </div>
+
+                        <div class="group">
+                            <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Type</label>
+                            <select name="type" class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-xs font-black text-dark focus:bg-white focus:border-primary/20 focus:ring-0 transition-all">
+                                @foreach(\App\Models\Blog::types() as $value => $label)
+                                    <option value="{{ $value }}" {{ old('type', $blog->type ?? 'article') === $value ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('type') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -136,6 +146,16 @@
                         </div>
                         <div class="absolute inset-0 bg-dark/5 opacity-0 group-hover:opacity-100 transition-all"></div>
                     </div>
+                    <div class="mt-4 space-y-2">
+                        <label class="block text-[10px] font-black text-gray uppercase tracking-widest">Feature Image</label>
+                        <input type="file" name="blog_image" accept="image/*" class="w-full rounded-2xl border border-gray-lighter p-2 bg-white text-xs" />
+                        @if(isset($blog->blog_image) && $blog->blog_image)
+                            <div class="mt-3">
+                                <img src="{{ asset('storage/' . $blog->blog_image) }}" alt="Blog image" class="w-full rounded-2xl object-cover" />
+                            </div>
+                        @endif
+                        @error('blog_image') <span class="text-xs text-danger">{{ $message }}</span> @enderror
+                    </div>
                 </div>
 
                 <!-- Intelligent Tags -->
@@ -145,6 +165,7 @@
                         <div class="flex flex-wrap gap-2">
                             <template x-for="(tag, index) in tags" :key="index">
                                 <span class="px-3 py-1.5 bg-primary/10 text-primary text-[9px] font-black uppercase rounded-full border border-primary/20 flex items-center gap-2 group hover:bg-primary hover:text-white transition-all cursor-default">
+                                    <input type="hidden" name="blog_tags[]" :value="tag">
                                     <span x-text="tag"></span>
                                     <i @click="removeTag(index)" class="fas fa-times cursor-pointer opacity-50 hover:opacity-100"></i>
                                 </span>
