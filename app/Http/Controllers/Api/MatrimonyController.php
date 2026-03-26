@@ -36,6 +36,9 @@ class MatrimonyController extends Controller
             'annual_income' => ['nullable', 'string', 'max:255'],
             'about' => ['nullable', 'string', 'max:2000'],
             'profile_photo' => ['nullable', 'file', 'image', 'max:5120'],
+            'pan_card_number' => ['nullable', 'string', 'max:20', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/'],
+            'driving_licence_number' => ['nullable', 'string', 'max:50'],
+            'aadhar_card_number' => ['nullable', 'string', 'max:20', 'regex:/^[0-9]{12}$/'],
         ]);
 
         $profile = MatrimonyProfile::updateOrCreate(

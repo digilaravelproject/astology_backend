@@ -4,12 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
+use App\Services\RazorpayService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Carbon\Carbon;
 
 class PlanController extends Controller
 {
+    protected $razorpayService;
+
+    public function __construct(RazorpayService $razorpayService)
+    {
+        $this->razorpayService = $razorpayService;
+    }
     public function index(Request $request): JsonResponse
     {
         $plans = Plan::where('status', 'active')->orderBy('price')->get();
@@ -83,9 +90,29 @@ class PlanController extends Controller
 
         $wallet = \App\Models\Wallet::firstOrCreate(['user_id' => $user->id], ['balance' => 0]);
 
-        // Create fake razorpay order for deduction on upgrade
-        $providerOrderId = 'razorpay_order_' . \Illuminate\Support\Str::random(12);
+        // Create Razorpay order
+        $amountInPaise = (int)($plan->price * 100); // Convert to paise
+        $razorpayResult = $this->razorpayService->createOrder(
+            $amountInPaise,
+            'INR',
+            'plan_' . $user->id . '_' . $plan->id . '_' . time(),
+            [
+                'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'plan_name' => $plan->name,
+            ]
+        );
 
+        if ($razorpayResult['status'] !== 'success') {
+            return response()->json([
+                'status' => 'error',
+                'message' => $razorpayResult['message'] ?? 'Failed to create Razorpay order.',
+            ], 422);
+        }
+
+        $razorpayOrder = $razorpayResult['data'];
+
+        // Create transaction record in database
         $transaction = \App\Models\WalletTransaction::create([
             'wallet_id' => $wallet->id,
             'plan_id' => $plan->id,
@@ -93,17 +120,23 @@ class PlanController extends Controller
             'amount' => $plan->price,
             'status' => 'pending',
             'payment_provider' => 'razorpay',
-            'provider_order_id' => $providerOrderId,
+            'provider_order_id' => $razorpayOrder['id'],
             'description' => 'Plan upgrade to ' . $plan->name,
         ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Razorpay order created. Proceed to payment verification.',
+            'message' => 'Razorpay order created. Proceed to payment.',
             'data' => [
                 'plan' => $plan,
                 'wallet' => $wallet,
                 'transaction' => $transaction,
+                'razorpay_order' => [
+                    'id' => $razorpayOrder['id'],
+                    'amount' => $razorpayOrder['amount'],
+                    'currency' => $razorpayOrder['currency'],
+                    'key_id' => config('razorpay.key_id'),
+                ],
             ],
         ], 201);
     }
@@ -111,9 +144,9 @@ class PlanController extends Controller
     public function verifyUpgrade(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'provider_order_id' => 'required|string',
-            'provider_payment_id' => 'required|string',
-            'signature' => 'required|string',
+            'razorpay_order_id' => 'required|string',
+            'razorpay_payment_id' => 'required|string',
+            'razorpay_signature' => 'required|string',
         ]);
 
         $user = $request->user();
@@ -122,7 +155,19 @@ class PlanController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
         }
 
-        $transaction = \App\Models\WalletTransaction::where('provider_order_id', $validated['provider_order_id'])
+        // Verify Razorpay signature
+        $isSignatureValid = $this->razorpayService->verifySignature(
+            $validated['razorpay_order_id'],
+            $validated['razorpay_payment_id'],
+            $validated['razorpay_signature']
+        );
+
+        if (!$isSignatureValid) {
+            return response()->json(['status' => 'error', 'message' => 'Payment signature verification failed.'], 422);
+        }
+
+        // Find the transaction
+        $transaction = \App\Models\WalletTransaction::where('provider_order_id', $validated['razorpay_order_id'])
             ->where('payment_provider', 'razorpay')
             ->where('status', 'pending')
             ->first();
@@ -133,10 +178,13 @@ class PlanController extends Controller
 
         $wallet = $transaction->wallet;
 
-        // Mark transaction complete (Razorpay confirmed)
-        $transaction->provider_payment_id = $validated['provider_payment_id'];
+        // Update transaction as completed
+        $transaction->provider_payment_id = $validated['razorpay_payment_id'];
         $transaction->status = 'completed';
-        $transaction->meta = ['signature' => $validated['signature'], 'verified_at' => now()->toDateTimeString()];
+        $transaction->meta = [
+            'signature' => $validated['razorpay_signature'],
+            'verified_at' => now()->toDateTimeString(),
+        ];
         $transaction->save();
 
         $plan = Plan::find($transaction->plan_id);

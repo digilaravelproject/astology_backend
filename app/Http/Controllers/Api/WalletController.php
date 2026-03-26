@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Services\RazorpayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,12 @@ use Illuminate\Support\Str;
 
 class WalletController extends Controller
 {
+    protected $razorpayService;
+
+    public function __construct(RazorpayService $razorpayService)
+    {
+        $this->razorpayService = $razorpayService;
+    }
     /**
      * Get authenticated user's wallet and balance.
      */
@@ -39,7 +46,7 @@ class WalletController extends Controller
     /**
      * Create a top-up order (Razorpay) for adding funds to wallet.
      *
-     * This endpoint does not complete the top-up; it creates a pending transaction.
+     * This endpoint creates a Razorpay order that must be verified with payment details.
      */
     public function createTopup(Request $request): JsonResponse
     {
@@ -49,34 +56,60 @@ class WalletController extends Controller
         }
 
         $request->validate([
-            'amount' => ['required', 'numeric', 'min:1'],
+            'amount' => ['required', 'numeric', 'min:1', 'max:100000'],
         ]);
 
+        $amount = (float)$request->input('amount');
         $wallet = Wallet::firstOrCreate(
             ['user_id' => $user->id],
             ['balance' => 0]
         );
 
-        // In a real integration, you would create an order with Razorpay here.
-        // We'll generate a fake order id for demonstration.
-        $providerOrderId = 'razorpay_order_' . Str::random(10);
+        // Create Razorpay order
+        $amountInPaise = (int)($amount * 100); // Convert to paise
+        $razorpayResult = $this->razorpayService->createOrder(
+            $amountInPaise,
+            'INR',
+            'topup_' . $user->id . '_' . time(),
+            [
+                'user_id' => $user->id,
+                'amount' => $amount,
+                'description' => 'Wallet top-up',
+            ]
+        );
 
+        if ($razorpayResult['status'] !== 'success') {
+            return response()->json([
+                'status' => 'error',
+                'message' => $razorpayResult['message'] ?? 'Failed to create Razorpay order.',
+            ], 422);
+        }
+
+        $razorpayOrder = $razorpayResult['data'];
+
+        // Create transaction record
         $transaction = WalletTransaction::create([
             'wallet_id' => $wallet->id,
             'transaction_type' => 'credit',
-            'amount' => $request->input('amount'),
+            'amount' => $amount,
             'status' => 'pending',
             'payment_provider' => 'razorpay',
-            'provider_order_id' => $providerOrderId,
+            'provider_order_id' => $razorpayOrder['id'],
             'description' => 'Wallet top-up (pending payment)',
         ]);
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Top-up order created.',
+            'message' => 'Top-up order created. Proceed to payment.',
             'data' => [
                 'wallet' => $wallet,
                 'transaction' => $transaction,
+                'razorpay_order' => [
+                    'id' => $razorpayOrder['id'],
+                    'amount' => $razorpayOrder['amount'],
+                    'currency' => $razorpayOrder['currency'],
+                    'key_id' => config('razorpay.key_id'),
+                ],
             ],
         ], 201);
     }
@@ -92,11 +125,21 @@ class WalletController extends Controller
         }
 
         $request->validate([
-            'provider_order_id' => ['required', 'string'],
-            'provider_payment_id' => ['required', 'string'],
-            // real integration should verify `signature`
-            'signature' => ['required', 'string'],
+            'razorpay_order_id' => ['required', 'string'],
+            'razorpay_payment_id' => ['required', 'string'],
+            'razorpay_signature' => ['required', 'string'],
         ]);
+
+        // Verify Razorpay signature
+        $isSignatureValid = $this->razorpayService->verifySignature(
+            $request->input('razorpay_order_id'),
+            $request->input('razorpay_payment_id'),
+            $request->input('razorpay_signature')
+        );
+
+        if (!$isSignatureValid) {
+            return response()->json(['status' => 'error', 'message' => 'Payment signature verification failed.'], 422);
+        }
 
         $wallet = Wallet::firstOrCreate(
             ['user_id' => $user->id],
@@ -104,7 +147,7 @@ class WalletController extends Controller
         );
 
         $transaction = WalletTransaction::where('wallet_id', $wallet->id)
-            ->where('provider_order_id', $request->input('provider_order_id'))
+            ->where('provider_order_id', $request->input('razorpay_order_id'))
             ->where('payment_provider', 'razorpay')
             ->where('status', 'pending')
             ->first();
@@ -113,19 +156,25 @@ class WalletController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Pending top-up transaction not found.'], 404);
         }
 
-        // NOTE: In a real integration you must verify the signature using Razorpay secret.
-        // Here we accept it as-is and mark payment completed.
-        $transaction->provider_payment_id = $request->input('provider_payment_id');
+        // Mark transaction as completed
+        $transaction->provider_payment_id = $request->input('razorpay_payment_id');
         $transaction->status = 'completed';
         $transaction->meta = [
             'verified_at' => now()->toDateTimeString(),
-            'signature' => $request->input('signature'),
+            'signature' => $request->input('razorpay_signature'),
         ];
         $transaction->save();
 
+        // Credit wallet balance
         DB::transaction(function () use ($wallet, $transaction) {
             $wallet->balance = $wallet->balance + $transaction->amount;
             $wallet->save();
+
+            Log::info('Wallet credited', [
+                'user_id' => $wallet->user_id,
+                'amount' => $transaction->amount,
+                'new_balance' => $wallet->balance,
+            ]);
         });
 
         return response()->json([

@@ -26,6 +26,9 @@ class MatrimonyProfile extends Model
         'annual_income',
         'about',
         'profile_photo',
+        'pan_card_number',
+        'driving_licence_number',
+        'aadhar_card_number',
         'is_active',
     ];
 
