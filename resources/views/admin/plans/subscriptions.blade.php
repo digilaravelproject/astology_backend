@@ -23,65 +23,70 @@
         <div class="bg-white p-6 rounded-[32px] border border-gray-lighter shadow-sm group hover:shadow-xl transition-all relative overflow-hidden">
             <div class="absolute -right-2 -bottom-2 w-16 h-16 bg-primary/5 rounded-full group-hover:scale-150 transition-all duration-500"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-3">Live Subscriptions</div>
-            <div class="text-3xl font-black text-dark">1,284</div>
+            <div class="text-3xl font-black text-dark">{{ $analytics['active_subscriptions'] ?? 0 }}</div>
             <div class="mt-2 flex items-center gap-1.5 text-success font-black text-[9px] uppercase">
-                <i class="fas fa-arrow-up"></i> 14% Retention
+                <i class="fas fa-arrow-up"></i> {{ $analytics['retention_rate'] ?? 0 }}% Retention
             </div>
         </div>
         <div class="bg-white p-6 rounded-[32px] border border-gray-lighter shadow-sm group hover:shadow-xl transition-all relative overflow-hidden">
             <div class="absolute -right-2 -bottom-2 w-16 h-16 bg-success/5 rounded-full group-hover:scale-150 transition-all duration-500"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-3">Est. MRR</div>
-            <div class="text-3xl font-black text-dark">₹ 4.2L</div>
+            <div class="text-3xl font-black text-dark">{{ $analytics['mrr_formatted'] ?? '₹ 0' }}</div>
             <div class="mt-2 flex items-center gap-1.5 text-success font-black text-[9px] uppercase">
-                <i class="fas fa-chart-line"></i> +₹ 45K Delta
+                <i class="fas fa-chart-line"></i> {{ $analytics['mrr_delta'] ?? '₹ 0' }}
             </div>
         </div>
         <div class="bg-white p-6 rounded-[32px] border border-gray-lighter shadow-sm group hover:shadow-xl transition-all relative overflow-hidden">
             <div class="absolute -right-2 -bottom-2 w-16 h-16 bg-info/5 rounded-full group-hover:scale-150 transition-all duration-500"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-3">Churn Probability</div>
-            <div class="text-3xl font-black text-dark">2.4%</div>
-            <div class="mt-2 flex items-center gap-1.5 text-info font-black text-[9px] uppercase">
-                <i class="fas fa-shield-alt"></i> Low Risk
+            <div class="text-3xl font-black text-dark">{{ $analytics['churn_rate'] ?? 0 }}%</div>
+            <div class="mt-2 flex items-center gap-1.5 {{ $analytics['churn_rate'] > 10 ? 'text-warning' : 'text-info' }} font-black text-[9px] uppercase">
+                <i class="fas fa-shield-alt"></i> {{ $analytics['churn_rate'] > 10 ? 'Moderate Risk' : 'Low Risk' }}
             </div>
         </div>
         <div class="bg-white p-6 rounded-[32px] border border-gray-lighter shadow-sm group hover:shadow-xl transition-all relative overflow-hidden">
             <div class="absolute -right-2 -bottom-2 w-16 h-16 bg-warning/5 rounded-full group-hover:scale-150 transition-all duration-500"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-3">Top Tier Adopt</div>
-            <div class="text-3xl font-black text-dark">42%</div>
+            <div class="text-3xl font-black text-dark">{{ $analytics['adoption_rate'] ?? 0 }}%</div>
             <div class="mt-2 flex items-center gap-1.5 text-warning font-black text-[9px] uppercase">
-                <i class="fas fa-gem"></i> Platinum Heavy
+                <i class="fas fa-gem"></i> Premium Focus
             </div>
         </div>
     </div>
 
     <!-- Subscription Console -->
     <div class="bg-white p-6 rounded-[28px] border border-gray-lighter shadow-sm mb-8 flex flex-wrap gap-4 items-end">
-        <div class="flex-1 min-w-[200px]">
-            <label class="text-[10px] font-black text-gray uppercase tracking-widest mb-2 block">Universal Search</label>
-            <div class="relative group">
-                <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray transition-colors group-focus-within:text-dark"></i>
-                <input type="text" placeholder="Search by Subscription ID, User Name..." class="w-full bg-light/50 border border-gray-lighter pl-11 pr-4 py-3.5 rounded-2xl text-xs font-bold focus:outline-none focus:border-dark transition-all focus:bg-white focus:shadow-sm">
+        <form method="GET" action="{{ route('admin.plans.subscriptions') }}" class="w-full flex flex-wrap gap-4 items-end">
+            <div class="flex-1 min-w-[200px]">
+                <label class="text-[10px] font-black text-gray uppercase tracking-widest mb-2 block">Universal Search</label>
+                <div class="relative group">
+                    <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray transition-colors group-focus-within:text-dark"></i>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Search by Subscription ID, User Name..." class="w-full bg-light/50 border border-gray-lighter pl-11 pr-4 py-3.5 rounded-2xl text-xs font-bold focus:outline-none focus:border-dark transition-all focus:bg-white focus:shadow-sm">
+                </div>
             </div>
-        </div>
-        <div class="w-full sm:w-40">
-            <label class="text-[10px] font-black text-gray uppercase tracking-widest mb-2 block">Plan Level</label>
-            <select class="w-full bg-light/50 border border-gray-lighter px-4 py-3.5 rounded-2xl text-xs font-bold focus:outline-none focus:border-dark transition-all appearance-none cursor-pointer">
-                <option>All Tiers</option>
-                <option>Silver (Lite)</option>
-                <option>Gold (Pro)</option>
-                <option>Platinum (Elite)</option>
-            </select>
-        </div>
-        <div class="w-full sm:w-40">
-            <label class="text-[10px] font-black text-gray uppercase tracking-widest mb-2 block">Lifecycle</label>
-            <select class="w-full bg-light/50 border border-gray-lighter px-4 py-3.5 rounded-2xl text-xs font-bold focus:outline-none focus:border-dark transition-all appearance-none cursor-pointer">
-                <option>Active Only</option>
-                <option>Expiring Soon</option>
-                <option>Lapsed</option>
-                <option>Cancelled</option>
-            </select>
-        </div>
-        <button class="bg-dark text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-dark/10 transform active:scale-95 h-[52px]">Filter Ecosystem</button>
+            <div class="w-full sm:w-40">
+                <label class="text-[10px] font-black text-gray uppercase tracking-widest mb-2 block">Plan Level</label>
+                <select name="plan" class="w-full bg-light/50 border border-gray-lighter px-4 py-3.5 rounded-2xl text-xs font-bold focus:outline-none focus:border-dark transition-all appearance-none cursor-pointer">
+                    <option value="all" {{ request('plan') === 'all' || !request('plan') ? 'selected' : '' }}>All Tiers</option>
+                    @forelse($plans as $plan)
+                        <option value="{{ $plan->id }}" {{ request('plan') == $plan->id ? 'selected' : '' }}>{{ $plan->name }}</option>
+                    @empty
+                    @endforelse
+                </select>
+            </div>
+            <div class="w-full sm:w-40">
+                <label class="text-[10px] font-black text-gray uppercase tracking-widest mb-2 block">Lifecycle</label>
+                <select name="lifecycle" class="w-full bg-light/50 border border-gray-lighter px-4 py-3.5 rounded-2xl text-xs font-bold focus:outline-none focus:border-dark transition-all appearance-none cursor-pointer">
+                    <option value="" {{ !request('lifecycle') ? 'selected' : '' }}>All Status</option>
+                    <option value="active" {{ request('lifecycle') === 'active' ? 'selected' : '' }}>Active Only</option>
+                    <option value="expiring" {{ request('lifecycle') === 'expiring' ? 'selected' : '' }}>Expiring Soon</option>
+                    <option value="lapsed" {{ request('lifecycle') === 'lapsed' ? 'selected' : '' }}>Lapsed</option>
+                    <option value="cancelled" {{ request('lifecycle') === 'cancelled' ? 'selected' : '' }}>Cancelled</option>
+                </select>
+            </div>
+            <button type="submit" class="bg-dark text-white px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-xl shadow-dark/10 transform active:scale-95 h-[52px]">Filter Ecosystem</button>
+            <a href="{{ route('admin.plans.subscriptions') }}" class="bg-white border border-gray-lighter text-dark px-8 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-light transition-all shadow-sm h-[52px] flex items-center justify-center">Reset</a>
+        </form>
     </div>
 
     <!-- Subscription Table -->
@@ -99,20 +104,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-lighter">
-                    @php
-                        $subs = [
-                            ['id' => 'SUB-9941', 'user' => 'Rajesh Khanna', 'plan' => 'Platinum Elite', 'amount' => '₹ 2,499', 'start' => '12 Oct 2024', 'end' => '12 Nov 2024', 'status' => 'Active', 'renew' => 'Yes', 'method' => 'UPI'],
-                            ['id' => 'SUB-9942', 'user' => 'Priya Sharma', 'plan' => 'Gold Pro', 'amount' => '₹ 999', 'start' => '10 Oct 2024', 'end' => '10 Nov 2024', 'status' => 'Active', 'renew' => 'No', 'method' => 'Card'],
-                            ['id' => 'SUB-9943', 'user' => 'Amitabh V.', 'plan' => 'Silver Lite', 'amount' => '₹ 499', 'start' => '05 Oct 2024', 'end' => '05 Nov 2024', 'status' => 'Expiring', 'renew' => 'Yes', 'method' => 'Wallet'],
-                            ['id' => 'SUB-9944', 'user' => 'Deepika P.', 'plan' => 'Platinum Elite', 'amount' => '₹ 2,499', 'start' => '01 Oct 2024', 'end' => '01 Nov 2024', 'status' => 'Active', 'renew' => 'Yes', 'method' => 'UPI'],
-                            ['id' => 'SUB-9945', 'user' => 'Ranveer Singh', 'plan' => 'Gold Pro', 'amount' => '₹ 999', 'start' => '25 Sep 2024', 'end' => '25 Oct 2024', 'status' => 'Lapsed', 'renew' => 'No', 'method' => 'Card'],
-                            ['id' => 'SUB-9946', 'user' => 'Salman Khan', 'plan' => 'Platinum Elite', 'amount' => '₹ 2,499', 'start' => '20 Sep 2024', 'end' => '20 Oct 2024', 'status' => 'Active', 'renew' => 'Yes', 'method' => 'Net Banking'],
-                            ['id' => 'SUB-9947', 'user' => 'Shahrukh R.', 'plan' => 'Silver Lite', 'amount' => '₹ 499', 'start' => '15 Sep 2024', 'end' => '15 Oct 2024', 'status' => 'Cancelled', 'renew' => 'No', 'method' => 'Wallet'],
-                            ['id' => 'SUB-9948', 'user' => 'Kareena K.', 'plan' => 'Gold Pro', 'amount' => '₹ 999', 'start' => '10 Sep 2024', 'end' => '10 Oct 2024', 'status' => 'Active', 'renew' => 'Yes', 'method' => 'UPI'],
-                        ];
-                    @endphp
-
-                    @foreach($subs as $sub)
+                    @forelse($subs as $sub)
                     <tr class="hover:bg-light/30 transition-all group">
                         <td class="px-6 py-5">
                             <div class="flex items-center gap-3">
@@ -129,8 +121,8 @@
                         </td>
                     @php
                         $expiryClasses = $sub['status'] == 'Expiring' 
-                            ? 'bg-red-50 text-red-900 border-red-200' 
-                            : 'bg-white text-slate-800 border-slate-100';
+                            ? 'bg-yellow-50 text-yellow-900 border-yellow-200' 
+                            : ($sub['status'] == 'Lapsed' ? 'bg-red-50 text-red-900 border-red-200' : 'bg-white text-slate-800 border-slate-100');
                         $renewDotClass = $sub['renew'] == 'Yes' 
                             ? 'bg-emerald-600' 
                             : 'bg-slate-200';
@@ -148,7 +140,7 @@
                                 </div>
                                 <i class="fas fa-arrow-right text-[10px] text-gray-lighter"></i>
                                 <div class="text-center border p-2 rounded-xl {{ $expiryClasses }}">
-                                    <div class="text-[8px] font-black text-slate-500 uppercase leading-none mb-1">Expiry</div>
+                                    <div class="text-[8px] font-black uppercase leading-none mb-1">Expiry</div>
                                     <div class="text-[10px] font-black leading-none">{{ $sub['end'] }}</div>
                                 </div>
                             </div>
@@ -165,18 +157,45 @@
                             </button>
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr>
+                        <td colspan="6" class="px-6 py-12 text-center">
+                            <div class="flex flex-col items-center justify-center">
+                                <i class="fas fa-inbox text-4xl text-gray-lighter mb-4"></i>
+                                <p class="text-gray font-bold">No subscriptions found</p>
+                                <p class="text-gray-light text-xs mt-1">Try adjusting your filters</p>
+                            </div>
+                        </td>
+                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
         <!-- Pagination -->
         <div class="px-6 py-6 border-t border-gray-lighter flex justify-between items-center bg-light/20">
-            <div class="text-[10px] font-black text-gray uppercase tracking-widest">Analyzing 8 of 1,284 Contracts</div>
+            <div class="text-[10px] font-black text-gray uppercase tracking-widest">Analyzing {{ $subscriptions->count() }} of {{ $subscriptions->total() }} Contracts</div>
             <div class="flex items-center gap-1.5">
-                <button class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-gray hover:text-dark hover:border-dark transition-all"><i class="fas fa-chevron-left text-xs"></i></button>
-                <button class="w-10 h-10 rounded-xl bg-dark text-white font-black text-xs">1</button>
-                <button class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-dark font-black text-xs hover:bg-dark hover:text-white transition-all">2</button>
-                <button class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-gray hover:text-dark hover:border-dark transition-all"><i class="fas fa-chevron-right text-xs"></i></button>
+                @if($subscriptions->onFirstPage())
+                    <button disabled class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-gray opacity-50 cursor-not-allowed"><i class="fas fa-chevron-left text-xs"></i></button>
+                @else
+                    <a href="{{ $subscriptions->previousPageUrl() }}" class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-gray hover:text-dark hover:border-dark transition-all flex items-center justify-center"><i class="fas fa-chevron-left text-xs"></i></a>
+                @endif
+                
+                @for($i = 1; $i <= $subscriptions->lastPage(); $i++)
+                    @if($i == $subscriptions->currentPage())
+                        <button class="w-10 h-10 rounded-xl bg-dark text-white font-black text-xs">{{ $i }}</button>
+                    @elseif($i <= 3 || $i == $subscriptions->lastPage())
+                        <a href="{{ $subscriptions->url($i) }}" class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-dark font-black text-xs hover:bg-dark hover:text-white transition-all flex items-center justify-center">{{ $i }}</a>
+                    @elseif($i == 4)
+                        <span class="text-gray font-bold">...</span>
+                    @endif
+                @endfor
+                
+                @if($subscriptions->hasMorePages())
+                    <a href="{{ $subscriptions->nextPageUrl() }}" class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-gray hover:text-dark hover:border-dark transition-all flex items-center justify-center"><i class="fas fa-chevron-right text-xs"></i></a>
+                @else
+                    <button disabled class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-gray opacity-50 cursor-not-allowed"><i class="fas fa-chevron-right text-xs"></i></button>
+                @endif
             </div>
         </div>
     </div>

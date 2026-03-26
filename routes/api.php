@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\MatrimonyController;
 use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\PlanController;
 
 Route::prefix('v1')->group(function () {
     Route::prefix('astrologer')->group(function () {
@@ -122,6 +123,18 @@ Route::prefix('v1')->group(function () {
 
         // Report astrologer (requires auth)
         Route::middleware('auth:sanctum')->post('/astrologers/{id}/report', [UserAuthController::class, 'reportAstrologer']);
+
+        // User following, logout, delete account (requires auth)
+        Route::middleware('auth:sanctum')->get('/following', [UserAuthController::class, 'getFollowing']);
+        Route::middleware('auth:sanctum')->post('/logout', [UserAuthController::class, 'logout']);
+        Route::middleware('auth:sanctum')->delete('/delete-account', [UserAuthController::class, 'deleteAccount']);
+
+        // Plan endpoints (public + requires auth)
+        Route::get('/plans', [PlanController::class, 'index']);
+        Route::get('/plans/{plan}', [PlanController::class, 'show']);
+        Route::middleware('auth:sanctum')->get('/plan', [PlanController::class, 'current']);
+        Route::middleware('auth:sanctum')->post('/plans/upgrade', [PlanController::class, 'upgrade']);
+        Route::middleware('auth:sanctum')->post('/plans/upgrade/verify', [PlanController::class, 'verifyUpgrade']);
 
         // Wallet endpoints (requires auth)
         Route::middleware('auth:sanctum')->get('/wallet', [WalletController::class, 'show']);

@@ -60,11 +60,8 @@ Route::prefix('admin')->group(function () {
         Route::resource('static_pages', \App\Http\Controllers\Admin\StaticPageController::class)->names('admin.static_pages');
 
         // Plan Management
-        Route::prefix('plans')->group(function() {
-            Route::get('/', function() { return view('admin.plans.index'); })->name('admin.plans.index');
-            Route::get('/create', function() { return view('admin.plans.create'); })->name('admin.plans.create');
-            Route::get('/subscriptions', function() { return view('admin.plans.subscriptions'); })->name('admin.plans.subscriptions');
-        });
+        Route::resource('plans', \App\Http\Controllers\Admin\PlanController::class)->names('admin.plans')->except(['show']);
+        Route::get('plans/subscriptions', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index'])->name('admin.plans.subscriptions');
 
         // Reports & Analytics
         Route::get('reports', function() { return view('admin.reports.index'); })->name('admin.reports.index');

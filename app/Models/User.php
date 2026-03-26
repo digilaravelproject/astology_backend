@@ -36,6 +36,9 @@ class User extends Authenticatable
         'otp_expires_at',
         'otp_verified_at',
         'profile_completed',
+        'plan_id',
+        'plan_started_at',
+        'plan_expires_at',
     ];
 
     /**
@@ -64,6 +67,8 @@ class User extends Authenticatable
             'languages' => 'array',
             'password' => 'hashed',
             'profile_completed' => 'boolean',
+            'plan_started_at' => 'datetime',
+            'plan_expires_at' => 'datetime',
         ];
     }
 
@@ -73,6 +78,11 @@ class User extends Authenticatable
     public function astrologer()
     {
         return $this->hasOne(\App\Models\Astrologer::class);
+    }
+
+    public function plan()
+    {
+        return $this->belongsTo(\App\Models\Plan::class);
     }
 
     /**

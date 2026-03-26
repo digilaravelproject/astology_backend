@@ -18,101 +18,89 @@
 </div>
 
 <!-- Plan Grid -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-    @php
-        $plans = [
-            [
-                'name' => 'Silver Lite',
-                'price' => '499',
-                'period' => 'Monthly',
-                'color' => 'gray',
-                'icon' => 'moon',
-                'features' => ['3 Daily Horoscopes', 'Standard Chat Access', 'Community Forum'],
-                'status' => 'Active',
-                'users' => 452
-            ],
-            [
-                'name' => 'Gold Pro',
-                'price' => '999',
-                'period' => 'Monthly',
-                'color' => 'warning',
-                'icon' => 'sun',
-                'features' => ['Unlimited Horoscopes', 'Priority Chat (2hr wait)', '1 Free Call Monthly'],
-                'status' => 'Active',
-                'users' => 812
-            ],
-            [
-                'name' => 'Platinum Elite',
-                'price' => '2,499',
-                'period' => 'Monthly',
-                'color' => 'primary',
-                'icon' => 'gem',
-                'features' => ['Real-time Alerts', 'Instant Expert Access', 'Weekly Video Consult'],
-                'status' => 'Active',
-                'users' => 324
-            ],
-            [
-                'name' => 'Astro Annual',
-                'price' => '9,999',
-                'period' => 'Yearly',
-                'color' => 'info',
-                'icon' => 'infinity',
-                'features' => ['Full Suite Access', 'Dedicated Concierge', 'VVIP Event Access'],
-                'status' => 'Inactive',
-                'users' => 12
-            ]
-        ];
-    @endphp
-
+<div class="space-y-6">
     @foreach($plans as $plan)
-    <div class="bg-white rounded-[48px] border border-gray-lighter shadow-sm group hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 overflow-hidden flex flex-col h-full">
-        <!-- Top Banner -->
-        <div class="h-3 shadow-inner bg-{{ $plan['color'] }}"></div>
-        
-        <div class="p-8 pb-4 flex items-start justify-between">
-            <div class="w-14 h-14 rounded-2xl bg-{{ $plan['color'] }}/10 text-{{ $plan['color'] }} flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-                <i class="fas fa-{{ $plan['icon'] }}"></i>
-            </div>
-            <div class="text-right">
-                <span class="text-[9px] font-black uppercase px-3 py-1 bg-{{ $plan['status'] == 'Active' ? 'success' : 'gray' }}/10 text-{{ $plan['status'] == 'Active' ? 'success' : 'gray' }} rounded-full border border-{{ $plan['status'] == 'Active' ? 'success' : 'gray' }}/20">
-                    {{ $plan['status'] }}
-                </span>
-                <div class="mt-2 text-[9px] font-bold text-gray uppercase tracking-widest text-right">{{ $plan['users'] }} Active Souls</div>
-            </div>
-        </div>
-
-        <div class="p-8 pt-4 flex-1">
-            <h3 class="text-xl font-black text-dark tracking-tighter uppercase mb-1">{{ $plan['name'] }}</h3>
-            <div class="flex items-baseline gap-1 mb-6">
-                <span class="text-sm font-black text-dark">₹</span>
-                <span class="text-3xl font-black text-dark tracking-tighter">{{ $plan['price'] }}</span>
-                <span class="text-[10px] font-bold text-gray uppercase tracking-widest">/ {{ $plan['period'] }}</span>
-            </div>
-
-            <div class="space-y-3 mb-8">
-                @foreach($plan['features'] as $feature)
-                <div class="flex items-start gap-3">
-                    <i class="fas fa-check-circle text-[10px] text-{{ $plan['color'] }} mt-1"></i>
-                    <span class="text-[11px] font-semibold text-gray-light leading-snug">{{ $feature }}</span>
+    @php
+        $cardColor = $plan->status === 'active' ? 'primary' : 'gray';
+        $cardIcon = match(strtolower($plan->name)) {
+            'silver lite', 'silver' => 'moon',
+            'gold pro', 'gold' => 'sun',
+            'platinum elite', 'platinum' => 'gem',
+            default => 'star'
+        };
+        $planUsers = $plan->users()->count();
+        $period = $plan->duration_days >= 365 ? 'Yearly' : ($plan->duration_days >= 90 ? 'Quarterly' : 'Monthly');
+    @endphp
+    <div class="bg-white rounded-[24px] border border-gray-lighter shadow-sm group hover:shadow-lg transition-all duration-300 overflow-hidden">
+        <!-- Card Content - Horizontal Layout -->
+        <div class="flex items-center justify-between p-6 gap-6">
+            <!-- Left: Icon & Plan Details -->
+            <div class="flex items-center gap-6 flex-1">
+                <!-- Icon -->
+                <div class="w-14 h-14 rounded-2xl bg-{{ $cardColor }}/10 text-{{ $cardColor }} flex items-center justify-center text-2xl flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <i class="fas fa-{{ $cardIcon }}"></i>
                 </div>
-                @endforeach
+                
+                <!-- Plan Name & Details -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-3 mb-2">
+                        <h3 class="text-lg font-black text-dark tracking-tighter uppercase">{{ $plan->name }}</h3>
+                        <span class="text-[8px] font-black uppercase px-2 py-1 bg-{{ $plan->status === 'active' ? 'success' : 'gray' }}/10 text-{{ $plan->status === 'active' ? 'success' : 'gray' }} rounded-full border border-{{ $plan->status === 'active' ? 'success' : 'gray' }}/20 flex-shrink-0">
+                            {{ ucfirst($plan->status) }}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray font-medium">{{ $plan->description ?? 'Subscription plan' }}</p>
+                    <div class="flex items-center gap-4 mt-2 flex-wrap">
+                        <span class="text-[9px] font-bold text-gray uppercase tracking-widest">{{ $planUsers }} Active Users</span>
+                        <span class="text-[9px] font-bold text-gray uppercase tracking-widest">{{ $plan->duration_days }} Days</span>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="p-8 pt-0 mt-auto grid grid-cols-2 gap-3">
-            <button class="px-4 py-3 bg-light text-dark text-[10px] font-black uppercase rounded-2xl hover:bg-dark hover:text-white transition-all">Configure</button>
-            <button class="px-4 py-3 bg-white border border-gray-lighter text-dark text-[10px] font-black uppercase rounded-2xl hover:bg-danger hover:text-white hover:border-danger transition-all">Suspend</button>
+            <!-- Middle: Price -->
+            <div class="text-center flex-shrink-0">
+                <div class="flex items-baseline gap-1 justify-center">
+                    <span class="text-sm font-black text-dark">₹</span>
+                    <span class="text-2xl font-black text-dark tracking-tighter">{{ number_format($plan->price, 2) }}</span>
+                </div>
+                <span class="text-[9px] font-bold text-gray uppercase tracking-widest block mt-1">/ {{ $period }}</span>
+            </div>
+
+            <!-- Right: Features Count & Actions -->
+            <div class="flex items-center gap-4 flex-shrink-0">
+                <div class="text-center">
+                    <div class="text-lg font-black text-{{ $cardColor }}">{{ count($plan->features ?? []) }}</div>
+                    <span class="text-[9px] font-bold text-gray uppercase tracking-widest">Features</span>
+                </div>
+
+                <div class="flex gap-2">
+                    <a href="{{ route('admin.plans.edit', $plan->id) }}" class="px-4 py-2 bg-light text-dark text-[9px] font-black uppercase rounded-lg hover:bg-dark hover:text-white transition-all" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </a>
+                    <form action="{{ route('admin.plans.destroy', $plan->id) }}" method="POST" onsubmit="return confirm('Are you sure to delete this plan?');" class="inline">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="px-4 py-2 bg-white border border-gray-lighter text-dark text-[9px] font-black uppercase rounded-lg hover:bg-danger hover:text-white hover:border-danger transition-all" title="Delete">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
         </div>
     </div>
     @endforeach
 
     <!-- Add Plan Card -->
-    <a href="{{ route('admin.plans.create') }}" class="bg-light/30 rounded-[48px] border-4 border-dashed border-gray-lighter flex flex-col items-center justify-center p-10 group hover:border-primary/30 hover:bg-white transition-all duration-500 min-h-[400px]">
-        <div class="w-16 h-16 rounded-full bg-white border border-gray-lighter text-gray group-hover:text-primary group-hover:border-primary group-hover:scale-110 transition-all flex items-center justify-center text-xl mb-4 shadow-sm">
-            <i class="fas fa-plus"></i>
+    <a href="{{ route('admin.plans.create') }}" class="bg-light/30 rounded-[24px] border-4 border-dashed border-gray-lighter flex items-center justify-center p-8 group hover:border-primary/30 hover:bg-white transition-all duration-500 h-24">
+        <div class="flex items-center gap-6 w-full justify-center">
+            <div class="w-12 h-12 rounded-full bg-white border border-gray-lighter text-gray group-hover:text-primary group-hover:border-primary group-hover:scale-110 transition-all flex items-center justify-center text-lg flex-shrink-0 shadow-sm">
+                <i class="fas fa-plus"></i>
+            </div>
+            <div class="text-center">
+                <div class="text-[11px] font-black text-dark uppercase tracking-[0.2em]">Add New Plan</div>
+                <div class="text-[9px] font-semibold text-gray uppercase italic">Create subscription tier</div>
+            </div>
         </div>
-        <div class="text-[10px] font-black text-dark uppercase tracking-[0.3em]">Architect New Tier</div>
-        <div class="mt-2 text-[9px] font-bold text-gray uppercase italic">Extend platform capabilities</div>
     </a>
 </div>
 @endsection
