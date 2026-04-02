@@ -17,7 +17,7 @@ return new class extends Migration
 
         Schema::table('users', function (Blueprint $table) {
             if (!Schema::hasColumn('users', 'otp')) {
-                $table->string('otp', 10)->nullable()->after('api_token');
+                $table->string('otp', 10)->nullable()->after('password');
             }
 
             if (!Schema::hasColumn('users', 'otp_expires_at')) {

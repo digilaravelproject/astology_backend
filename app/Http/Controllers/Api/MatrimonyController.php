@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\MatrimonyProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class MatrimonyController extends Controller
@@ -41,31 +43,38 @@ class MatrimonyController extends Controller
             'aadhar_card_number' => ['nullable', 'string', 'max:20', 'regex:/^[0-9]{12}$/'],
         ]);
 
-        $profile = MatrimonyProfile::updateOrCreate(
-            ['user_id' => $user->id],
-            array_merge($validated, ['user_id' => $user->id])
-        );
+        try {
+            return DB::transaction(function () use ($user, $validated, $request) {
+                $profile = MatrimonyProfile::updateOrCreate(
+                    ['user_id' => $user->id],
+                    array_merge($validated, ['user_id' => $user->id])
+                );
 
-        if ($request->hasFile('profile_photo')) {
-            $file = $request->file('profile_photo');
-            $filename = time() . '_' . $user->id . '_matrimony.' . $file->getClientOriginalExtension();
-            $path = 'matrimony_profiles/' . $user->id;
+                if ($request->hasFile('profile_photo')) {
+                    $file = $request->file('profile_photo');
+                    $filename = time() . '_' . $user->id . '_matrimony.' . $file->getClientOriginalExtension();
+                    $path = 'matrimony_profiles/' . $user->id;
 
-            if ($profile->profile_photo && Storage::disk('public')->exists($profile->profile_photo)) {
-                Storage::disk('public')->delete($profile->profile_photo);
-            }
+                    if ($profile->profile_photo && Storage::disk('public')->exists($profile->profile_photo)) {
+                        Storage::disk('public')->delete($profile->profile_photo);
+                    }
 
-            $profile->profile_photo = Storage::disk('public')->putFileAs($path, $file, $filename);
-            $profile->save();
+                    $profile->profile_photo = Storage::disk('public')->putFileAs($path, $file, $filename);
+                    $profile->save();
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Matrimony profile saved successfully.',
+                    'data' => [
+                        'profile' => $profile,
+                    ],
+                ], 201);
+            });
+        } catch (\Exception $e) {
+            Log::error('Matrimony profile save error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to save profile.'], 500);
         }
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Matrimony profile saved successfully.',
-            'data' => [
-                'profile' => $profile,
-            ],
-        ], 201);
     }
 
     /**

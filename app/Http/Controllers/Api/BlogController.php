@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Blog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class BlogController extends Controller
 {
@@ -14,16 +15,21 @@ class BlogController extends Controller
      */
     public function index(): JsonResponse
     {
-        $blogs = Blog::where('is_active', true)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        try {
+            $blogs = Blog::where('is_active', true)
+                ->orderBy('created_at', 'desc')
+                ->get();
 
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'blogs' => $blogs,
-            ],
-        ], 200);
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'blogs' => $blogs,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Blog index error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to fetch blogs.'], 500);
+        }
     }
 
     /**
@@ -31,23 +37,28 @@ class BlogController extends Controller
      */
     public function show($id): JsonResponse
     {
-        $blog = Blog::where('id', $id)
-            ->where('is_active', true)
-            ->first();
+        try {
+            $blog = Blog::where('id', $id)
+                ->where('is_active', true)
+                ->first();
 
-        if (!$blog) {
+            if (!$blog) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Blog not found.',
+                ], 404);
+            }
+
             return response()->json([
-                'status' => 'error',
-                'message' => 'Blog not found.',
-            ], 404);
+                'status' => 'success',
+                'data' => [
+                    'blog' => $blog,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Blog show error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to fetch blog details.'], 500);
         }
-
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'blog' => $blog,
-            ],
-        ], 200);
     }
 
     /**
@@ -55,42 +66,47 @@ class BlogController extends Controller
      */
     public function search(Request $request): JsonResponse
     {
-        $search = $request->query('q');
-        $type = $request->query('type');
-        $tags = $request->query('tags');
+        try {
+            $search = $request->query('q');
+            $type = $request->query('type');
+            $tags = $request->query('tags');
 
-        $query = Blog::where('is_active', true);
+            $query = Blog::where('is_active', true);
 
-        if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->where('title', 'like', "%{$search}%")
-                    ->orWhere('subtitle', 'like', "%{$search}%")
-                    ->orWhere('author', 'like', "%{$search}%")
-                    ->orWhere('content', 'like', "%{$search}%");
-            });
-        }
+            if ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('title', 'like', "%{$search}%")
+                        ->orWhere('subtitle', 'like', "%{$search}%")
+                        ->orWhere('author', 'like', "%{$search}%")
+                        ->orWhere('content', 'like', "%{$search}%");
+                });
+            }
 
-        if ($type) {
-            $query->where('type', $type);
-        }
+            if ($type) {
+                $query->where('type', $type);
+            }
 
-        if ($tags) {
-            $tagArray = is_string($tags) ? explode(',', $tags) : (array) $tags;
-            foreach ($tagArray as $tagItem) {
-                $tagItem = trim($tagItem);
-                if ($tagItem !== '') {
-                    $query->whereJsonContains('blog_tags', $tagItem);
+            if ($tags) {
+                $tagArray = is_string($tags) ? explode(',', $tags) : (array) $tags;
+                foreach ($tagArray as $tagItem) {
+                    $tagItem = trim($tagItem);
+                    if ($tagItem !== '') {
+                        $query->whereJsonContains('blog_tags', $tagItem);
+                    }
                 }
             }
+
+            $blogs = $query->orderByDesc('created_at')->get();
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'blogs' => $blogs,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Blog search error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to search blogs.'], 500);
         }
-
-        $blogs = $query->orderByDesc('created_at')->get();
-
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'blogs' => $blogs,
-            ],
-        ], 200);
     }
 }

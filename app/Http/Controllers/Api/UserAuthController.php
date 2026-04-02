@@ -12,6 +12,7 @@ use App\Services\NotificationHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
@@ -84,7 +85,7 @@ class UserAuthController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('User sendOtp error: ' . $e->getMessage());
+            Log::error('User sendOtp error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -107,48 +108,62 @@ class UserAuthController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $phone = $request->input('phone');
-        $otp = $request->input('otp');
+        try {
+            DB::beginTransaction();
 
-        $user = User::where('phone', $phone)->where('user_type', 'user')->first();
+            $phone = $request->input('phone');
+            $otp = $request->input('otp');
 
-        if (!$user) {
-            return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
+            $user = User::where('phone', $phone)->where('user_type', 'user')->lockForUpdate()->first();
+
+            if (!$user) {
+                DB::rollBack();
+                return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
+            }
+
+            if (!$user->otp || !$user->otp_expires_at || Carbon::now()->gt($user->otp_expires_at)) {
+                DB::rollBack();
+                return response()->json(['status' => 'error', 'message' => 'OTP expired or not generated.'], 422);
+            }
+
+            if ($user->otp !== $otp) {
+                DB::rollBack();
+                return response()->json(['status' => 'error', 'message' => 'Invalid OTP.'], 422);
+            }
+
+            // OTP verified
+            $user->otp = null;
+            $user->otp_expires_at = null;
+            $user->otp_verified_at = Carbon::now();
+            $user->save();
+
+            // Issue Sanctum token
+            $token = $user->createToken('auth_token')->plainTextToken;
+
+            DB::commit();
+
+            NotificationHelper::send(
+                $user->id,
+                'OTP verified',
+                'You have successfully verified your OTP and are now logged in.',
+                ['phone' => $phone]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'OTP verified.',
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'data' => [
+                    'user' => $user,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('User verifyOtp error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to verify OTP.'], 500);
         }
-
-        if (!$user->otp || !$user->otp_expires_at || Carbon::now()->gt($user->otp_expires_at)) {
-            return response()->json(['status' => 'error', 'message' => 'OTP expired or not generated.'], 422);
-        }
-
-        if ($user->otp !== $otp) {
-            return response()->json(['status' => 'error', 'message' => 'Invalid OTP.'], 422);
-        }
-
-        // OTP verified
-        $user->otp = null;
-        $user->otp_expires_at = null;
-        $user->otp_verified_at = Carbon::now();
-        $user->save();
-
-        NotificationHelper::send(
-            $user->id,
-            'OTP verified',
-            'You have successfully verified your OTP and are now logged in.',
-            ['phone' => $phone]
-        );
-
-        // Issue Sanctum token
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'OTP verified.',
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'data' => [
-                'user' => $user,
-            ],
-        ], 200);
     }
 
     /**
@@ -190,7 +205,7 @@ class UserAuthController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            \Log::error('Get profile error: ' . $e->getMessage());
+            Log::error('Get profile error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -261,7 +276,7 @@ class UserAuthController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Update user profile error: ' . $e->getMessage());
+            Log::error('Update user profile error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -369,7 +384,7 @@ class UserAuthController extends Controller
             ], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Update in-app profile error: ' . $e->getMessage());
+            Log::error('Update in-app profile error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -642,7 +657,7 @@ class UserAuthController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            \Log::error('Get following list error: ' . $e->getMessage());
+            Log::error('Get following list error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -686,7 +701,7 @@ class UserAuthController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            \Log::error('User logout error: ' . $e->getMessage());
+            Log::error('User logout error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -746,7 +761,7 @@ class UserAuthController extends Controller
 
             DB::commit();
 
-            \Log::info("User account deleted: ID={$userId}, Name={$userName}");
+            Log::info("User account deleted: ID={$userId}, Name={$userName}");
 
             return response()->json([
                 'status' => 'success',
@@ -759,7 +774,7 @@ class UserAuthController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Delete user account error: ' . $e->getMessage());
+            Log::error('Delete user account error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',

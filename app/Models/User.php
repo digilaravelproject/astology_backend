@@ -39,6 +39,11 @@ class User extends Authenticatable
         'plan_id',
         'plan_started_at',
         'plan_expires_at',
+        'is_online',
+        'last_seen_at',
+        'is_busy',
+        'busy_session_id',
+        'fcm_token',
     ];
 
     /**
@@ -69,6 +74,9 @@ class User extends Authenticatable
             'profile_completed' => 'boolean',
             'plan_started_at' => 'datetime',
             'plan_expires_at' => 'datetime',
+            'is_online' => 'boolean',
+            'is_busy' => 'boolean',
+            'last_seen_at' => 'datetime',
         ];
     }
 
@@ -115,5 +123,25 @@ class User extends Authenticatable
     public function reviews()
     {
         return $this->hasMany(\App\Models\AstrologerReview::class);
+    }
+
+    public function initiatedCalls()
+    {
+        return $this->hasMany(\App\Models\CallSession::class, 'consumer_id');
+    }
+
+    public function receivedCalls()
+    {
+        return $this->hasMany(\App\Models\CallSession::class, 'provider_id');
+    }
+
+    public function initiatedChats()
+    {
+        return $this->hasMany(\App\Models\ChatSession::class, 'consumer_id');
+    }
+
+    public function receivedChats()
+    {
+        return $this->hasMany(\App\Models\ChatSession::class, 'provider_id');
     }
 }
