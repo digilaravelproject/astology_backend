@@ -60,45 +60,64 @@ class ChatController extends Controller
     public function endChat(Request $request, $sessionId)
     {
         try {
-            $session = $this->chatService->endChat($sessionId);
+            $session = $this->chatService->endChat($sessionId, $request->user()->id);
             broadcast(new ChatEnded($session, $request->user()->id));
             return ApiResponse::success(['session' => $session], 'Chat ended successfully');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 400);
+            return ApiResponse::error($e->getMessage(), 403);
         }
     }
 
     public function rejectChat(Request $request, $sessionId)
     {
         try {
-            $session = $this->chatService->endChat($sessionId);
+            $session = $this->chatService->endChat($sessionId, $request->user()->id);
             broadcast(new ChatEnded($session, $request->user()->id));
             return ApiResponse::success(null, 'Chat rejected');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 400);
+            return ApiResponse::error($e->getMessage(), 403);
         }
     }
 
     public function sendMessage(Request $request, $sessionId)
     {
         $request->validate([
-            'receiver_id' => 'required|exists:users,id',
             'message' => 'required_without:attachment_url|string',
             'attachment_url' => 'nullable|string',
             'type' => 'in:text,image,system'
         ]);
 
-        $message = Message::create([
-            'chat_session_id' => $sessionId,
-            'sender_id' => $request->user()->id,
-            'receiver_id' => $request->receiver_id,
-            'message' => $request->message,
-            'attachment_url' => $request->attachment_url,
-            'type' => $request->type ?? 'text',
-        ]);
+        try {
+            $userId = $request->user()->id;
+            $session = $this->chatService->getSession($sessionId);
 
-        broadcast(new MessageSent($message, $request->receiver_id));
+            if (!$session || !in_array($session->status, ['initiated', 'accepted', 'ongoing'])) {
+                return ApiResponse::error('Invalid or expired session', 400);
+            }
 
-        return ApiResponse::success(['message' => $message], 'Message sent');
+            // Security: Determine receiver and verify participation
+            if ($session->consumer_id == $userId) {
+                $receiverId = $session->provider_id;
+            } elseif ($session->provider_id == $userId) {
+                $receiverId = $session->consumer_id;
+            } else {
+                return ApiResponse::error('Unauthorized participation in this session', 403);
+            }
+
+            $message = Message::create([
+                'chat_session_id' => $sessionId,
+                'sender_id' => $userId,
+                'receiver_id' => $receiverId,
+                'message' => $request->message,
+                'attachment_url' => $request->attachment_url,
+                'type' => $request->type ?? 'text',
+            ]);
+
+            broadcast(new MessageSent($message, $receiverId));
+
+            return ApiResponse::success(['message' => $message], 'Message sent');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
     }
 }

@@ -73,45 +73,63 @@ class CallController extends Controller
     public function endCall(Request $request, $sessionId)
     {
         try {
-            $session = $this->callService->endCall($sessionId);
+            $session = $this->callService->endCall($sessionId, $request->user()->id);
             
             // Broadcast end
             broadcast(new CallEnded($session, $request->user()->id));
             
             return ApiResponse::success(['session' => $session], 'Call ended successfully');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 400);
+            return ApiResponse::error($e->getMessage(), 403);
         }
     }
 
     public function rejectCall(Request $request, $sessionId)
     {
         try {
-            $session = $this->callService->endCall($sessionId);
-            // You might want a specific CallRejected event, but CallEnded with ended_by is often enough
+            $session = $this->callService->endCall($sessionId, $request->user()->id);
             broadcast(new CallEnded($session, $request->user()->id));
             return ApiResponse::success(null, 'Call rejected');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 400);
+            return ApiResponse::error($e->getMessage(), 403);
         }
     }
 
     public function sendIceCandidate(Request $request, $sessionId)
     {
         $request->validate([
-            'candidate' => 'required|string',
-            'receiver_id' => 'required|exists:users,id'
+            'candidate' => 'required|string'
         ]);
 
-        $candidate = IceCandidate::create([
-            'call_session_id' => $sessionId,
-            'sender_id' => $request->user()->id,
-            'receiver_id' => $request->receiver_id,
-            'candidate' => $request->candidate
-        ]);
+        try {
+            $userId = $request->user()->id;
+            $session = $this->callService->getSession($sessionId);
 
-        broadcast(new IceCandidateSent($session = null, $request->candidate, $request->receiver_id));
+            if (!$session || !in_array($session->status, ['initiated', 'ringing', 'accepted', 'ongoing'])) {
+                return ApiResponse::error('Invalid or expired session', 400);
+            }
 
-        return ApiResponse::success(null, 'Candidate sent');
+            // Security: Determine receiver and verify participation
+            if ($session->consumer_id == $userId) {
+                $receiverId = $session->provider_id;
+            } elseif ($session->provider_id == $userId) {
+                $receiverId = $session->consumer_id;
+            } else {
+                return ApiResponse::error('Unauthorized participation in this session', 403);
+            }
+
+            $candidate = IceCandidate::create([
+                'call_session_id' => $sessionId,
+                'sender_id' => $userId,
+                'receiver_id' => $receiverId,
+                'candidate' => $request->candidate
+            ]);
+
+            broadcast(new IceCandidateSent($session, $request->candidate, $receiverId));
+
+            return ApiResponse::success(null, 'Candidate sent');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
     }
 }

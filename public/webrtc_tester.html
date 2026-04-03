@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>SignalMaster Pro | v3.9 Host-Aware Debugger</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://js.pusher.com/8.0.1/pusher.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.17.1/dist/echo.iife.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body { font-family: 'Space Grotesk', sans-serif; background: #020617; color: #f1f5f9; min-height: 100vh; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .video-box { background: #000; border-radius: 2rem; aspect-ratio: 16/9; overflow: hidden; position: relative; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .btn-action { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-action:active { transform: scale(0.92); }
+        .logs-window::-webkit-scrollbar { width: 2px; }
+        .bubble { padding: 12px 20px; border-radius: 20px; max-width: 80%; font-size: 13px; margin-bottom: 8px; }
+        .bubble-me { align-self: flex-end; background: #6366f1; color: white; }
+        .bubble-them { align-self: flex-start; background: #1e293b; color: white; }
+        .warn-banner { background: #f43f5e; color: white; padding: 12px; text-align: center; font-size: 11px; font-weight: 800; border-radius: 12px; margin-bottom: 20px; }
+    </style>
+</head>
+<body class="p-4 md:p-8 overflow-x-hidden">
+
+    <!-- SMART HOST DETECTION BANNER -->
+    <div id="hostAlert" class="warn-banner hidden">
+        ⚠️ AUTO-HOST APPLIED: Detected you are on <span id="detectedHost" class="underline"></span>. Syncing config now...
+    </div>
+
+    <!-- INSECURE CONTEXT WARNING -->
+    <div id="secureWarn" class="warn-banner" style="display:none; background:#d946ef;">
+        🛡️ CAMERA BLOCKED: Non-localhost HTTP detected. For Android/Chrome: Go to chrome://flags#unsafely-treat-insecure-origin-as-secure and add this IP.
+    </div>
+
+    <div class="max-w-7xl mx-auto">
+        <header class="flex flex-col lg:flex-row justify-between items-start gap-8 mb-12">
+            <div>
+                <h1 class="text-4xl md:text-6xl font-black text-white tracking-tighter uppercase">SIGNAL_<span class="text-indigo-500">PRO</span></h1>
+                <p class="text-[9px] text-slate-500 font-bold tracking-[0.4em] mt-2 italic">Infrastructure Finalist v3.9</p>
+            </div>
+            
+            <div class="glass flex items-center gap-6 py-4 px-8 rounded-3xl">
+                <div class="flex items-center gap-3">
+                    <div id="wsDot" class="h-2.5 w-2.5 rounded-full bg-slate-800"></div>
+                    <span id="wsLb" class="text-[9px] font-black uppercase text-slate-500">Wait...</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- CONFIG -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="glass p-8 rounded-[2.5rem] space-y-6">
+                    <div class="grid grid-cols-1 gap-4">
+                        <div class="space-y-1">
+                            <label class="text-[9px] font-black text-slate-500 uppercase px-1">API_BASE</label>
+                            <input type="text" id="baseUrl" value="http://127.0.0.1:8000" class="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold transition-all">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[9px] font-black text-slate-500 uppercase px-1">REVERB_HOST</label>
+                            <input type="text" id="wsHost" value="127.0.0.1" class="w-full bg-slate-950 border border-white/5 rounded-2xl px-5 py-4 text-xs font-bold transition-all text-indigo-400">
+                        </div>
+                    </div>
+
+                    <div class="space-y-4">
+                        <!-- ROLE A -->
+                        <div class="p-6 rounded-[2rem] bg-indigo-500/5 border border-indigo-500/10">
+                            <div class="flex justify-between items-center mb-4 text-[9px] font-black">
+                                <span class="text-indigo-400 tracking-widest uppercase">Peer A (Consumer)</span>
+                                <span id="vA" class="text-slate-600">--</span>
+                            </div>
+                            <input type="text" id="tokenA" placeholder="Bearer Key" class="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-[9px] font-mono mb-3">
+                            <div class="flex gap-2">
+                                <input type="number" id="idA" placeholder="ID" class="w-16 bg-black border border-white/5 rounded-xl px-2 text-xs font-black">
+                                <button onclick="boot('A')" id="btnA" class="btn-action flex-1 bg-indigo-600 py-3 rounded-xl text-[9px] font-black tracking-widest">CONNECT A</button>
+                            </div>
+                        </div>
+
+                        <!-- ROLE B -->
+                        <div class="p-6 rounded-[2rem] bg-purple-500/5 border border-purple-500/10">
+                            <div class="flex justify-between items-center mb-4 text-[9px] font-black uppercase">
+                                <span class="text-purple-400 tracking-widest">Peer B (Astro)</span>
+                                <span id="vB" class="text-slate-600">--</span>
+                            </div>
+                            <input type="text" id="tokenB" placeholder="Bearer Key" class="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-[9px] font-mono mb-3">
+                            <div class="flex gap-2">
+                                <input type="number" id="idB" placeholder="ID" class="w-16 bg-black border border-white/5 rounded-xl px-2 text-xs font-black">
+                                <button onclick="boot('B')" id="btnB" class="btn-action flex-1 bg-purple-600 py-3 rounded-xl text-[9px] font-black tracking-widest">CONNECT B</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOGS -->
+                <div class="glass p-6 rounded-[2rem] h-60 flex flex-col bg-black/20">
+                    <div id="logs" class="logs-window mono text-[9px] space-y-2 overflow-y-auto flex-1 pr-2"></div>
+                </div>
+            </div>
+
+            <!-- VIEWPORTS -->
+            <div class="lg:col-span-8 space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="video-box"><video id="vL" autoplay muted playsinline class="scale-x-[-1]"></video>
+                        <div class="absolute bottom-6 left-6 text-[9px] font-black text-indigo-400 uppercase tracking-widest">MASTER_STREAM</div>
+                    </div>
+                    <div class="video-box"><video id="vR" autoplay playsinline></video>
+                        <div class="absolute bottom-6 left-6 text-[9px] font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>REMOTE_PEER</div>
+                    </div>
+                </div>
+
+                <div id="tp" class="hidden glass p-8 rounded-[2.5rem]">
+                    <div class="flex gap-4">
+                        <input type="number" id="dest" placeholder="Target ID" class="w-32 bg-black border border-white/10 rounded-2xl px-6 py-5 text-lg font-black">
+                        <button onclick="negV()" class="btn-action flex-1 bg-indigo-600 rounded-2xl font-black text-[10px] uppercase tracking-widest">VIDEO CALL</button>
+                        <button onclick="negC()" class="btn-action flex-1 bg-white text-black rounded-2xl font-black text-[10px] uppercase tracking-widest">CHAT START</button>
+                    </div>
+                </div>
+
+                <div id="cb" class="hidden glass rounded-[3rem] flex-col h-[500px] overflow-hidden">
+                    <div id="msgLog" class="flex-1 overflow-y-auto p-10 flex flex-col gap-3"></div>
+                    <div class="p-6 bg-black/40 flex gap-4"><input type="text" id="mi" class="flex-1 bg-transparent text-sm" onkeydown="if(event.key==='Enter') sM()"><button onclick="sM()" class="bg-indigo-600 px-6 py-2 rounded-xl text-xs font-black">SEND</button></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CALL MODAL -->
+    <div id="cm" class="fixed inset-0 bg-black/90 z-100 hidden items-center justify-center backdrop-blur-2xl">
+        <div class="glass p-16 rounded-[4rem] text-center border-2 border-indigo-500/20">
+            <h2 class="text-3xl font-black mb-8 text-white">INCOMING SIGNAL</h2>
+            <div class="flex gap-4">
+                <button onclick="cA('accept')" class="bg-emerald-600 px-12 py-5 rounded-3xl font-black text-xs">ACCEPT</button>
+                <button onclick="cA('reject')" class="bg-rose-600 px-12 py-5 rounded-3xl font-black text-xs">REJECT</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let echo = null, sId = null, pc = null, lS = null, mySide = null;
+
+        // Smart Host Logic
+        const hostname = window.location.hostname;
+        if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+            document.getElementById('hostAlert').classList.remove('hidden');
+            document.getElementById('detectedHost').innerText = hostname;
+            document.getElementById('baseUrl').value = `http://${hostname}:8000`;
+            document.getElementById('wsHost').value = hostname;
+        }
+        if (!window.isSecureContext && hostname !== 'localhost') document.getElementById('secureWarn').style.display = 'block';
+
+        const L = (m, t='info') => {
+            const l = document.getElementById('logs');
+            const el = document.createElement('div');
+            el.className = `p-2 mb-1 rounded bg-white/5 ${t==='error'?'text-rose-500':'text-indigo-400'}`;
+            el.innerText = `[${new Date().toLocaleTimeString()}] ${m}`;
+            l.prepend(el);
+        };
+
+        const boot = (s) => {
+            mySide = s;
+            const t = document.getElementById(`token${s}`).value.trim().replace('Bearer ', '');
+            const u = document.getElementById(`id${s}`).value;
+            const b = document.getElementById('baseUrl').value;
+            const h = document.getElementById('wsHost').value;
+
+            echo = new Echo({
+                broadcaster: 'reverb', key: 'astrology-key', wsHost: h, wsPort: 8080, forceTLS: false,
+                authEndpoint: `${b}/api/v1/broadcasting/auth`,
+                auth: { headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' } }
+            });
+
+            echo.connector.pusher.connection.bind('connected', () => {
+                document.getElementById('wsDot').className = 'h-2.5 w-2.5 rounded-full bg-emerald-500';
+                document.getElementById('wsLb').innerText = 'BRIDGE_STABLE';
+                L(`Peer ${s} Connected!`);
+                if(s === 'A') document.getElementById('tp').classList.remove('hidden');
+            });
+
+            echo.private(`user.${u}`)
+                .listen('.CallInitiated', async e => { sId = e.session.id; L('SIGNAL: Offer Rx'); document.getElementById('cm').style.display='flex'; setupMedia(s); await pc.setRemoteDescription(new RTCSessionDescription({type:'offer', sdp:e.offer})); })
+                .listen('.CallAccepted', async e => { L('SIGNAL: Answer Rx'); await pc.setRemoteDescription(new RTCSessionDescription({type:'answer', sdp:e.answer})); })
+                .listen('.ChatInitiated', e => { sId = e.session.id; L('CHAT: Request Rx'); document.getElementById('cb').style.display='flex'; })
+                .listen('.MessageSent', e => dB(e.messageData.message, 'them'))
+                .listen('.IceCandidateSent', async e => { try { if(pc) await pc.addIceCandidate(new RTCIceCandidate(e.candidate)); } catch(x){} });
+        };
+
+        const setupMedia = (s) => {
+            pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+            pc.onicecandidate = e => {
+                if(e.candidate) {
+                    const t = document.getElementById(`token${s}`).value.trim().replace('Bearer ', '');
+                    axios.post(`${document.getElementById('baseUrl').value}/api/v1/call/${sId}/ice-candidate`, { 
+                        candidate: e.candidate,
+                        receiver_id: document.getElementById('dest').value || (s==='A' ? document.getElementById('idB').value : document.getElementById('idA').value)
+                    }, { headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' } });
+                }
+            };
+            pc.ontrack = e => { document.getElementById('vR').srcObject = e.streams[0]; L('TRACK: Bound'); };
+            if(lS) lS.getTracks().forEach(t => pc.addTrack(t, lS));
+        };
+
+        const negV = async () => {
+            const t = document.getElementById('tokenA').value.trim().replace('Bearer ', '');
+            const b = document.getElementById('baseUrl').value;
+            try {
+                if(!navigator.mediaDevices) throw new Error('Secure Context Required (camera)');
+                lS = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+                document.getElementById('vL').srcObject = lS;
+                setupMedia('A');
+                const o = await pc.createOffer(); await pc.setLocalDescription(o);
+                const res = await axios.post(`${b}/api/v1/call/initiate`, { provider_id: document.getElementById('dest').value, offer: o.sdp }, { headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' } });
+                sId = res.data.session.id;
+                L('OFFER: Dispatched');
+            } catch(e) { L(`FAIL_V: ${e.message}`, 'error'); }
+        };
+
+        const negC = async () => {
+            const t = document.getElementById('tokenA').value.trim().replace('Bearer ', '');
+            const b = document.getElementById('baseUrl').value;
+            const destId = document.getElementById('dest').value;
+            L(`Attempting Chat to ${b}/api/v1/chat/initiate...`);
+            try {
+                const res = await axios.post(`${b}/api/v1/chat/initiate`, { provider_id: destId }, { headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' } });
+                sId = res.data.session.id;
+                document.getElementById('cb').style.display='flex';
+                L('CHAT: Session Created');
+            } catch(e) { L(`CHAT_ERR: ${e.response?.data?.message || e.message}`, 'error'); }
+        };
+
+        const cA = async (act) => {
+            const t = document.getElementById('tokenB').value.trim().replace('Bearer ', '');
+            const b = document.getElementById('baseUrl').value;
+            let sdp = 'EMPTY';
+            if(act==='accept') {
+                lS = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+                document.getElementById('vL').srcObject = lS;
+                const a = await pc.createAnswer(); await pc.setLocalDescription(a);
+                sdp = a.sdp;
+            }
+            await axios.post(`${b}/api/v1/call/${sId}/${act}`, { answer: sdp }, { headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' } });
+            document.getElementById('cm').style.display='none';
+            L(`CALL: ${act.toUpperCase()}`);
+        };
+
+        const dB = (m, o) => { const log = document.getElementById('msgLog'); const el = document.createElement('div'); el.className = `bubble bubble-${o}`; el.innerText = m; log.appendChild(el); log.scrollTop = log.scrollHeight; };
+
+        const sM = () => {
+            const t = document.getElementById(`token${mySide}`).value.trim().replace('Bearer ', '');
+            const b = document.getElementById('baseUrl').value;
+            const m = document.getElementById('mi').value;
+            if(!m || !sId) return;
+            axios.post(`${b}/api/v1/chat/${sId}/message`, { message: m }, { headers: { Authorization: `Bearer ${t}`, Accept: 'application/json' } });
+            dB(m, 'me'); document.getElementById('mi').value = '';
+        };
+    </script>
+</body>
+</html>

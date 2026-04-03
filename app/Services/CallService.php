@@ -25,6 +25,11 @@ class CallService
         $this->presenceService = $presenceService;
     }
 
+    public function getSession($sessionId)
+    {
+        return $this->callRepo->findById($sessionId);
+    }
+
     /**
      * Initiate a call session with rate validation and balance check.
      */
@@ -56,12 +61,17 @@ class CallService
                     throw new Exception("Insufficient balance. You need minimum " . ($rate * 5) . " in your wallet to start this call.");
                 }
 
-                return $this->callRepo->create([
+                $session = $this->callRepo->create([
                     'consumer_id' => $consumerId,
                     'provider_id' => $providerId,
                     'status' => 'initiated',
                     'rate_per_minute' => $rate,
                 ]);
+
+                // Dispatch timeout cleanup (60 seconds ringing timeout)
+                \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
+
+                return $session;
 
             } catch (Exception $e) {
                 Log::error("Call Initiation Failed: " . $e->getMessage());
@@ -109,20 +119,26 @@ class CallService
     /**
      * End a call session and calculate final costs.
      */
-    public function endCall($sessionId)
+    public function endCall($sessionId, $userId = null)
     {
-        return DB::transaction(function () use ($sessionId) {
+        return DB::transaction(function () use ($sessionId, $userId) {
             try {
                 $session = $this->callRepo->findById($sessionId);
+                
                 if (!$session || !in_array($session->status, ['initiated', 'ringing', 'accepted', 'ongoing'])) {
                     return $session;
+                }
+
+                // Security check: Only participants can end the call (unless userId is null, e.g., from a Job)
+                if ($userId && $session->consumer_id != $userId && $session->provider_id != $userId) {
+                    throw new Exception("You are not authorized to end this call.");
                 }
 
                 $endTime = now();
                 $durationSeconds = $session->started_at ? $session->started_at->diffInSeconds($endTime) : 0;
                 $finalCost = $this->calculateCost($durationSeconds, $session->rate_per_minute);
                 
-                // Calculate unbilled amount (final cost minus what's already been deducted by jobs)
+                // Calculate unbilled amount
                 $alreadyBilled = $session->total_cost ?? 0;
                 $unbilledBalance = $finalCost - $alreadyBilled;
 
@@ -146,7 +162,7 @@ class CallService
                 return $session;
 
             } catch (Exception $e) {
-                Log::error("Ending Call Failed: " . $session->id . " error: " . $e->getMessage());
+                Log::error("Ending Call Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
         });

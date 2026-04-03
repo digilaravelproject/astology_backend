@@ -25,6 +25,11 @@ class ChatService
         $this->presenceService = $presenceService;
     }
 
+    public function getSession($sessionId)
+    {
+        return $this->chatRepo->findById($sessionId);
+    }
+
     /**
      * Initiate a chat session with rate validation and balance check.
      */
@@ -54,12 +59,17 @@ class ChatService
                     throw new Exception("Insufficient balance. Minimum 5 minutes required (" . ($rate * 5) . ").");
                 }
 
-                return $this->chatRepo->create([
+                $session = $this->chatRepo->create([
                     'consumer_id' => $consumerId,
                     'provider_id' => $providerId,
                     'status' => 'initiated',
                     'rate_per_minute' => $rate,
                 ]);
+                
+                // Dispatch timeout cleanup (60 seconds ringing timeout)
+                \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'chat')->delay(now()->addSeconds(60));
+
+                return $session;
 
             } catch (Exception $e) {
                 Log::error("Chat Initiation Failed: " . $e->getMessage());
@@ -105,13 +115,18 @@ class ChatService
     /**
      * End a chat session and calculate final costs.
      */
-    public function endChat($sessionId)
+    public function endChat($sessionId, $userId = null)
     {
-        return DB::transaction(function () use ($sessionId) {
+        return DB::transaction(function () use ($sessionId, $userId) {
             try {
                 $session = $this->chatRepo->findById($sessionId);
                 if (!$session || !in_array($session->status, ['initiated', 'accepted', 'ongoing'])) {
                     return $session;
+                }
+
+                // Security check: Only participants (or system) can end the chat
+                if ($userId && $session->consumer_id != $userId && $session->provider_id != $userId) {
+                    throw new Exception("You are not authorized to end this chat.");
                 }
 
                 $endTime = now();
@@ -141,7 +156,7 @@ class ChatService
                 return $session;
 
             } catch (Exception $e) {
-                Log::error("Ending Chat Failed: " . $e->getMessage());
+                Log::error("Ending Chat Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
         });
