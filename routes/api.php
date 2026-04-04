@@ -130,7 +130,7 @@ Route::prefix('v1')->group(function () {
         Route::middleware('auth:sanctum')->delete('/delete-account', [UserAuthController::class, 'deleteAccount']);
 
         // Plan endpoints (public + requires auth)
-        Route::get('/plans', [PlanController::class, 'index']);
+        Route::middleware('auth:sanctum')->get('/plans', [PlanController::class, 'index']);
         Route::get('/plans/{plan}', [PlanController::class, 'show']);
         Route::middleware('auth:sanctum')->get('/plan', [PlanController::class, 'current']);
         Route::middleware('auth:sanctum')->post('/plans/upgrade', [PlanController::class, 'upgrade']);

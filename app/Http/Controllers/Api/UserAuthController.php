@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateUserProfileRequest;
 use App\Models\Astrologer;
 use App\Models\AstrologerCommunity;
 use App\Models\User;
+use App\Models\MatrimonyProfile;
 use App\Services\NotificationHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -181,6 +182,11 @@ class UserAuthController extends Controller
                     'message' => 'This is not a regular user.',
                 ], 404);
             }
+
+            // ✅ Check if matrimony profile exists
+            $isMatrimony = MatrimonyProfile::where('user_id', $userId)->exists();
+
+            $user->is_matrimony = $isMatrimony;
 
             return response()->json([
                 'status' => 'success',
