@@ -24,6 +24,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 class AstrologerAuthController extends Controller
 {
@@ -69,13 +71,13 @@ class AstrologerAuthController extends Controller
                         $file = $request->file($field);
                         $filename = time() . '_' . $user->id . '_' . $field . '.' . $file->getClientOriginalExtension();
                         $path = 'astrologers/' . $user->id . '/' . $field;
-                        
+
                         // Store file in storage
                         $uploadedFiles[$field] = Storage::disk('public')->putFileAs($path, $file, $filename);
-                        
+
                     } catch (\Exception $e) {
                         // Log file upload error but continue
-                        \Log::error("File upload error for {$field}: " . $e->getMessage());
+                        Log::error("File upload error for {$field}: " . $e->getMessage());
                         // Don't throw error, just skip this file
                     }
                 }
@@ -185,7 +187,7 @@ class AstrologerAuthController extends Controller
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Rollback transaction on validation error
             DB::rollBack();
-            
+
             return response()->json([
                 'status' => 'error',
                 'message' => 'Validation failed',
@@ -197,7 +199,7 @@ class AstrologerAuthController extends Controller
             DB::rollBack();
 
             // Log the error
-            \Log::error('Astrologer signup error: ' . $e->getMessage());
+            Log::error('Astrologer signup error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -367,8 +369,8 @@ class AstrologerAuthController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
-            \Log::error('Get profile error: ' . $e->getMessage());
-            
+            Log::error('Get profile error: ' . $e->getMessage());
+
             return response()->json([
                 'status' => 'error',
                 'message' => 'An error occurred while fetching profile.',
@@ -511,7 +513,7 @@ class AstrologerAuthController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Update profile error: ' . $e->getMessage());
+            Log::error('Update profile error: ' . $e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -527,7 +529,7 @@ class AstrologerAuthController extends Controller
      */
     public function getHomeStatus(): JsonResponse
     {
-        $user = auth()->user();
+        $user = Auth::user();
 
         if (!$user || !$user->astrologer) {
             return response()->json([
@@ -970,8 +972,10 @@ class AstrologerAuthController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
-        if ($request->user()->currentAccessToken()) {
-            $request->user()->currentAccessToken()->delete();
+        $token = $request->user()->currentAccessToken();
+        if ($token) {
+            /** @var \Laravel\Sanctum\PersonalAccessToken $token */
+            $token->delete();
         }
 
         return response()->json(['status' => 'success', 'message' => 'Logged out successfully.'], 200);
@@ -1000,7 +1004,7 @@ class AstrologerAuthController extends Controller
             return response()->json(['status' => 'success', 'message' => 'Astrologer account deleted successfully.'], 200);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Astrologer delete account error: ' . $e->getMessage());
+            Log::error('Astrologer delete account error: ' . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => 'Failed to delete astrologer account.'], 500);
         }
     }

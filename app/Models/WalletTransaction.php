@@ -20,6 +20,10 @@ class WalletTransaction extends Model
         'provider_payment_id',
         'description',
         'meta',
+        'balance_before',
+        'balance_after',
+        'reference_type',
+        'reference_id',
     ];
 
     protected $casts = [
@@ -30,5 +34,10 @@ class WalletTransaction extends Model
     public function wallet()
     {
         return $this->belongsTo(Wallet::class);
+    }
+
+    public function reference()
+    {
+        return $this->morphTo();
     }
 }

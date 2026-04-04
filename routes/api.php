@@ -1,173 +1,180 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Api\AstrologerAuthController;
-use App\Http\Controllers\Api\BlogController;
-use App\Http\Controllers\Api\AstrologerController;
-use App\Http\Controllers\Api\FoundersWordController;
-use App\Http\Controllers\Api\RemedyController;
-use App\Http\Controllers\Api\NoticeController;
-use App\Http\Controllers\Api\TrainingVideoController;
-use App\Http\Controllers\Api\UserAuthController;
-use App\Http\Controllers\Api\MatrimonyController;
-use App\Http\Controllers\Api\WalletController;
-use App\Http\Controllers\Api\ReviewController;
-use App\Http\Controllers\Api\NotificationController;
-use App\Http\Controllers\Api\PlanController;
+use Illuminate\Support\Facades\Broadcast;
+use App\Http\Controllers\Api\{
+    AstrologerAuthController,
+    AstrologerController,
+    BlogController,
+    CallController,
+    ChatController,
+    FoundersWordController,
+    MatrimonyController,
+    NoticeController,
+    NotificationController,
+    PlanController,
+    PresenceController,
+    RemedyController,
+    ReviewController,
+    StaticPageController,
+    TrainingVideoController,
+    UserAuthController,
+    WalletController
+};
+
+/*
+|--------------------------------------------------------------------------
+| API Routes - Version 1
+|--------------------------------------------------------------------------
+|
+| All routes are prefixed with /api/v1
+|
+*/
 
 Route::prefix('v1')->group(function () {
+
+    /*
+    |--------------------------------------------------------------------------
+    | ASTROLOGER ROUTES
+    |--------------------------------------------------------------------------
+    */
     Route::prefix('astrologer')->group(function () {
-        // Astrologer signup endpoint
         Route::post('/signup', [AstrologerAuthController::class, 'signup']);
-        // OTP login routes
         Route::post('/send-otp', [AstrologerAuthController::class, 'sendOtp']);
         Route::post('/verify-otp', [AstrologerAuthController::class, 'verifyOtp']);
         Route::post('/resend-otp', [AstrologerAuthController::class, 'resendOtp']);
-        
-        // Get astrologer profile endpoint
         Route::get('/profile/{userId}', [AstrologerAuthController::class, 'getProfile']);
-
-        // Update astrologer profile endpoint (requires authentication)
-        Route::middleware('auth:sanctum')->put('/profile', [AstrologerAuthController::class, 'updateProfile']);
-
-        // Home status (availability + pricing) endpoints (requires authentication)
-        Route::middleware('auth:sanctum')->get('/home', [AstrologerAuthController::class, 'getHomeStatus']);
-        Route::middleware('auth:sanctum')->put('/home', [AstrologerAuthController::class, 'updateHomeStatus']);
-
-        // Update astrologer skill details (requires authentication)
-        Route::middleware('auth:sanctum')->put('/profile/skills', [AstrologerAuthController::class, 'updateSkill']);
-
-        // Update astrologer other details (requires authentication)
-        Route::middleware('auth:sanctum')->put('/profile/other-details', [AstrologerAuthController::class, 'updateOtherDetails']);
-
-        // Update profile photo endpoint (requires authentication)
-        // Use POST + _method=PUT if you want to upload multipart/form-data from clients that don't support PUT file uploads.
-        Route::middleware('auth:sanctum')->post('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
-        Route::middleware('auth:sanctum')->put('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
-
-        // Community (followers / favorites) endpoints
-        Route::middleware('auth:sanctum')->get('/community/followers', [AstrologerAuthController::class, 'getFollowers']);
-        Route::middleware('auth:sanctum')->post('/community/followers/{userId}/toggle-like', [AstrologerAuthController::class, 'toggleFollowerLike']);
-        Route::middleware('auth:sanctum')->get('/community/favorites', [AstrologerAuthController::class, 'getFavorites']);
-
-        // Astrologer phone numbers (requires authentication)
-        Route::middleware('auth:sanctum')->post('/phone-numbers', [AstrologerAuthController::class, 'addPhoneNumber']);
-        Route::middleware('auth:sanctum')->get('/phone-numbers', [AstrologerAuthController::class, 'getPhoneNumbers']);
-        Route::middleware('auth:sanctum')->post('/phone-numbers/{id}/verify', [AstrologerAuthController::class, 'verifyPhoneNumber']);
-        Route::middleware('auth:sanctum')->post('/phone-numbers/{id}/set-default', [AstrologerAuthController::class, 'setDefaultPhoneNumber']);
-
-        // Astrologer bank accounts (requires authentication)
-        Route::middleware('auth:sanctum')->get('/bank-accounts', [AstrologerAuthController::class, 'getBankAccounts']);
-        Route::middleware('auth:sanctum')->post('/bank-accounts', [AstrologerAuthController::class, 'addBankAccount']);
-        Route::middleware('auth:sanctum')->post('/bank-accounts/{id}/set-default', [AstrologerAuthController::class, 'setDefaultBankAccount']);
-
-        // Astrologer availability (requires authentication)
-        Route::middleware('auth:sanctum')->get('/availability', [AstrologerAuthController::class, 'getAvailability']);
-        Route::middleware('auth:sanctum')->put('/availability', [AstrologerAuthController::class, 'setAvailability']);
-
-        // Astrologer sleep hours (requires authentication)
-        Route::middleware('auth:sanctum')->get('/sleep-hours', [AstrologerAuthController::class, 'getSleepHours']);
-        Route::middleware('auth:sanctum')->post('/sleep-hours', [AstrologerAuthController::class, 'setSleepHours']);
-
-        // Astrologer logout/delete account (requires authentication)
-        Route::middleware('auth:sanctum')->post('/logout', [AstrologerAuthController::class, 'logout']);
-        Route::middleware('auth:sanctum')->delete('/delete-account', [AstrologerAuthController::class, 'deleteAccount']);
-
-        // Training videos (public)
         Route::get('/training-videos', [TrainingVideoController::class, 'index']);
         Route::get('/training-videos/{id}', [TrainingVideoController::class, 'show']);
+
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::put('/profile', [AstrologerAuthController::class, 'updateProfile']);
+            Route::get('/home', [AstrologerAuthController::class, 'getHomeStatus']);
+            Route::put('/home', [AstrologerAuthController::class, 'updateHomeStatus']);
+            Route::put('/profile/skills', [AstrologerAuthController::class, 'updateSkill']);
+            Route::put('/profile/other-details', [AstrologerAuthController::class, 'updateOtherDetails']);
+            Route::post('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
+            Route::put('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
+            Route::get('/community/followers', [AstrologerAuthController::class, 'getFollowers']);
+            Route::post('/community/followers/{userId}/toggle-like', [AstrologerAuthController::class, 'toggleFollowerLike']);
+            Route::get('/community/favorites', [AstrologerAuthController::class, 'getFavorites']);
+            Route::get('/phone-numbers', [AstrologerAuthController::class, 'getPhoneNumbers']);
+            Route::post('/phone-numbers', [AstrologerAuthController::class, 'addPhoneNumber']);
+            Route::post('/phone-numbers/{id}/verify', [AstrologerAuthController::class, 'verifyPhoneNumber']);
+            Route::post('/phone-numbers/{id}/set-default', [AstrologerAuthController::class, 'setDefaultPhoneNumber']);
+            Route::get('/bank-accounts', [AstrologerAuthController::class, 'getBankAccounts']);
+            Route::post('/bank-accounts', [AstrologerAuthController::class, 'addBankAccount']);
+            Route::post('/bank-accounts/{id}/set-default', [AstrologerAuthController::class, 'setDefaultBankAccount']);
+            Route::get('/availability', [AstrologerAuthController::class, 'getAvailability']);
+            Route::put('/availability', [AstrologerAuthController::class, 'setAvailability']);
+            Route::get('/sleep-hours', [AstrologerAuthController::class, 'getSleepHours']);
+            Route::post('/sleep-hours', [AstrologerAuthController::class, 'setSleepHours']);
+            Route::post('/logout', [AstrologerAuthController::class, 'logout']);
+            Route::delete('/delete-account', [AstrologerAuthController::class, 'deleteAccount']);
+        });
     });
 
+    /*
+    |--------------------------------------------------------------------------
+    | USER (CONSUMER) ROUTES
+    |--------------------------------------------------------------------------
+    */
     Route::prefix('user')->group(function () {
-        // User OTP login routes (creates account if doesn't exist)
         Route::post('/send-otp', [UserAuthController::class, 'sendOtp']);
         Route::post('/verify-otp', [UserAuthController::class, 'verifyOtp']);
         Route::post('/resend-otp', [UserAuthController::class, 'resendOtp']);
-        
-        // Get user profile endpoint
         Route::get('/profile/{userId}', [UserAuthController::class, 'getProfile']);
-        
-        // Update user profile endpoint (after OTP verification)
-        Route::put('/profile/{userId}', [UserAuthController::class, 'updateProfile']);
+        Route::put('/profile/{userId}', [UserAuthController::class, 'updateProfile']); 
 
-        // Update authenticated user profile (requires auth)
-        Route::middleware('auth:sanctum')->put('/profileInAppUpdate', [UserAuthController::class, 'updateInAppProfile']);
-        Route::middleware('auth:sanctum')->post('/profile/photo', [UserAuthController::class, 'updateProfilePhoto']);
-
-        // Founder words endpoints (public)
         Route::get('/founders-words', [FoundersWordController::class, 'index']);
         Route::get('/founders-words/{id}', [FoundersWordController::class, 'show']);
-
-        // Remedies endpoints (public)
         Route::get('/remedies', [RemedyController::class, 'index']);
         Route::get('/remedies/{id}', [RemedyController::class, 'show']);
-
-        // Blogs endpoints (public)
         Route::get('/blogs', [BlogController::class, 'index']);
         Route::get('/blogs/search', [BlogController::class, 'search']);
         Route::get('/blogs/{id}', [BlogController::class, 'show']);
-
-        // Notices endpoints (public)
         Route::get('/notices', [NoticeController::class, 'index']);
-
-        // Astrologers endpoints (public)
         Route::get('/astrologers', [AstrologerController::class, 'index']);
         Route::get('/astrologers/{id}', [AstrologerController::class, 'show']);
-
-        // Follow / unfollow astrologer (requires auth)
-        Route::middleware('auth:sanctum')->post('/astrologers/{id}/follow', [UserAuthController::class, 'toggleFollowAstrologer']);
-
-        // Block astrologer (requires auth)
-        Route::middleware('auth:sanctum')->post('/astrologers/{id}/block', [UserAuthController::class, 'blockAstrologer']);
-
-        // Report astrologer (requires auth)
-        Route::middleware('auth:sanctum')->post('/astrologers/{id}/report', [UserAuthController::class, 'reportAstrologer']);
-
-        // User following, logout, delete account (requires auth)
-        Route::middleware('auth:sanctum')->get('/following', [UserAuthController::class, 'getFollowing']);
-        Route::middleware('auth:sanctum')->post('/logout', [UserAuthController::class, 'logout']);
-        Route::middleware('auth:sanctum')->delete('/delete-account', [UserAuthController::class, 'deleteAccount']);
-
-        // Plan endpoints (public + requires auth)
+        Route::get('/reviews', [ReviewController::class, 'index']);
         Route::middleware('auth:sanctum')->get('/plans', [PlanController::class, 'index']);
         Route::get('/plans/{plan}', [PlanController::class, 'show']);
-        Route::middleware('auth:sanctum')->get('/plan', [PlanController::class, 'current']);
-        Route::middleware('auth:sanctum')->post('/plans/upgrade', [PlanController::class, 'upgrade']);
-        Route::middleware('auth:sanctum')->post('/plans/upgrade/verify', [PlanController::class, 'verifyUpgrade']);
 
-        // Wallet endpoints (requires auth)
-        Route::middleware('auth:sanctum')->get('/wallet', [WalletController::class, 'show']);
-        Route::middleware('auth:sanctum')->post('/wallet/topup', [WalletController::class, 'createTopup']);
-
-        // Reviews endpoints
-        Route::middleware('auth:sanctum')->post('/reviews', [ReviewController::class, 'store']);
-        Route::middleware('auth:sanctum')->post('/reviews/{reviewId}/reply', [ReviewController::class, 'reply']);
-        Route::get('/reviews', [ReviewController::class, 'index']);
-
-        // Notification endpoints
-        Route::get('/notifications/count', [NotificationController::class, 'count']);
-        Route::get('/notifications', [NotificationController::class, 'list']);
-        Route::get('/notifications/{id}', [NotificationController::class, 'show']);
-        Route::middleware('auth:sanctum')->put('/notifications/{id}/mark-read', [NotificationController::class, 'markRead']);
-
-        Route::middleware('auth:sanctum')->post('/wallet/topup/verify', [WalletController::class, 'verifyTopup']);
-        Route::middleware('auth:sanctum')->get('/wallet/transactions', [WalletController::class, 'transactions']);
-        Route::middleware('auth:sanctum')->get('/wallet/transactions/{id}', [WalletController::class, 'transactionDetail']);
-
-        // Matrimony endpoints (requires auth)
-        Route::middleware('auth:sanctum')->post('/matrimony/profile', [MatrimonyController::class, 'createProfile']);
-        Route::middleware('auth:sanctum')->get('/matrimony/profiles', [MatrimonyController::class, 'listProfiles']);
-        Route::middleware('auth:sanctum')->get('/matrimony/profiles/{id}', [MatrimonyController::class, 'showProfile']);
-        Route::middleware('auth:sanctum')->get('/matrimony/search', [MatrimonyController::class, 'searchProfiles']);
-
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::put('/profileInAppUpdate', [UserAuthController::class, 'updateInAppProfile']);
+            Route::post('/profile/photo', [UserAuthController::class, 'updateProfilePhoto']);
+            Route::post('/astrologers/{id}/follow', [UserAuthController::class, 'toggleFollowAstrologer']);
+            Route::post('/astrologers/{id}/block', [UserAuthController::class, 'blockAstrologer']);
+            Route::post('/astrologers/{id}/report', [UserAuthController::class, 'reportAstrologer']);
+            Route::get('/following', [UserAuthController::class, 'getFollowing']);
+            Route::get('/plan', [PlanController::class, 'current']);
+            Route::post('/plans/upgrade', [PlanController::class, 'upgrade']);
+            Route::post('/plans/upgrade/verify', [PlanController::class, 'verifyUpgrade']);
+            Route::get('/wallet', [WalletController::class, 'show']);
+            Route::post('/wallet/topup', [WalletController::class, 'createTopup']);
+            Route::post('/wallet/topup/verify', [WalletController::class, 'verifyTopup']);
+            Route::get('/wallet/transactions', [WalletController::class, 'transactions']);
+            Route::get('/wallet/transactions/{id}', [WalletController::class, 'transactionDetail']);
+            Route::post('/reviews', [ReviewController::class, 'store']);
+            Route::post('/reviews/{reviewId}/reply', [ReviewController::class, 'reply']);
+            Route::get('/notifications/count', [NotificationController::class, 'count']);
+            Route::get('/notifications', [NotificationController::class, 'list']);
+            Route::get('/notifications/{id}', [NotificationController::class, 'show']);
+            Route::put('/notifications/{id}/mark-read', [NotificationController::class, 'markRead']);
+            Route::post('/matrimony/profile', [MatrimonyController::class, 'createProfile']);
+            Route::get('/matrimony/profiles', [MatrimonyController::class, 'listProfiles']);
+            Route::get('/matrimony/profiles/{id}', [MatrimonyController::class, 'showProfile']);
+            Route::get('/matrimony/search', [MatrimonyController::class, 'searchProfiles']);
+            Route::post('/logout', [UserAuthController::class, 'logout']);
+            Route::delete('/delete-account', [UserAuthController::class, 'deleteAccount']);
+        });
     });
 
-    // Static Pages endpoints (public)
-    Route::get('/static-pages', [\App\Http\Controllers\Api\StaticPageController::class, 'index']);
-    Route::get('/static-pages/{type}', [\App\Http\Controllers\Api\StaticPageController::class, 'show']);
-    Route::get('/faqs', [\App\Http\Controllers\Api\StaticPageController::class, 'getFaqs']);
-    Route::get('/privacy-policy', [\App\Http\Controllers\Api\StaticPageController::class, 'getPrivacyPolicy']);
-    Route::get('/terms-and-conditions', [\App\Http\Controllers\Api\StaticPageController::class, 'getTermsAndConditions']);
-    Route::get('/payment-policy', [\App\Http\Controllers\Api\StaticPageController::class, 'getPaymentPolicy']);
+    /*
+    |--------------------------------------------------------------------------
+    | REAL-TIME SIGNALING & BROADCAST AUTH
+    |--------------------------------------------------------------------------
+    */
+    // Public/Debug Broadcast Auth (Move inside v1 group)
+    Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
+        \Illuminate\Support\Facades\Log::info("DEBUG Broadcast Auth Attempt", [
+            'channel' => $request->channel_name,
+            'user' => $request->user() ? $request->user()->id : 'GUEST'
+        ]);
+        return Broadcast::auth($request);
+    })->middleware('auth:sanctum');
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/presence/pulse', [PresenceController::class, 'pulse']);
+        Route::post('/presence/offline', [PresenceController::class, 'offline']);
+
+        Route::prefix('call')->group(function () {
+            Route::post('/initiate', [CallController::class, 'initiateCall']);
+            Route::post('/{sessionId}/accept', [CallController::class, 'acceptCall']);
+            Route::post('/{sessionId}/reject', [CallController::class, 'rejectCall']);
+            Route::post('/{sessionId}/end', [CallController::class, 'endCall']);
+            Route::post('/{sessionId}/ice-candidate', [CallController::class, 'sendIceCandidate']);
+        });
+
+        Route::prefix('chat')->group(function () {
+            Route::post('/initiate', [ChatController::class, 'initiateChat']);
+            Route::post('/{sessionId}/accept', [ChatController::class, 'acceptChat']);
+            Route::post('/{sessionId}/reject', [ChatController::class, 'rejectChat']);
+            Route::post('/{sessionId}/end', [ChatController::class, 'endChat']);
+            Route::post('/{sessionId}/message', [ChatController::class, 'sendMessage']);
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATIC PAGES
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/static-pages', [StaticPageController::class, 'index']);
+    Route::get('/static-pages/{type}', [StaticPageController::class, 'show']);
+    Route::get('/faqs', [StaticPageController::class, 'getFaqs']);
+    Route::get('/privacy-policy', [StaticPageController::class, 'getPrivacyPolicy']);
+    Route::get('/terms-and-conditions', [StaticPageController::class, 'getTermsAndConditions']);
+    Route::get('/payment-policy', [StaticPageController::class, 'getPaymentPolicy']);
+
 });

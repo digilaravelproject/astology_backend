@@ -1,0 +1,4 @@
+php artisan serve
+php artisan queue:listen
+soketi start
+php artisan reverb:start
