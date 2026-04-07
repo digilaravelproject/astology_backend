@@ -20,8 +20,8 @@
         <div class="bg-white p-8 rounded-[40px] border border-gray-lighter shadow-sm group hover:shadow-2xl transition-all relative overflow-hidden">
             <div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[100px] -mr-8 -mt-8 group-hover:bg-primary/10 transition-all"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-4">Top Revenue Generator</div>
-            <div class="text-xl font-black text-dark mb-1">Pt. Rahul Vyas</div>
-            <div class="text-3xl font-black text-primary">₹8.42 Lakh</div>
+            <div class="text-xl font-black text-dark mb-1">{{ $topRevenue['name'] }}</div>
+            <div class="text-3xl font-black text-primary">{{ $topRevenue['rev_display'] }}</div>
             <div class="mt-4 flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
                 <span class="text-[9px] font-bold text-gray uppercase tracking-tighter">Lifetime Settlement</span>
@@ -30,18 +30,18 @@
         <div class="bg-white p-8 rounded-[40px] border border-gray-lighter shadow-sm group hover:shadow-2xl transition-all relative overflow-hidden">
             <div class="absolute top-0 right-0 w-32 h-32 bg-success/5 rounded-bl-[100px] -mr-8 -mt-8 group-hover:bg-success/10 transition-all"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-4">Highest Volume</div>
-            <div class="text-xl font-black text-dark mb-1">Aarti Sharma</div>
-            <div class="text-3xl font-black text-success">3,120 Orders</div>
+            <div class="text-xl font-black text-dark mb-1">{{ $highestVolume['name'] }}</div>
+            <div class="text-3xl font-black text-success">{{ number_format($highestVolume['total']) }} Orders</div>
             <div class="mt-4 flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-success animate-pulse"></span>
-                <span class="text-[9px] font-bold text-gray uppercase tracking-tighter">98.2% Success Rate</span>
+                <span class="text-[9px] font-bold text-gray uppercase tracking-tighter">Peak channel performance</span>
             </div>
         </div>
         <div class="bg-white p-8 rounded-[40px] border border-gray-lighter shadow-sm group hover:shadow-2xl transition-all relative overflow-hidden">
             <div class="absolute top-0 right-0 w-32 h-32 bg-info/5 rounded-bl-[100px] -mr-8 -mt-8 group-hover:bg-info/10 transition-all"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-4">Avg. Order Value</div>
             <div class="text-xl font-black text-dark mb-1">Platform-Wide</div>
-            <div class="text-3xl font-black text-info">₹1,145.00</div>
+            <div class="text-3xl font-black text-info">₹{{ number_format($avgOrderValue, 2) }}</div>
             <div class="mt-4 flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-info animate-pulse"></span>
                 <span class="text-[9px] font-bold text-gray uppercase tracking-tighter">Growth: +5% MoM</span>
@@ -77,24 +77,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-lighter">
-                    @php
-                        $astrologers = [
-                            ['name' => 'Pt. Rahul Vyas', 'total' => '4,820', 'month' => '450', 'week' => '120', 'today' => '15', 'rev' => '₹8,42,000'],
-                            ['name' => 'Aarti Sharma', 'total' => '3,120', 'month' => '320', 'week' => '85', 'today' => '12', 'rev' => '₹5,12,000'],
-                            ['name' => 'Vikram Joshi', 'total' => '2,850', 'month' => '280', 'week' => '70', 'today' => '8', 'rev' => '₹4,90,000'],
-                            ['name' => 'Meera Bai', 'total' => '2,100', 'month' => '210', 'week' => '55', 'today' => '6', 'rev' => '₹3,45,000'],
-                            ['name' => 'Pt. Gajanand', 'total' => '1,950', 'month' => '180', 'week' => '45', 'today' => '4', 'rev' => '₹2,80,000'],
-                            ['name' => 'Sanjay Dutt', 'total' => '1,500', 'month' => '150', 'week' => '40', 'today' => '3', 'rev' => '₹2,10,000'],
-                            ['name' => 'Pooja Reddy', 'total' => '1,240', 'month' => '120', 'week' => '30', 'today' => '2', 'rev' => '₹1,95,000'],
-                            ['name' => 'Arjun Nair', 'total' => '1,100', 'month' => '110', 'week' => '25', 'today' => '1', 'rev' => '₹1,50,000'],
-                            ['name' => 'Sneha Gupta', 'total' => '980', 'month' => '95', 'week' => '20', 'today' => '0', 'rev' => '₹1,25,000'],
-                            ['name' => 'Kavita Joshi', 'total' => '850', 'month' => '80', 'week' => '15', 'today' => '0', 'rev' => '₹1,10,000'],
-                            ['name' => 'Deepak Chopra', 'total' => '720', 'month' => '70', 'week' => '12', 'today' => '0', 'rev' => '₹95,000'],
-                            ['name' => 'Shweta Tiwari', 'total' => '650', 'month' => '60', 'week' => '10', 'today' => '0', 'rev' => '₹82,000'],
-                        ];
-                    @endphp
-
-                    @foreach($astrologers as $astro)
+                    @forelse($astrologers as $astro)
                     <tr class="hover:bg-light/30 transition-all group">
                         <td class="px-8 py-6">
                             <div class="text-sm font-black text-dark group-hover:text-primary transition-colors flex items-center gap-2 italic">
@@ -102,20 +85,24 @@
                                 {{ $astro['name'] }}
                             </div>
                         </td>
-                        <td class="px-8 py-6 text-sm font-black text-dark/70">{{ $astro['total'] }}</td>
-                        <td class="px-8 py-6 text-sm font-black text-dark/70">{{ $astro['month'] }}</td>
-                        <td class="px-8 py-6 text-sm font-black text-dark/70">{{ $astro['week'] }}</td>
+                        <td class="px-8 py-6 text-sm font-black text-dark/70">{{ number_format($astro['total']) }}</td>
+                        <td class="px-8 py-6 text-sm font-black text-dark/70">{{ number_format($astro['month']) }}</td>
+                        <td class="px-8 py-6 text-sm font-black text-dark/70">{{ number_format($astro['week']) }}</td>
                         <td class="px-8 py-6">
-                            <span class="px-3 py-1.5 bg-primary/5 text-primary text-[10px] font-black rounded-lg border border-primary/10">{{ $astro['today'] }} Now</span>
+                            <span class="px-3 py-1.5 bg-primary/5 text-primary text-[10px] font-black rounded-lg border border-primary/10">{{ number_format($astro['today']) }} Now</span>
                         </td>
-                        <td class="px-8 py-6 text-sm font-black text-success">{{ $astro['rev'] }}</td>
+                        <td class="px-8 py-6 text-sm font-black text-success">{{ $astro['rev_display'] }}</td>
                         <td class="px-8 py-6 text-right">
-                            <button @click="selectedAstro = {{ json_encode($astro) }}; historyModal = true" class="w-12 h-12 bg-white border-2 border-gray-lighter text-dark rounded-2xl flex items-center justify-center hover:border-dark hover:bg-dark hover:text-white transition-all shadow-sm transform active:scale-90">
+                            <a href="{{ route('admin.orders.by-astrologer.provider', $astro['id']) }}" class="w-12 h-12 bg-white border-2 border-gray-lighter text-dark rounded-2xl inline-flex items-center justify-center hover:border-dark hover:bg-dark hover:text-white transition-all shadow-sm transform active:scale-90">
                                 <i class="fas fa-arrow-right text-xs"></i>
-                            </button>
+                            </a>
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr>
+                        <td colspan="7" class="px-8 py-10 text-center text-gray text-xs">No astrologers found.</td>
+                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>

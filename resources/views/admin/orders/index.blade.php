@@ -12,9 +12,9 @@
             <button class="bg-white border border-gray-lighter text-dark px-4 py-2.5 rounded-xl font-bold hover:bg-light transition-all flex items-center gap-2 text-xs">
                 <i class="fas fa-file-export"></i> Global CSV Export
             </button>
-            <button class="bg-primary text-white px-4 py-2.5 rounded-xl font-bold hover:bg-primary-dark transition-all flex items-center gap-2 text-xs shadow-lg shadow-primary/20">
+            <a href="{{ route('admin.orders.create') }}" class="bg-primary text-white px-4 py-2.5 rounded-xl font-bold hover:bg-primary-dark transition-all flex items-center gap-2 text-xs shadow-lg shadow-primary/20">
                 <i class="fas fa-plus"></i> Manual Order
-            </button>
+            </a>
         </div>
     </div>
 
@@ -23,7 +23,7 @@
         <div class="bg-white p-6 rounded-[28px] border border-gray-lighter shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
             <div class="absolute -right-4 -top-4 w-16 h-16 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/20 transition-all"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Total Volume</div>
-            <div class="text-3xl font-black text-dark">4,821</div>
+            <div class="text-3xl font-black text-dark">{{ number_format($totalVolume) }}</div>
             <div class="mt-2 flex items-center gap-1.5">
                 <span class="text-[9px] font-black text-success py-0.5 px-2 bg-success/10 rounded-full">+12%</span>
                 <span class="text-[9px] font-bold text-gray-light uppercase tracking-tighter">from last week</span>
@@ -32,16 +32,16 @@
         <div class="bg-white p-6 rounded-[28px] border border-gray-lighter shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
             <div class="absolute -right-4 -top-4 w-16 h-16 bg-success/5 rounded-full blur-xl group-hover:bg-success/20 transition-all"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Today High</div>
-            <div class="text-3xl font-black text-dark">₹42.6K</div>
+            <div class="text-3xl font-black text-dark">₹{{ number_format($todayHigh, 0) }}</div>
             <div class="mt-2 flex items-center gap-1.5">
-                <span class="text-[9px] font-black text-success py-0.5 px-2 bg-success/10 rounded-full">+₹5.2K</span>
+                <span class="text-[9px] font-black text-success py-0.5 px-2 bg-success/10 rounded-full">+₹0</span>
                 <span class="text-[9px] font-bold text-gray-light uppercase tracking-tighter">vs yesterday</span>
             </div>
         </div>
         <div class="bg-white p-6 rounded-[28px] border border-gray-lighter shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
             <div class="absolute -right-4 -top-4 w-16 h-16 bg-info/5 rounded-full blur-xl group-hover:bg-info/20 transition-all"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Completion</div>
-            <div class="text-3xl font-black text-dark">96.8%</div>
+            <div class="text-3xl font-black text-dark">{{ $completionPercent }}%</div>
             <div class="mt-2 flex items-center gap-1.5">
                 <span class="text-[9px] font-black text-info py-0.5 px-2 bg-info/10 rounded-full">Elite</span>
                 <span class="text-[9px] font-bold text-gray-light uppercase tracking-tighter">platform health</span>
@@ -50,7 +50,7 @@
         <div class="bg-white p-6 rounded-[28px] border border-gray-lighter shadow-sm hover:shadow-xl transition-all group overflow-hidden relative">
             <div class="absolute -right-4 -top-4 w-16 h-16 bg-danger/5 rounded-full blur-xl group-hover:bg-danger/20 transition-all"></div>
             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Refund Req.</div>
-            <div class="text-3xl font-black text-dark">12</div>
+            <div class="text-3xl font-black text-dark">{{ number_format($refundReq) }}</div>
             <div class="mt-2 flex items-center gap-1.5">
                 <span class="text-[9px] font-black text-danger py-0.5 px-2 bg-danger/10 rounded-full">Action</span>
                 <span class="text-[9px] font-bold text-gray-light uppercase tracking-tighter">pending review</span>
@@ -106,27 +106,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-lighter">
-                    @php
-                        $orders = [
-                            ['id' => 'ORD-98421', 'user' => 'Rajesh Kumar', 'user_mail' => 'rajesh@example.com', 'astro' => 'Pt. Rahul Vyas', 'type' => 'Call', 'duration' => '15m 30s', 'amount' => '₹450', 'status' => 'Completed', 'date' => 'Oct 14, 2024'],
-                            ['id' => 'ORD-98422', 'user' => 'Sneha Kapoor', 'user_mail' => 'sneha@example.com', 'astro' => 'Aarti Sharma', 'type' => 'Chat', 'duration' => '20m 00s', 'amount' => '₹600', 'status' => 'Completed', 'date' => 'Oct 14, 2024'],
-                            ['id' => 'ORD-98423', 'user' => 'Amit Shah', 'user_mail' => 'amit@example.com', 'astro' => 'Vikram Joshi', 'type' => 'Video', 'duration' => '10m 15s', 'amount' => '₹1,200', 'status' => 'Cancelled', 'date' => 'Oct 14, 2024'],
-                            ['id' => 'ORD-98424', 'user' => 'Priya Singh', 'user_mail' => 'priya@example.com', 'astro' => 'Meera Bai', 'type' => 'Report', 'duration' => 'Manual', 'amount' => '₹2,500', 'status' => 'Completed', 'date' => 'Oct 13, 2024'],
-                            ['id' => 'ORD-98425', 'user' => 'Karan Johar', 'user_mail' => 'karan@example.com', 'astro' => 'Pt. Gajanand', 'type' => 'Call', 'duration' => '45m 00s', 'amount' => '₹1,500', 'status' => 'Processing', 'date' => 'Oct 13, 2024'],
-                            ['id' => 'ORD-98426', 'user' => 'Aditi Rao', 'user_mail' => 'aditi@example.com', 'astro' => 'Sanjay Dutt', 'type' => 'Chat', 'duration' => '12m 45s', 'amount' => '₹300', 'status' => 'Refunded', 'date' => 'Oct 13, 2024'],
-                            ['id' => 'ORD-98427', 'user' => 'Vijay Mallya', 'user_mail' => 'vijay@example.com', 'astro' => 'Pooja Reddy', 'type' => 'Call', 'duration' => '05m 20s', 'amount' => '₹150', 'status' => 'Completed', 'date' => 'Oct 12, 2024'],
-                            ['id' => 'ORD-98428', 'user' => 'Harsh Vardhan', 'user_mail' => 'harsh@example.com', 'astro' => 'Arjun Nair', 'type' => 'Video', 'duration' => '30m 00s', 'amount' => '₹3,000', 'status' => 'Completed', 'date' => 'Oct 12, 2024'],
-                            ['id' => 'ORD-98429', 'user' => 'Rohan Sharma', 'user_mail' => 'rohan@example.com', 'astro' => 'Sneha Gupta', 'type' => 'Chat', 'duration' => '08m 10s', 'amount' => '₹200', 'status' => 'Completed', 'date' => 'Oct 12, 2024'],
-                            ['id' => 'ORD-98430', 'user' => 'Deepak Singh', 'user_mail' => 'deepak@example.com', 'astro' => 'Kavita Joshi', 'type' => 'Call', 'duration' => '22m 30s', 'amount' => '₹650', 'status' => 'Completed', 'date' => 'Oct 11, 2024'],
-                            ['id' => 'ORD-98431', 'user' => 'Sunita Rani', 'user_mail' => 'sunita@example.com', 'astro' => 'Deepak Chopra', 'type' => 'Chat', 'duration' => '15m 00s', 'amount' => '₹450', 'status' => 'Cancelled', 'date' => 'Oct 11, 2024'],
-                            ['id' => 'ORD-98432', 'user' => 'Mohit Jain', 'user_mail' => 'mohit@example.com', 'astro' => 'Shweta Tiwari', 'type' => 'Call', 'duration' => '18m 45s', 'amount' => '₹540', 'status' => 'Completed', 'date' => 'Oct 11, 2024'],
-                            ['id' => 'ORD-98433', 'user' => 'Neha Kakkar', 'user_mail' => 'neha@example.com', 'astro' => 'Aarti Sharma', 'type' => 'Call', 'duration' => '10m 00s', 'amount' => '₹300', 'status' => 'Completed', 'date' => 'Oct 10, 2024'],
-                            ['id' => 'ORD-98434', 'user' => 'Arijit Singh', 'user_mail' => 'arijit@example.com', 'astro' => 'Pt. Rahul Vyas', 'type' => 'Video', 'duration' => '25m 00s', 'amount' => '₹2,500', 'status' => 'Completed', 'date' => 'Oct 10, 2024'],
-                            ['id' => 'ORD-98435', 'user' => 'Shreya Ghosal', 'user_mail' => 'shreya@example.com', 'astro' => 'Meera Bai', 'type' => 'Chat', 'duration' => '30m 00s', 'amount' => '₹900', 'status' => 'Processing', 'date' => 'Oct 10, 2024'],
-                        ];
-                    @endphp
-
-                    @foreach($orders as $ord)
+                    @forelse($orders as $ord)
                     <tr class="hover:bg-light/30 transition-colors group">
                         <td class="px-6 py-5">
                             <div class="text-[11px] font-black text-dark underline decoration-primary/20 decoration-2 underline-offset-4">{{ $ord['id'] }}</div>
@@ -154,19 +134,30 @@
                             @elseif($ord['status'] == 'Refunded') <span class="px-3 py-1 bg-warning/10 text-warning text-[9px] font-black uppercase rounded-full border border-warning/20 shadow-xs">Reversed</span>
                             @else <span class="px-3 py-1 bg-info/10 text-info text-[9px] font-black uppercase rounded-full border border-info/20 shadow-xs animate-pulse">In Flow</span> @endif
                         </td>
-                        <td class="px-6 py-5 text-right">
-                            <button @click="selectedOrder = {{ json_encode($ord) }}; orderModal = true" class="w-10 h-10 bg-white border border-gray-lighter text-dark rounded-xl flex items-center justify-center hover:bg-dark hover:text-white transition-all shadow-sm">
-                                <i class="fas fa-receipt text-xs"></i>
-                            </button>
+                        <td class="px-6 py-5 text-right space-x-2">
+                            <a href="{{ route('admin.orders.show', ['type' => strtolower($ord['type']), 'id' => explode('-', $ord['id'])[1]]) }}" class="inline-flex w-10 h-10 bg-white border border-gray-lighter text-dark rounded-xl items-center justify-center hover:bg-dark hover:text-white transition-all shadow-sm">
+                                <i class="fas fa-eye text-xs"></i>
+                            </a>
+                            <form action="{{ route('admin.orders.destroy', ['type' => strtolower($ord['type']), 'id' => explode('-', $ord['id'])[1]]) }}" method="POST" class="inline-block">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="w-10 h-10 bg-white border border-gray-lighter text-danger rounded-xl flex items-center justify-center hover:bg-danger hover:text-white transition-all shadow-sm" onclick="return confirm('Delete this order?');">
+                                    <i class="fas fa-trash text-xs"></i>
+                                </button>
+                            </form>
                         </td>
                     </tr>
-                    @endforeach
+                    @empty
+                    <tr>
+                        <td colspan="7" class="px-6 py-10 text-center text-gray text-xs">No orders found.</td>
+                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
         <!-- Pagination -->
         <div class="px-6 py-6 border-t border-gray-lighter flex justify-between items-center bg-light/20">
-            <div class="text-[10px] font-black text-gray uppercase tracking-widest">Registry Page 1 of 322</div>
+            <div class="text-[10px] font-black text-gray uppercase tracking-widest">Showing {{ number_format($orders->count()) }} orders</div>
             <div class="flex items-center gap-1.5">
                 <button class="w-10 h-10 rounded-xl bg-white border border-gray-lighter text-gray hover:text-dark hover:border-dark transition-all"><i class="fas fa-chevron-left text-xs"></i></button>
                 <button class="w-10 h-10 rounded-xl bg-dark text-white font-black text-xs">1</button>
