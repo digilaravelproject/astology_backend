@@ -161,4 +161,22 @@ class ChatService
             }
         });
     }
+
+    /**
+     * Retrieve chat history for a session with pagination.
+     */
+    public function getMessages($sessionId)
+    {
+        return \App\Models\Message::where('chat_session_id', $sessionId)
+            ->latest()
+            ->paginate(30);
+    }
+
+    /**
+     * Retrieve all chat sessions for a user with pagination.
+     */
+    public function getSessions($userId)
+    {
+        return $this->chatRepo->getSessionsByUserId($userId);
+    }
 }

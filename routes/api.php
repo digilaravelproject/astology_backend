@@ -157,11 +157,15 @@ Route::prefix('v1')->group(function () {
         });
 
         Route::prefix('chat')->group(function () {
+            Route::get('/sessions', [ChatController::class, 'getSessions']);
             Route::post('/initiate', [ChatController::class, 'initiateChat']);
             Route::post('/{sessionId}/accept', [ChatController::class, 'acceptChat']);
             Route::post('/{sessionId}/reject', [ChatController::class, 'rejectChat']);
             Route::post('/{sessionId}/end', [ChatController::class, 'endChat']);
             Route::post('/{sessionId}/message', [ChatController::class, 'sendMessage']);
+            Route::post('/{sessionId}/read', [ChatController::class, 'markAsRead']);
+            Route::post('/{sessionId}/sync-status', [ChatController::class, 'syncStatus']);
+            Route::get('/{sessionId}/messages', [ChatController::class, 'getMessages']);
         });
     });
 
