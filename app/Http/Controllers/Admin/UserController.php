@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\Astrologer;
+use App\Models\Plan;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
@@ -53,7 +54,8 @@ class UserController extends Controller
      */
     public function create()
     {
-        return view('admin.users.form');
+        $plans = Plan::pluck('name', 'id');
+        return view('admin.users.form', compact('plans'))->with('user', null);
     }
 
     /**
@@ -67,15 +69,33 @@ class UserController extends Controller
             'phone' => 'nullable|string|max:20|unique:users',
             'password' => 'required|string|min:8',
             'user_type' => 'required|in:user,astrologer',
+            'city' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'profile_photo' => 'nullable|url|max:255',
+            'gender' => 'nullable|string|max:50',
+            'date_of_birth' => 'nullable|date',
+            'time_of_birth' => 'nullable',
+            'place_of_birth' => 'nullable|string|max:255',
+            'languages' => 'nullable|string|max:255',
+            'otp' => 'nullable|string|max:20',
+            'otp_expires_at' => 'nullable|date',
+            'otp_verified_at' => 'nullable|date',
+            'profile_completed' => 'sometimes|boolean',
+            'plan_id' => 'nullable|exists:plans,id',
+            'plan_started_at' => 'nullable|date',
+            'plan_expires_at' => 'nullable|date',
+            'is_online' => 'sometimes|boolean',
+            'is_busy' => 'sometimes|boolean',
+            'busy_session_id' => 'nullable|integer',
+            'last_seen_at' => 'nullable|date',
+            'fcm_token' => 'nullable|string|max:255',
+            'email_verified_at' => 'nullable|date',
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'password' => Hash::make($request->password),
-            'user_type' => $request->user_type,
-        ]);
+        $data = $this->prepareUserData($request);
+        $data['password'] = Hash::make($request->password);
+
+        $user = User::create($data);
 
         if ($request->user_type === 'astrologer') {
             Astrologer::create([
@@ -94,7 +114,8 @@ class UserController extends Controller
     public function edit($id)
     {
         $user = User::with('astrologer')->findOrFail($id);
-        return view('admin.users.form', compact('user'));
+        $plans = Plan::pluck('name', 'id');
+        return view('admin.users.form', compact('user', 'plans'));
     }
 
     /**
@@ -118,14 +139,30 @@ class UserController extends Controller
             'email' => ['nullable', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:20', Rule::unique('users')->ignore($user->id)],
             'user_type' => 'required|in:user,astrologer',
+            'city' => 'nullable|string|max:255',
+            'country' => 'nullable|string|max:255',
+            'profile_photo' => 'nullable|url|max:255',
+            'gender' => 'nullable|string|max:50',
+            'date_of_birth' => 'nullable|date',
+            'time_of_birth' => 'nullable',
+            'place_of_birth' => 'nullable|string|max:255',
+            'languages' => 'nullable|string|max:255',
+            'otp' => 'nullable|string|max:20',
+            'otp_expires_at' => 'nullable|date',
+            'otp_verified_at' => 'nullable|date',
+            'profile_completed' => 'sometimes|boolean',
+            'plan_id' => 'nullable|exists:plans,id',
+            'plan_started_at' => 'nullable|date',
+            'plan_expires_at' => 'nullable|date',
+            'is_online' => 'sometimes|boolean',
+            'is_busy' => 'sometimes|boolean',
+            'busy_session_id' => 'nullable|integer',
+            'last_seen_at' => 'nullable|date',
+            'fcm_token' => 'nullable|string|max:255',
+            'email_verified_at' => 'nullable|date',
         ]);
 
-        $data = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'user_type' => $request->user_type,
-        ];
+        $data = $this->prepareUserData($request);
 
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
@@ -157,8 +194,6 @@ class UserController extends Controller
     {
         $user = User::findOrFail($id);
         
-        // Due to foreign key constraints, we delete the astrologer profile if exists
-        // Or if database has cascade, it will automatically delete
         if ($user->astrologer) {
             $user->astrologer->delete();
         }
@@ -166,6 +201,37 @@ class UserController extends Controller
         $user->delete();
 
         return redirect()->route('admin.users.index')->with('success', 'User deleted successfully.');
+    }
+
+    protected function prepareUserData(Request $request): array
+    {
+        return [
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'user_type' => $request->user_type,
+            'city' => $request->city,
+            'country' => $request->country,
+            'profile_photo' => $request->profile_photo,
+            'gender' => $request->gender,
+            'date_of_birth' => $request->date_of_birth,
+            'time_of_birth' => $request->time_of_birth,
+            'place_of_birth' => $request->place_of_birth,
+            'languages' => $request->filled('languages') ? array_values(array_filter(array_map('trim', explode(',', $request->languages)))) : [],
+            'otp' => $request->otp,
+            'otp_expires_at' => $request->otp_expires_at,
+            'otp_verified_at' => $request->otp_verified_at,
+            'email_verified_at' => $request->email_verified_at,
+            'profile_completed' => $request->has('profile_completed'),
+            'plan_id' => $request->plan_id,
+            'plan_started_at' => $request->plan_started_at,
+            'plan_expires_at' => $request->plan_expires_at,
+            'is_online' => $request->has('is_online'),
+            'is_busy' => $request->has('is_busy'),
+            'busy_session_id' => $request->busy_session_id,
+            'last_seen_at' => $request->last_seen_at,
+            'fcm_token' => $request->fcm_token,
+        ];
     }
 
     /**

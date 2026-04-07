@@ -97,7 +97,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/astrologers', [AstrologerController::class, 'index']);
         Route::get('/astrologers/{id}', [AstrologerController::class, 'show']);
         Route::get('/reviews', [ReviewController::class, 'index']);
-        Route::get('/plans', [PlanController::class, 'index']);
+        Route::middleware('auth:sanctum')->get('/plans', [PlanController::class, 'index']);
         Route::get('/plans/{plan}', [PlanController::class, 'show']);
 
         Route::middleware('auth:sanctum')->group(function () {

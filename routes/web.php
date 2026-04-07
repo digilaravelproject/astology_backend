@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\UserController;
 
 Route::get('/', function () {
@@ -42,8 +43,13 @@ Route::prefix('admin')->group(function () {
 
         // Order Management
         Route::prefix('orders')->group(function() {
-            Route::get('/', function() { return view('admin.orders.index'); })->name('admin.orders.index');
-            Route::get('/by-astrologer', function() { return view('admin.orders.by-astrologer'); })->name('admin.orders.by-astrologer');
+            Route::get('/', [OrderController::class, 'index'])->name('admin.orders.index');
+            Route::get('/create', [OrderController::class, 'create'])->name('admin.orders.create');
+            Route::post('/', [OrderController::class, 'store'])->name('admin.orders.store');
+            Route::get('/{type}/{id}', [OrderController::class, 'show'])->where('type', 'call|chat')->name('admin.orders.show');
+            Route::delete('/{type}/{id}', [OrderController::class, 'destroy'])->where('type', 'call|chat')->name('admin.orders.destroy');
+            Route::get('/by-astrologer', [OrderController::class, 'byAstrologer'])->name('admin.orders.by-astrologer');
+            Route::get('/by-astrologer/{provider}', [OrderController::class, 'providerOrders'])->name('admin.orders.by-astrologer.provider');
         });
 
         // Blog Management

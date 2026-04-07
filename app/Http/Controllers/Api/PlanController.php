@@ -19,20 +19,32 @@ class PlanController extends Controller
     {
         $this->razorpayService = $razorpayService;
     }
+    
     public function index(Request $request): JsonResponse
     {
-        $plans = Plan::where('status', 'active')->orderBy('price')->get();
+        $user = $request->user();
+
+        $plans = Plan::where('status', 'active')
+            ->orderBy('price')
+            ->get();
 
         $activePlan = null;
-        $user = $request->user();
-        
+
         if ($user) {
-            // Refresh user to ensure fresh data from DB
             $user->refresh();
-            
-            // Load plan relationship with all data
+
             if ($user->plan_id) {
                 $activePlan = $user->load('plan')->plan;
+            }
+
+            // Mark purchased plan
+            foreach ($plans as $plan) {
+                $plan->purchased = ($user->plan_id == $plan->id);
+            }
+        } else {
+            // If user not logged in
+            foreach ($plans as $plan) {
+                $plan->purchased = false;
             }
         }
 
