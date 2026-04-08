@@ -30,9 +30,15 @@
     <div class="bg-white rounded-3xl border border-gray-lighter shadow-sm overflow-hidden">
         <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 p-8">
             <div class="space-y-6 bg-light/30 rounded-3xl p-6">
-                <div class="flex items-center justify-center w-28 h-28 rounded-[30px] bg-primary/10 text-primary text-6xl font-black">
-                    {{ strtoupper(substr($user->name, 0, 1)) }}
-                </div>
+                @if($user->profile_photo)
+                    <div class="w-28 h-28 rounded-[30px] overflow-hidden border-2 border-primary shadow-md mx-auto">
+                        <img src="{{ $user->profile_photo }}" alt="{{ $user->name }}" class="w-full h-full object-cover" />
+                    </div>
+                @else
+                    <div class="flex items-center justify-center w-28 h-28 rounded-[30px] bg-primary/10 text-primary text-6xl font-black mx-auto">
+                        {{ strtoupper(substr($user->name, 0, 1)) }}
+                    </div>
+                @endif
                 <div>
                     <h2 class="text-2xl font-black text-dark">{{ $user->name }}</h2>
                     <p class="text-xs text-gray uppercase tracking-widest mt-2">ID: #USR-{{ $user->id }}</p>
@@ -101,6 +107,14 @@
                         <div>
                             <div class="text-[10px] font-black text-gray uppercase">Languages</div>
                             <div>{{ empty($user->languages) ? '-' : implode(', ', (array) $user->languages) }}</div>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-black text-gray uppercase">Profile Photo</div>
+                            @if($user->profile_photo)
+                                <a href="{{ $user->profile_photo }}" target="_blank" class="text-primary font-semibold hover:underline inline-block">View Photo</a>
+                            @else
+                                <span class="text-gray">No photo uploaded</span>
+                            @endif
                         </div>
                     </div>
                 </div>
