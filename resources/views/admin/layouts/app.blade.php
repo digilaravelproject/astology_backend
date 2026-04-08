@@ -143,6 +143,18 @@
                                 </a>
                             </li>
                             <li>
+                                <a href="{{ route('admin.astrologers.community') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.astrologers.community') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Community
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.astrologers.reported') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.astrologers.reported') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Report Astrologer
+                                </a>
+                            </li>
+                            <li>
                                 <a href="{{ route('admin.astrologers.live') }}" 
                                    class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.astrologers.live') ? 'text-primary' : 'text-gray hover:text-primary' }}">
                                     <i class="fas fa-circle text-[6px]"></i> Live Now
@@ -352,7 +364,23 @@
                                     <i class="fas fa-circle text-[6px]"></i> Payment Policy
                                 </a>
                             </li>
+                            <li>
+                                <a href="{{ route('admin.founder_words.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.founder_words.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Founder Words
+                                </a>
+                            </li>
                         </ul>
+                    </li>
+
+                    <!-- Training Videos -->
+                    <li>
+                        <a href="{{ route('admin.training_videos.index') }}" 
+                           class="flex items-center gap-4 px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                  {{ request()->routeIs('admin.training_videos.*') ? 'bg-sidebar-hover text-primary' : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <i class="fas fa-video w-5 text-center text-base"></i>
+                            <span>Training Videos</span>
+                        </a>
                     </li>
 
                     <!-- Reports -->

@@ -34,12 +34,19 @@ Route::prefix('admin')->group(function () {
         Route::get('users-referrals', function() { return view('admin.users.referrals'); })->name('admin.users.referrals');
 
         // Astrologer Management
-        Route::resource('astrologers', \App\Http\Controllers\Admin\AstrologerController::class)->names('admin.astrologers');
-
         // Legacy / additional pages (keep if still used elsewhere)
         Route::get('astrologers/performance', function() { return view('admin.astrologers.performance'); })->name('admin.astrologers.performance');
-        Route::get('astrologers/reviews', function() { return view('admin.astrologers.reviews'); })->name('admin.astrologers.reviews');
+        Route::get('astrologers/reviews', [\App\Http\Controllers\Admin\AstrologerReviewController::class, 'index'])->name('admin.astrologers.reviews');
+        Route::post('astrologers/reviews/{review}/reply', [\App\Http\Controllers\Admin\AstrologerReviewController::class, 'reply'])->name('admin.astrologers.reviews.reply');
+        Route::delete('astrologers/reviews/{review}', [\App\Http\Controllers\Admin\AstrologerReviewController::class, 'destroy'])->name('admin.astrologers.reviews.destroy');
+        Route::get('astrologers/community', [\App\Http\Controllers\Admin\AstrologerCommunityController::class, 'index'])->name('admin.astrologers.community');
+        Route::get('astrologers/reported', [\App\Http\Controllers\Admin\AstrologerCommunityController::class, 'reported'])->name('admin.astrologers.reported');
+        Route::post('astrologers/reported/{community}/resolve', [\App\Http\Controllers\Admin\AstrologerCommunityController::class, 'resolveReport'])->name('admin.astrologers.reported.resolve');
+        Route::post('astrologers/community/{community}/toggle-like', [\App\Http\Controllers\Admin\AstrologerCommunityController::class, 'toggleLike'])->name('admin.astrologers.community.toggle-like');
+        Route::post('astrologers/community/{community}/toggle-block', [\App\Http\Controllers\Admin\AstrologerCommunityController::class, 'toggleBlock'])->name('admin.astrologers.community.toggle-block');
+        Route::delete('astrologers/community/{community}', [\App\Http\Controllers\Admin\AstrologerCommunityController::class, 'destroy'])->name('admin.astrologers.community.destroy');
         Route::get('astrologers/live', function() { return view('admin.astrologers.live'); })->name('admin.astrologers.live');
+        Route::resource('astrologers', \App\Http\Controllers\Admin\AstrologerController::class)->names('admin.astrologers');
 
         // Order Management
         Route::prefix('orders')->group(function() {
@@ -62,8 +69,14 @@ Route::prefix('admin')->group(function () {
         Route::resource('remedies', \App\Http\Controllers\Admin\RemedyController::class)->names('admin.remedies');
         Route::post('remedies/{id}/toggle-status', [\App\Http\Controllers\Admin\RemedyController::class, 'toggleStatus'])->name('admin.remedies.toggle-status');
 
+        // Training Videos Management
+        Route::resource('training_videos', \App\Http\Controllers\Admin\TrainingVideoController::class)->names('admin.training_videos');
+
         // Static Pages Management
         Route::resource('static_pages', \App\Http\Controllers\Admin\StaticPageController::class)->names('admin.static_pages');
+
+        // Founder Words Management
+        Route::resource('founder_words', \App\Http\Controllers\Admin\FounderWordsController::class)->names('admin.founder_words');
 
         // Plan Management
         Route::resource('plans', \App\Http\Controllers\Admin\PlanController::class)->names('admin.plans')->except(['show']);
