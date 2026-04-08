@@ -27,4 +27,15 @@ class ChatSessionRepository
             ->whereIn('status', ['accepted', 'ongoing'])
             ->get();
     }
+
+    public function getSessionsByUserId($userId)
+    {
+        return ChatSession::with(['consumer', 'provider'])
+            ->where(function ($query) use ($userId) {
+                $query->where('consumer_id', $userId)
+                      ->orWhere('provider_id', $userId);
+            })
+            ->latest()
+            ->paginate(15);
+    }
 }

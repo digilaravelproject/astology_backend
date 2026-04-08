@@ -10,32 +10,36 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class ChatEnded implements ShouldBroadcastNow
+class ChatAccepted implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $session;
-    public $endedById;
+    public $providerData;
 
-    public function __construct($session, $endedById)
+    public function __construct($session, $providerData = null)
     {
         $this->session = $session;
-        $this->endedById = $endedById;
+        $this->providerData = $providerData;
     }
 
+    /**
+     * Get the channels the event should broadcast on.
+     *
+     * @return array<int, \Illuminate\Broadcasting\Channel>
+     */
     public function broadcastOn(): array
     {
-        $receiverId = ($this->endedById == $this->session->consumer_id) 
-            ? $this->session->provider_id 
-            : $this->session->consumer_id;
-
         return [
-            new PrivateChannel('user.' . $receiverId),
+            new PrivateChannel('user.' . $this->session->consumer_id),
         ];
     }
-    
-    public function broadcastAs()
+
+    /**
+     * The event's broadcast name.
+     */
+    public function broadcastAs(): string
     {
-        return 'ChatEnded';
+        return 'ChatAccepted';
     }
 }

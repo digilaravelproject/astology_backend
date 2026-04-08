@@ -10,6 +10,7 @@ use App\Models\Message;
 use App\Events\MessageSent;
 use App\Events\ChatInitiated;
 use App\Events\ChatEnded;
+use App\Events\ChatAccepted;
 use Exception;
 
 class ChatController extends Controller
@@ -31,12 +32,8 @@ class ChatController extends Controller
             $consumerId = $request->user()->id;
             $session = $this->chatService->initiateChat($consumerId, $request->provider_id);
             
-            // Broadcast ChatInitiated
-            broadcast(new ChatInitiated($session, [
-                'id' => $request->user()->id,
-                'name' => $request->user()->name,
-                'profile_photo' => $request->user()->profile_photo
-            ]));
+            // Broadcast ChatInitiated with full consumer details
+            broadcast(new ChatInitiated($session, $request->user()));
             
             return ApiResponse::success(['session' => $session], 'Chat initiated successfully');
             
@@ -50,6 +47,10 @@ class ChatController extends Controller
         try {
             $providerId = $request->user()->id;
             $session = $this->chatService->acceptChat($sessionId, $providerId);
+            
+            // Broadcast ChatAccepted to the consumer with full provider details
+            $session->load(['provider.astrologer', 'consumer']);
+            broadcast(new ChatAccepted($session, $session->provider));
             
             return ApiResponse::success(['session' => $session], 'Chat accepted successfully');
         } catch (Exception $e) {
@@ -116,6 +117,69 @@ class ChatController extends Controller
             broadcast(new MessageSent($message, $receiverId));
 
             return ApiResponse::success(['message' => $message], 'Message sent');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    public function getMessages(Request $request, $sessionId)
+    {
+        try {
+            $messages = $this->chatService->getMessages($sessionId);
+            return ApiResponse::success($messages, 'Messages retrieved');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    public function markAsRead(Request $request, $sessionId)
+    {
+        try {
+            $userId = $request->user()->id;
+            Message::where('chat_session_id', $sessionId)
+                ->where('receiver_id', $userId)
+                ->where('is_read', false)
+                ->update(['is_read' => true, 'is_delivered' => true, 'updated_at' => now()]);
+
+            return ApiResponse::success(null, 'Messages marked as read');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    public function syncStatus(Request $request, $sessionId)
+    {
+        try {
+            $userId = $request->user()->id;
+            $status = $request->input('status'); // 'delivered' or 'seen'
+            $messageIds = $request->input('message_ids', []);
+
+            if (empty($messageIds)) {
+                return ApiResponse::error('No message IDs provided', 400);
+            }
+
+            $query = Message::where('chat_session_id', $sessionId)
+                ->whereIn('id', $messageIds)
+                ->where('receiver_id', $userId);
+
+            if ($status === 'delivered') {
+                $query->update(['is_delivered' => true, 'updated_at' => now()]);
+            } elseif ($status === 'seen') {
+                $query->update(['is_read' => true, 'is_delivered' => true, 'updated_at' => now()]);
+            }
+
+            return ApiResponse::success(null, 'Status updated');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    public function getSessions(Request $request)
+    {
+        try {
+            $userId = $request->user()->id;
+            $sessions = $this->chatService->getSessions($userId);
+            return ApiResponse::success($sessions, 'Sessions retrieved');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
         }
