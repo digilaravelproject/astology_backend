@@ -11,6 +11,7 @@ use App\Events\MessageSent;
 use App\Events\ChatInitiated;
 use App\Events\ChatEnded;
 use App\Events\ChatAccepted;
+use App\Events\MessageStatusUpdated;
 use Exception;
 
 class ChatController extends Controller
@@ -141,6 +142,17 @@ class ChatController extends Controller
                 ->where('is_read', false)
                 ->update(['is_read' => true, 'is_delivered' => true, 'updated_at' => now()]);
 
+            $session = $this->chatService->getSession($sessionId);
+            $senderToNotify = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
+            
+            $messageIds = Message::where('chat_session_id', $sessionId)
+                ->where('receiver_id', $userId)
+                ->pluck('id')->toArray();
+
+            if (!empty($messageIds)) {
+                broadcast(new MessageStatusUpdated($messageIds, 'seen', $senderToNotify, $sessionId));
+            }
+
             return ApiResponse::success(null, 'Messages marked as read');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
@@ -167,6 +179,10 @@ class ChatController extends Controller
             } elseif ($status === 'seen') {
                 $query->update(['is_read' => true, 'is_delivered' => true, 'updated_at' => now()]);
             }
+
+            $session = $this->chatService->getSession($sessionId);
+            $senderToNotify = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
+            broadcast(new MessageStatusUpdated($messageIds, $status, $senderToNotify, $sessionId));
 
             return ApiResponse::success(null, 'Status updated');
         } catch (Exception $e) {
