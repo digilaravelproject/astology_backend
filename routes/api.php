@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\{
     ReviewController,
     StaticPageController,
     TrainingVideoController,
+    GiftController,
     UserAuthController,
     WalletController
 };
@@ -67,6 +68,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/bank-accounts/{id}/set-default', [AstrologerAuthController::class, 'setDefaultBankAccount']);
             Route::get('/availability', [AstrologerAuthController::class, 'getAvailability']);
             Route::put('/availability', [AstrologerAuthController::class, 'setAvailability']);
+            Route::delete('/availability/{day}/{slotIndex}', [AstrologerAuthController::class, 'deleteAvailability']);
             Route::get('/sleep-hours', [AstrologerAuthController::class, 'getSleepHours']);
             Route::post('/sleep-hours', [AstrologerAuthController::class, 'setSleepHours']);
             Route::post('/logout', [AstrologerAuthController::class, 'logout']);
@@ -79,6 +81,12 @@ Route::prefix('v1')->group(function () {
     | USER (CONSUMER) ROUTES
     |--------------------------------------------------------------------------
     */
+    Route::get('/gifts', [GiftController::class, 'index']);
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('/gifts/send', [GiftController::class, 'send']);
+        Route::get('/astrologers/{id}/gifts', [GiftController::class, 'astrologerGifts']);
+    });
+
     Route::prefix('user')->group(function () {
         Route::post('/send-otp', [UserAuthController::class, 'sendOtp']);
         Route::post('/verify-otp', [UserAuthController::class, 'verifyOtp']);

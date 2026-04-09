@@ -893,6 +893,74 @@ class AstrologerAuthController extends Controller
     }
 
     /**
+     * Delete a single availability slot for an astrologer.
+     */
+    public function deleteAvailability(Request $request, string $day, int $slotIndex): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $day = strtolower(trim($day));
+        $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+        // Validate day
+        if (!in_array($day, $allowedDays, true)) {
+            return response()->json(['status' => 'error', 'message' => "Invalid day provided: {$day}"], 422);
+        }
+
+        // Validate slotIndex is non-negative
+        if ($slotIndex < 0) {
+            return response()->json(['status' => 'error', 'message' => 'Slot index must be a non-negative integer.'], 422);
+        }
+
+        $astrologer = $user->astrologer;
+        $availability = $astrologer->availability ?? [];
+
+        // Find the day in availability array
+        $dayIndex = null;
+        foreach ($availability as $index => $item) {
+            if ($item['day'] === $day) {
+                $dayIndex = $index;
+                break;
+            }
+        }
+
+        if ($dayIndex === null) {
+            return response()->json(['status' => 'error', 'message' => "Availability not found for day: {$day}"], 404);
+        }
+
+        $dayItem = $availability[$dayIndex];
+
+        // Check if slot index exists
+        if (!isset($dayItem['slots'][$slotIndex])) {
+            return response()->json(['status' => 'error', 'message' => "Slot index {$slotIndex} not found for day: {$day}"], 404);
+        }
+
+        // Remove the slot
+        unset($availability[$dayIndex]['slots'][$slotIndex]);
+
+        // Reindex the slots array
+        $availability[$dayIndex]['slots'] = array_values($availability[$dayIndex]['slots']);
+
+        // If no slots left, disable the day
+        if (count($availability[$dayIndex]['slots']) === 0) {
+            $availability[$dayIndex]['enabled'] = false;
+        }
+
+        // Save updated availability
+        $astrologer->availability = $availability;
+        $astrologer->save();
+
+        return response()->json([
+            'status' => 'success',
+            'message' => "Slot {$slotIndex} deleted successfully for day: {$day}",
+            'data' => ['availability' => $availability]
+        ], 200);
+    }
+
+    /**
      * Get astrologer sleep hours settings.
      */
     public function getSleepHours(Request $request): JsonResponse

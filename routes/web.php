@@ -5,6 +5,8 @@ use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\GiftController;
+use App\Http\Controllers\Admin\GiftTransactionController;
 
 Route::get('/', function () {
     // return view('welcome');
@@ -71,6 +73,12 @@ Route::prefix('admin')->group(function () {
 
         // Training Videos Management
         Route::resource('training_videos', \App\Http\Controllers\Admin\TrainingVideoController::class)->names('admin.training_videos');
+
+        // Gift Management
+        Route::resource('gifts', GiftController::class)->names('admin.gifts');
+        Route::get('gift-transactions', [GiftTransactionController::class, 'index'])->name('admin.gift_transactions.index');
+        Route::get('gift-transactions/{transaction}', [GiftTransactionController::class, 'show'])->name('admin.gift_transactions.show');
+        Route::delete('gift-transactions/{transaction}', [GiftTransactionController::class, 'destroy'])->name('admin.gift_transactions.destroy');
 
         // Static Pages Management
         Route::resource('static_pages', \App\Http\Controllers\Admin\StaticPageController::class)->names('admin.static_pages');

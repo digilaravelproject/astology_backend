@@ -383,6 +383,31 @@
                         </a>
                     </li>
 
+                    <!-- Manage Gifts -->
+                    <li x-data="{ open: {{ request()->routeIs('admin.gifts.*') || request()->routeIs('admin.gift_transactions.*') ? 'true' : 'false' }} }">
+                        <button type="button" @click="open = !open" class="w-full flex items-center justify-between gap-4 px-6 py-3 text-[14px] font-medium transition-all duration-300 {{ request()->routeIs('admin.gifts.*') || request()->routeIs('admin.gift_transactions.*') ? 'bg-sidebar-hover text-primary' : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <span class="flex items-center gap-4">
+                                <i class="fas fa-gift w-5 text-center text-base"></i>
+                                <span>Manage Gifts</span>
+                            </span>
+                            <i :class="open ? 'fas fa-chevron-up' : 'fas fa-chevron-down'" class="text-xs"></i>
+                        </button>
+                        <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
+                            <li>
+                                <a href="{{ route('admin.gifts.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.gifts.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Gifts
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.gift_transactions.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.gift_transactions.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Gift Transactions
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
                     <!-- Reports -->
                     <li>
                         <a href="{{ route('admin.reports.index') }}" 
