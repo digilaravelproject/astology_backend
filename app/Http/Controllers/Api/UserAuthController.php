@@ -149,6 +149,9 @@ class UserAuthController extends Controller
                 'You have successfully verified your OTP and are now logged in.',
                 ['phone' => $phone]
             );
+            
+            // Check matrimony profile exists
+            $user->isMatrimony = MatrimonyProfile::where('user_id', $user->id)->exists();
 
             return response()->json([
                 'status' => 'success',
@@ -199,9 +202,7 @@ class UserAuthController extends Controller
             }
 
             // ✅ Check if matrimony profile exists
-            $isMatrimony = MatrimonyProfile::where('user_id', $userId)->exists();
-
-            $user->is_matrimony = $isMatrimony;
+            $user->isMatrimony = MatrimonyProfile::where('user_id', $userId)->exists();
 
             return response()->json([
                 'status' => 'success',

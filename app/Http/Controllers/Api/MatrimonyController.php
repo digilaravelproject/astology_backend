@@ -45,6 +45,7 @@ class MatrimonyController extends Controller
 
         try {
             return DB::transaction(function () use ($user, $validated, $request) {
+
                 $profile = MatrimonyProfile::updateOrCreate(
                     ['user_id' => $user->id],
                     array_merge($validated, ['user_id' => $user->id])
@@ -52,14 +53,25 @@ class MatrimonyController extends Controller
 
                 if ($request->hasFile('profile_photo')) {
                     $file = $request->file('profile_photo');
-                    $filename = time() . '_' . $user->id . '_matrimony.' . $file->getClientOriginalExtension();
+
+                    $filename = time() . '_' . $user->id . '_matrimony.' .
+                        $file->getClientOriginalExtension();
+
                     $path = 'matrimony_profiles/' . $user->id;
 
-                    if ($profile->profile_photo && Storage::disk('public')->exists($profile->profile_photo)) {
+                    if ($profile->profile_photo &&
+                        Storage::disk('public')->exists($profile->profile_photo)) {
+
                         Storage::disk('public')->delete($profile->profile_photo);
                     }
 
-                    $profile->profile_photo = Storage::disk('public')->putFileAs($path, $file, $filename);
+                    $profile->profile_photo =
+                        Storage::disk('public')->putFileAs(
+                            $path,
+                            $file,
+                            $filename
+                        );
+
                     $profile->save();
                 }
 
@@ -71,38 +83,61 @@ class MatrimonyController extends Controller
                     ],
                 ], 201);
             });
+
         } catch (\Exception $e) {
-            Log::error('Matrimony profile save error: ' . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => 'Failed to save profile.'], 500);
+
+            Log::error(
+                'Matrimony profile save error: ' .
+                $e->getMessage()
+            );
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to save profile.'
+            ], 500);
         }
     }
 
     /**
-     * List other matrimony profiles (excluding the authenticated user's own profile).
+     * List other matrimony profiles
      */
     public function listProfiles(Request $request): JsonResponse
     {
         $user = $request->user();
+
         if (!$user) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthenticated.'
+            ], 401);
         }
 
-        $query = MatrimonyProfile::query()->where('user_id', '!=', $user->id);
+        $query = MatrimonyProfile::with('user')
+            ->where('user_id', '!=', $user->id);
 
-        // Optional filters
         if ($location = $request->query('location')) {
-            $query->where('location', 'like', '%' . $location . '%');
+            $query->where(
+                'location',
+                'like',
+                '%' . $location . '%'
+            );
         }
 
         if ($education = $request->query('education')) {
-            $query->where('education', 'like', '%' . $education . '%');
+            $query->where(
+                'education',
+                'like',
+                '%' . $education . '%'
+            );
         }
 
         if ($gender = $request->query('gender')) {
             $query->where('gender', $gender);
         }
 
-        $profiles = $query->orderBy('created_at', 'desc')->get();
+        $profiles = $query
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         return response()->json([
             'status' => 'success',
@@ -113,18 +148,30 @@ class MatrimonyController extends Controller
     }
 
     /**
-     * Get a matrimony profile by ID.
+     * Show single profile
      */
-    public function showProfile(Request $request, $id): JsonResponse
-    {
+    public function showProfile(
+        Request $request,
+        $id
+    ): JsonResponse {
+
         $user = $request->user();
+
         if (!$user) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthenticated.'
+            ], 401);
         }
 
-        $profile = MatrimonyProfile::find($id);
+        $profile = MatrimonyProfile::with('user')
+            ->find($id);
+
         if (!$profile) {
-            return response()->json(['status' => 'error', 'message' => 'Profile not found.'], 404);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Profile not found.'
+            ], 404);
         }
 
         return response()->json([
@@ -136,29 +183,62 @@ class MatrimonyController extends Controller
     }
 
     /**
-     * Search matrimony profiles (by name / location / education / job title).
+     * Search profiles
      */
-    public function searchProfiles(Request $request): JsonResponse
-    {
+    public function searchProfiles(
+        Request $request
+    ): JsonResponse {
+
         $user = $request->user();
+
         if (!$user) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthenticated.'
+            ], 401);
         }
 
         $queryText = $request->query('q');
-        $query = MatrimonyProfile::query()->where('user_id', '!=', $user->id);
+
+        $query = MatrimonyProfile::with('user')
+            ->where('user_id', '!=', $user->id);
 
         if ($queryText) {
+
             $query->where(function ($q) use ($queryText) {
-                $q->where('first_name', 'like', "%{$queryText}%")
-                    ->orWhere('last_name', 'like', "%{$queryText}%")
-                    ->orWhere('location', 'like', "%{$queryText}%")
-                    ->orWhere('education', 'like', "%{$queryText}%")
-                    ->orWhere('job_title', 'like', "%{$queryText}%");
+
+                $q->where(
+                    'first_name',
+                    'like',
+                    "%{$queryText}%"
+                )
+                ->orWhere(
+                    'last_name',
+                    'like',
+                    "%{$queryText}%"
+                )
+                ->orWhere(
+                    'location',
+                    'like',
+                    "%{$queryText}%"
+                )
+                ->orWhere(
+                    'education',
+                    'like',
+                    "%{$queryText}%"
+                )
+                ->orWhere(
+                    'job_title',
+                    'like',
+                    "%{$queryText}%"
+                );
+
             });
         }
 
-        $profiles = $query->orderBy('created_at', 'desc')->get();
+        $profiles = $query
+            ->orderBy('created_at', 'desc')
+            ->get();
 
         return response()->json([
             'status' => 'success',
