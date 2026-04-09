@@ -216,7 +216,10 @@ class WalletController extends Controller
     {
         $user = $request->user();
         if (!$user) {
-            return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthenticated.'
+            ], 401);
         }
 
         $wallet = Wallet::firstOrCreate(
@@ -227,7 +230,16 @@ class WalletController extends Controller
         $transactions = WalletTransaction::where('wallet_id', $wallet->id)
             ->where('status', '!=', 'pending')
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($transaction) {
+                // Remove text inside parentheses () including brackets
+                if (!empty($transaction->description)) {
+                    $transaction->description = trim(
+                        preg_replace('/\s*\(.*?\)/', '', $transaction->description)
+                    );
+                }
+                return $transaction;
+            });
 
         return response()->json([
             'status' => 'success',
