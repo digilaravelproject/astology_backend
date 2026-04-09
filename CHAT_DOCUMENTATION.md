@@ -103,15 +103,30 @@ Back in your **WebSocket tab**, send this JSON:
 
 ### Step 3: Sending a Message
 
-- **API**: `POST /api/v1/chat/101/message`
+- **API**: `POST /api/v1/chat/{{SESSION_ID}}/message`
 - **Body**: `{"message": "Hello Guru!", "type": "text"}`
 - **Event (Other Person WebSocket)**:
     ```json
     {
         "event": "MessageSent",
         "data": {
-            "message": { "id": 500, "message": "Hello Guru!", "sender_id": 12, ... }
+            "messageData": { "id": 500, "message": "Hello Guru!", "sender_id": 12, ... },
+            "receiverId": 13
         }
+    }
+    ```
+
+### Step 4: Status Update (Server-side Event)
+
+When a message is marked as seen/delivered via API, the system broadcasts this event.
+
+- **Event**: `MessageStatusUpdated`
+- **Data**:
+    ```json
+    {
+        "message_ids": [500, 501],
+        "status": "seen",
+        "session_id": 101
     }
     ```
 
@@ -183,8 +198,16 @@ Standard `GET` APIs for loading old data or syncing database status.
 | `/chat/{id}/sync-status` | POST    | **Save State** | Background DB update for Seen/Delivered. |
 | `/chat/{id}/messages`    | **GET** | **History**    | Load old messages.                       |
 
+## 🧹 Maintenance Commands
+
+To clear all chat test data for a fresh start:
+```bash
+php artisan tinker --execute="App\\Models\\ChatSession::query()->delete(); App\\Models\\Message::query()->delete();"
+```
+
 ## 🛑 Troubleshooting for Beginners
 
 1.  **"Astrologer is Offline"**: Make sure you hit `/presence/pulse` with the Astrologer's token.
 2.  **Auth String**: Remember that if you "Connect" again, your `socket_id` changes, so you need a NEW auth string.
 3.  **Channel Names**: Ensure you are using `private-user.{{id}}` correctly.
+4.  **Payload Key**: Notice that `MessageSent` uses `messageData` for the message object.
