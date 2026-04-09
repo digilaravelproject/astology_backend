@@ -225,6 +225,7 @@ class WalletController extends Controller
         );
 
         $transactions = WalletTransaction::where('wallet_id', $wallet->id)
+            ->where('status', '!=', 'pending')
             ->orderBy('created_at', 'desc')
             ->get();
 
