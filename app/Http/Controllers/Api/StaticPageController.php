@@ -79,4 +79,20 @@ class StaticPageController extends Controller
     {
         return $this->show('payment_policy');
     }
+
+    /**
+     * Get about us.
+     */
+    public function getAboutUs(): JsonResponse
+    {
+        return $this->show('about_us');
+    }
+
+    /**
+     * Get customer support.
+     */
+    public function getCustomerSupport(): JsonResponse
+    {
+        return $this->show('customer_support');
+    }
 }

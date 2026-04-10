@@ -649,6 +649,8 @@ class UserAuthController extends Controller
                     'languages' => $astrologer->languages,
                     'bio' => $astrologer->bio,
                     'status' => $astrologer->status,
+                    'avg_rating' => '2',
+                    'is_online' => true,
                     'followed_at' => $record->liked_at,
                     'created_at' => $record->created_at,
                 ];
@@ -791,4 +793,3 @@ class UserAuthController extends Controller
         }
     }
 }
-

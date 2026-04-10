@@ -53,7 +53,7 @@ class StaticPageController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'type' => 'required|in:faq,privacy_policy,terms_and_conditions,payment_policy|unique:static_pages,type',
+            'type' => 'required|in:faq,privacy_policy,terms_and_conditions,payment_policy,about_us,customer_support|unique:static_pages,type',
             'title' => 'required|string|max:255',
             'content' => 'required|string',
             'is_active' => 'sometimes|boolean',

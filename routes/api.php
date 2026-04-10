@@ -188,5 +188,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/privacy-policy', [StaticPageController::class, 'getPrivacyPolicy']);
     Route::get('/terms-and-conditions', [StaticPageController::class, 'getTermsAndConditions']);
     Route::get('/payment-policy', [StaticPageController::class, 'getPaymentPolicy']);
+    Route::get('/about-us', [StaticPageController::class, 'getAboutUs']);
+    Route::get('/customer-support', [StaticPageController::class, 'getCustomerSupport']);
 
 });
