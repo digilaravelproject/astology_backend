@@ -120,8 +120,14 @@ class AstrologerController extends Controller
             $astrologers = $query->get();
 
             $astrologers = $query->get()->map(function ($astrologer) {
-                $astrologer->is_online = true;
-                $astrologer->avg_rating = 2.5; // use numeric, not string
+                // Calculate actual average rating from reviews
+                $avgRating = \App\Models\AstrologerReview::where('astrologer_id', $astrologer->id)
+                    ->avg('rating');
+                $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
+                
+                // Get real online status from astrologers table
+                $astrologer->is_online = (bool) $astrologer->is_online;
+                
                 return $astrologer;
             });
 

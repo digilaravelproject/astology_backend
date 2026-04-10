@@ -522,8 +522,8 @@ class UserAuthController extends Controller
 
         NotificationHelper::send(
             $user->id,
-            'Astrologer blocked',
-            "You have blocked astrologer {$astrologer->user->name}.",
+            'User blocked',
+            "You have blocked user {$astrologer->user->name}.",
             ['astrologer_id' => $astrologer->id]
         );
 
@@ -536,7 +536,7 @@ class UserAuthController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Astrologer blocked.',
+            'message' => 'Blocked.',
             'data' => [
                 'astrologer_id' => $astrologer->id,
                 'is_blocked' => true,
@@ -590,8 +590,8 @@ class UserAuthController extends Controller
 
         NotificationHelper::send(
             $user->id,
-            'Astrologer reported',
-            "You have reported astrologer {$astrologer->user->name}.",
+            'User reported',
+            "You have reported the user {$astrologer->user->name}.",
             ['astrologer_id' => $astrologer->id, 'reason' => $community->report_reason]
         );
 
@@ -604,7 +604,7 @@ class UserAuthController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Astrologer reported successfully.',
+            'message' => 'Reported successfully.',
             'data' => [
                 'astrologer_id' => $astrologer->id,
                 'report_reason' => $community->report_reason,
@@ -637,6 +637,15 @@ class UserAuthController extends Controller
 
             $data = $following->map(function ($record) {
                 $astrologer = $record->astrologer;
+                
+                // Calculate actual average rating from reviews
+                $avgRating = \App\Models\AstrologerReview::where('astrologer_id', $astrologer->id)
+                    ->avg('rating');
+                $avgRatingValue = $avgRating ? (float) number_format($avgRating, 2) : 0;
+                
+                // Get real online status from astrologers table
+                $isOnline = (bool) $astrologer->is_online;
+                
                 return [
                     'astrologer_id' => $astrologer->id,
                     // 'user_id' => $astrologer->user->id,
@@ -649,8 +658,8 @@ class UserAuthController extends Controller
                     'languages' => $astrologer->languages,
                     'bio' => $astrologer->bio,
                     'status' => $astrologer->status,
-                    'avg_rating' => '2',
-                    'is_online' => true,
+                    'avg_rating' => $avgRatingValue,
+                    'is_online' => $isOnline ? 1 : 0,
                     'followed_at' => $record->liked_at,
                     'created_at' => $record->created_at,
                 ];

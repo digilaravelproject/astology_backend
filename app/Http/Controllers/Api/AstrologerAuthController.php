@@ -1380,4 +1380,45 @@ class AstrologerAuthController extends Controller
             'data' => $data,
         ], 200);
     }
+
+    /**
+     * Toggle astrologer online/offline status.
+     */
+    public function toggleOnlineStatus(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $validated = $request->validate([
+            'is_online' => 'required|boolean',
+        ]);
+
+        // Toggle the is_online status
+        $astrologer->is_online = (bool) $validated['is_online'];
+        $astrologer->save();
+
+        NotificationHelper::send(
+            $user->id,
+            'Online status updated',
+            'Your online status has been ' . ($astrologer->is_online ? 'set to online' : 'set to offline') . '.',
+            ['is_online' => $astrologer->is_online]
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Online status updated successfully.',
+            'data' => [
+                'astrologer_id' => $astrologer->id,
+                'is_online' => (bool) $astrologer->is_online,
+                'updated_at' => $astrologer->updated_at,
+            ],
+        ], 200);
+    }
 }

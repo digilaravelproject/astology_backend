@@ -72,6 +72,7 @@ Route::prefix('v1')->group(function () {
             Route::delete('/availability/{day}/{slotIndex}', [AstrologerAuthController::class, 'deleteAvailability']);
             Route::get('/sleep-hours', [AstrologerAuthController::class, 'getSleepHours']);
             Route::post('/sleep-hours', [AstrologerAuthController::class, 'setSleepHours']);
+            Route::post('/toggle-online', [AstrologerAuthController::class, 'toggleOnlineStatus']);
             Route::post('/logout', [AstrologerAuthController::class, 'logout']);
             Route::delete('/delete-account', [AstrologerAuthController::class, 'deleteAccount']);
         });
