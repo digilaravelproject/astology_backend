@@ -638,8 +638,8 @@ class UserAuthController extends Controller
             $data = $following->map(function ($record) {
                 $astrologer = $record->astrologer;
                 return [
-                    // 'astrologer_id' => $astrologer->id,
-                    'user_id' => $astrologer->user->id,
+                    'astrologer_id' => $astrologer->id,
+                    // 'user_id' => $astrologer->user->id,
                     'name' => $astrologer->user->name,
                     'email' => $astrologer->user->email,
                     'phone' => $astrologer->user->phone,

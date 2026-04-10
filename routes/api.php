@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\{
     BlogController,
     CallController,
     ChatController,
+    FeedbackController,
     FoundersWordController,
     MatrimonyController,
     NoticeController,
@@ -190,5 +191,14 @@ Route::prefix('v1')->group(function () {
     Route::get('/payment-policy', [StaticPageController::class, 'getPaymentPolicy']);
     Route::get('/about-us', [StaticPageController::class, 'getAboutUs']);
     Route::get('/customer-support', [StaticPageController::class, 'getCustomerSupport']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | FEEDBACK
+    |--------------------------------------------------------------------------
+    */
+    Route::post('/feedback', [FeedbackController::class, 'store'])->middleware('auth:sanctum');
+    Route::get('/feedbacks', [FeedbackController::class, 'index']);
+    Route::get('/feedbacks/{id}', [FeedbackController::class, 'show']);
 
 });

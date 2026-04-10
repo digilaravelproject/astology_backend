@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\OrderController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\GiftController;
 use App\Http\Controllers\Admin\GiftTransactionController;
+use App\Http\Controllers\Admin\FeedbackController;
 
 Route::get('/', function () {
     // return view('welcome');
@@ -79,6 +80,9 @@ Route::prefix('admin')->group(function () {
         Route::get('gift-transactions', [GiftTransactionController::class, 'index'])->name('admin.gift_transactions.index');
         Route::get('gift-transactions/{transaction}', [GiftTransactionController::class, 'show'])->name('admin.gift_transactions.show');
         Route::delete('gift-transactions/{transaction}', [GiftTransactionController::class, 'destroy'])->name('admin.gift_transactions.destroy');
+
+        // Feedback Management
+        Route::resource('feedbacks', FeedbackController::class)->names('admin.feedbacks')->only(['index', 'show', 'destroy']);
 
         // Static Pages Management
         Route::resource('static_pages', \App\Http\Controllers\Admin\StaticPageController::class)->names('admin.static_pages');
