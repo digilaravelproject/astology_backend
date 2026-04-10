@@ -119,6 +119,12 @@ class AstrologerController extends Controller
 
             $astrologers = $query->get();
 
+            $astrologers = $query->get()->map(function ($astrologer) {
+                $astrologer->is_online = true;
+                $astrologer->avg_rating = 2.5; // use numeric, not string
+                return $astrologer;
+            });
+
             return response()->json([
                 'status' => 'success',
                 'data' => [
