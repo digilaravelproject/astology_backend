@@ -1258,38 +1258,78 @@ class AstrologerAuthController extends Controller
      */
     public function getFollowers(Request $request): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        if (!$user || !$user->astrologer) {
+            if (!$user || !$user->astrologer) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Astrologer profile not found.',
+                ], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'query' => 'nullable|string|min:1|max:255',
+                'per_page' => 'nullable|integer|min:1|max:100',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $astrologer = $user->astrologer;
+            $searchQuery = $request->input('query');
+            $perPage = $request->input('per_page', 15);
+
+            $query = AstrologerCommunity::with('user')
+                ->where('astrologer_id', $astrologer->id);
+
+            // Apply search filter if provided
+            if ($searchQuery) {
+                $query->whereHas('user', function ($q) use ($searchQuery) {
+                    $q->where('name', 'LIKE', "%{$searchQuery}%")
+                      ->orWhere('email', 'LIKE', "%{$searchQuery}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchQuery}%");
+                });
+            }
+
+            // Apply pagination
+            $results = $query->orderByDesc('created_at')->paginate($perPage);
+
+            $data = $results->map(function ($record) {
+                return [
+                    'user_id' => $record->user?->id,
+                    'name' => $record->user?->name,
+                    'email' => $record->user?->email,
+                    'phone' => $record->user?->phone,
+                    'is_liked' => $record->is_liked,
+                    'liked_at' => $record->liked_at,
+                    'followed_at' => $record->created_at,
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Followers retrieved successfully',
+                'data' => [
+                    'total' => $results->total(),
+                    'per_page' => $results->perPage(),
+                    'current_page' => $results->currentPage(),
+                    'last_page' => $results->lastPage(),
+                    'followers' => $data,
+                ],
+            ], 200);
+        } catch (Exception $e) {
+            Log::error('Get followers error: ' . $e->getMessage());
             return response()->json([
                 'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
+                'message' => 'Failed to retrieve followers: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $astrologer = $user->astrologer;
-
-        $query = AstrologerCommunity::with('user')->where('astrologer_id', $astrologer->id);
-        $count = $query->count();
-        $followers = $query->get();
-
-        $data = $followers->map(function ($record) {
-            return [
-                'user_id' => $record->user?->id,
-                'name' => $record->user?->name,
-                'email' => $record->user?->email,
-                'phone' => $record->user?->phone,
-                'is_liked' => $record->is_liked,
-                'liked_at' => $record->liked_at,
-                'followed_at' => $record->created_at,
-            ];
-        });
-
-        return response()->json([
-            'status' => 'success',
-            'count' => $count,
-            'data' => $data,
-        ], 200);
     }
 
     /**
@@ -1348,37 +1388,78 @@ class AstrologerAuthController extends Controller
      */
     public function getFavorites(Request $request): JsonResponse
     {
-        $user = $request->user();
+        try {
+            $user = $request->user();
 
-        if (!$user || !$user->astrologer) {
+            if (!$user || !$user->astrologer) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Astrologer profile not found.',
+                ], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'query' => 'nullable|string|min:1|max:255',
+                'per_page' => 'nullable|integer|min:1|max:100',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            $astrologer = $user->astrologer;
+            $searchQuery = $request->input('query');
+            $perPage = $request->input('per_page', 15);
+
+            $query = AstrologerCommunity::with('user')
+                ->where('astrologer_id', $astrologer->id)
+                ->where('is_liked', true);
+
+            // Apply search filter if provided
+            if ($searchQuery) {
+                $query->whereHas('user', function ($q) use ($searchQuery) {
+                    $q->where('name', 'LIKE', "%{$searchQuery}%")
+                      ->orWhere('email', 'LIKE', "%{$searchQuery}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchQuery}%");
+                });
+            }
+
+            // Apply pagination
+            $results = $query->orderByDesc('liked_at')->paginate($perPage);
+
+            $data = $results->map(function ($record) {
+                return [
+                    'user_id' => $record->user?->id,
+                    'name' => $record->user?->name,
+                    'email' => $record->user?->email,
+                    'phone' => $record->user?->phone,
+                    'liked_at' => $record->liked_at,
+                    'followed_at' => $record->created_at,
+                ];
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Favorites retrieved successfully',
+                'data' => [
+                    'total' => $results->total(),
+                    'per_page' => $results->perPage(),
+                    'current_page' => $results->currentPage(),
+                    'last_page' => $results->lastPage(),
+                    'favorites' => $data,
+                ],
+            ], 200);
+        } catch (Exception $e) {
+            Log::error('Get favorites error: ' . $e->getMessage());
             return response()->json([
                 'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
+                'message' => 'Failed to retrieve favorites: ' . $e->getMessage(),
+            ], 500);
         }
-
-        $astrologer = $user->astrologer;
-        $favorites = AstrologerCommunity::with('user')
-            ->where('astrologer_id', $astrologer->id)
-            ->where('is_liked', true)
-            ->get();
-
-        $data = $favorites->map(function ($record) {
-            return [
-                'user_id' => $record->user?->id,
-                'name' => $record->user?->name,
-                'email' => $record->user?->email,
-                'phone' => $record->user?->phone,
-                'liked_at' => $record->liked_at,
-                'followed_at' => $record->created_at,
-            ];
-        });
-
-        return response()->json([
-            'status' => 'success',
-            'count' => $data->count(),
-            'data' => $data,
-        ], 200);
     }
 
     /**
