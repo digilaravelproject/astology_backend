@@ -15,7 +15,7 @@
     </div>
 
     <div class="bg-white border border-gray-lighter rounded-[32px] shadow-sm p-8">
-        <form action="{{ $remedy->exists ? route('admin.remedies.update', $remedy->id) : route('admin.remedies.store') }}" method="POST">
+        <form action="{{ $remedy->exists ? route('admin.remedies.update', $remedy->id) : route('admin.remedies.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
             @if($remedy->exists)
                 @method('PUT')
@@ -34,6 +34,22 @@
                         <textarea name="description" rows="6" class="w-full bg-light/50 border border-gray-lighter rounded-2xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:border-dark" placeholder="Describe the remedy...">{{ old('description', $remedy->description) }}</textarea>
                         @error('description')<div class="text-danger text-xs mt-1">{{ $message }}</div>@enderror
                     </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-gray uppercase tracking-widest">Image</label>
+                        <div class="relative">
+                            <input name="image" type="file" accept="image/*" class="w-full bg-light/50 border border-gray-lighter rounded-2xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:border-dark file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark" id="image_input">
+                        </div>
+                        @error('image')<div class="text-danger text-xs mt-1">{{ $message }}</div>@enderror
+                        <div class="text-gray text-xs mt-2">Supported formats: JPEG, PNG, JPG, GIF, WebP (Max: 2MB)</div>
+                    </div>
+
+                    @if($remedy->exists && $remedy->image)
+                        <div class="bg-light/50 rounded-2xl p-3 border border-gray-lighter">
+                            <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-3">Current Image</div>
+                            <img src="{{ $remedy->image_url }}" alt="{{ $remedy->title }}" class="w-full h-40 object-cover rounded-xl">
+                        </div>
+                    @endif
 
                     <div class="flex items-center gap-3">
                         <input type="checkbox" id="is_active" name="is_active" value="1" {{ old('is_active', $remedy->is_active) ? 'checked' : '' }} class="w-4 h-4 text-primary border-gray-lighter rounded focus:ring-primary">

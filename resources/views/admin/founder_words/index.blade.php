@@ -60,6 +60,7 @@
             <table class="w-full text-left border-collapse">
                 <thead class="bg-light/50 border-b border-gray-lighter">
                     <tr>
+                        <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Image</th>
                         <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Title</th>
                         <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Message Preview</th>
                         <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider text-center">Status</th>
@@ -70,6 +71,15 @@
                 <tbody class="divide-y divide-gray-lighter">
                     @forelse($words as $word)
                         <tr class="hover:bg-light/30 transition-colors">
+                            <td class="px-6 py-4">
+                                @if($word->image)
+                                    <img src="{{ $word->image_url }}" alt="{{ $word->title }}" class="w-12 h-12 rounded-lg object-cover">
+                                @else
+                                    <div class="w-12 h-12 rounded-lg bg-gray-lighter flex items-center justify-center">
+                                        <i class="fas fa-image text-gray text-xs"></i>
+                                    </div>
+                                @endif
+                            </td>
                             <td class="px-6 py-4">
                                 <div class="text-sm font-black text-dark">{{ $word->title }}</div>
                             </td>

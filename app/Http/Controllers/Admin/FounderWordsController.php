@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\FoundersWord;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class FounderWordsController extends Controller
 {
@@ -50,10 +51,16 @@ class FounderWordsController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'message' => 'required|string|max:2000',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'sometimes|boolean',
         ]);
 
         $data['is_active'] = $request->has('is_active');
+
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('founder_words', 'public');
+        }
 
         FoundersWord::create($data);
 
@@ -73,10 +80,20 @@ class FounderWordsController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'message' => 'required|string|max:2000',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'sometimes|boolean',
         ]);
 
         $data['is_active'] = $request->has('is_active');
+
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($word->image && Storage::disk('public')->exists($word->image)) {
+                Storage::disk('public')->delete($word->image);
+            }
+            $data['image'] = $request->file('image')->store('founder_words', 'public');
+        }
 
         $word->update($data);
 
@@ -86,6 +103,12 @@ class FounderWordsController extends Controller
     public function destroy($id)
     {
         $word = FoundersWord::findOrFail($id);
+        
+        // Delete image if exists
+        if ($word->image && Storage::disk('public')->exists($word->image)) {
+            Storage::disk('public')->delete($word->image);
+        }
+        
         $word->delete();
 
         return redirect()->route('admin.founder_words.index')->with('success', 'Founder word deleted successfully.');

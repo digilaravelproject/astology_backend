@@ -15,7 +15,19 @@ class FoundersWordController extends Controller
     {
         $words = FoundersWord::where('is_active', true)
             ->orderBy('created_at', 'desc')
-            ->get();
+            ->get()
+            ->map(function ($word) {
+                return [
+                    'id' => $word->id,
+                    'title' => $word->title,
+                    'message' => $word->message,
+                    'image' => $word->image_url,
+                    'image_path' => $word->image,
+                    'is_active' => $word->is_active,
+                    'created_at' => $word->created_at,
+                    'updated_at' => $word->updated_at,
+                ];
+            });
 
         return response()->json([
             'status' => 'success',
@@ -44,7 +56,16 @@ class FoundersWordController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'founders_word' => $word,
+                'founders_word' => [
+                    'id' => $word->id,
+                    'title' => $word->title,
+                    'message' => $word->message,
+                    'image' => $word->image_url,
+                    'image_path' => $word->image,
+                    'is_active' => $word->is_active,
+                    'created_at' => $word->created_at,
+                    'updated_at' => $word->updated_at,
+                ],
             ],
         ], 200);
     }

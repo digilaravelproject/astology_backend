@@ -17,6 +17,7 @@ class FoundersWord extends Model
     protected $fillable = [
         'title',
         'message',
+        'image',
         'is_active',
     ];
 
@@ -28,4 +29,20 @@ class FoundersWord extends Model
     protected $casts = [
         'is_active' => 'boolean',
     ];
+
+    /**
+     * Get the image URL.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (!$this->image) {
+            return null;
+        }
+
+        if (filter_var($this->image, FILTER_VALIDATE_URL)) {
+            return $this->image;
+        }
+
+        return url('storage/' . $this->image);
+    }
 }

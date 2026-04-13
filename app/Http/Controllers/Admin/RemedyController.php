@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Remedy;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class RemedyController extends Controller
 {
@@ -48,10 +49,16 @@ class RemedyController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'sometimes|boolean',
         ]);
 
         $data['is_active'] = $request->has('is_active');
+
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            $data['image'] = $request->file('image')->store('remedies', 'public');
+        }
 
         Remedy::create($data);
 
@@ -71,10 +78,20 @@ class RemedyController extends Controller
         $data = $request->validate([
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'sometimes|boolean',
         ]);
 
         $data['is_active'] = $request->has('is_active');
+
+        // Handle image upload
+        if ($request->hasFile('image')) {
+            // Delete old image if exists
+            if ($remedy->image && Storage::disk('public')->exists($remedy->image)) {
+                Storage::disk('public')->delete($remedy->image);
+            }
+            $data['image'] = $request->file('image')->store('remedies', 'public');
+        }
 
         $remedy->update($data);
 
@@ -84,6 +101,12 @@ class RemedyController extends Controller
     public function destroy($id)
     {
         $remedy = Remedy::findOrFail($id);
+        
+        // Delete image if exists
+        if ($remedy->image && Storage::disk('public')->exists($remedy->image)) {
+            Storage::disk('public')->delete($remedy->image);
+        }
+        
         $remedy->delete();
 
         return redirect()->route('admin.remedies.index')->with('success', 'Remedy deleted successfully.');

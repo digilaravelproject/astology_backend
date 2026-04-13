@@ -17,7 +17,19 @@ class RemedyController extends Controller
         try {
             $remedies = Remedy::where('is_active', true)
                 ->orderBy('created_at', 'desc')
-                ->get();
+                ->get()
+                ->map(function ($remedy) {
+                    return [
+                        'id' => $remedy->id,
+                        'title' => $remedy->title,
+                        'description' => $remedy->description,
+                        'image' => $remedy->image_url,
+                        'image_path' => $remedy->image,
+                        'is_active' => $remedy->is_active,
+                        'created_at' => $remedy->created_at,
+                        'updated_at' => $remedy->updated_at,
+                    ];
+                });
 
             return response()->json([
                 'status' => 'success',
@@ -51,7 +63,16 @@ class RemedyController extends Controller
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'remedy' => $remedy,
+                    'remedy' => [
+                        'id' => $remedy->id,
+                        'title' => $remedy->title,
+                        'description' => $remedy->description,
+                        'image' => $remedy->image_url,
+                        'image_path' => $remedy->image,
+                        'is_active' => $remedy->is_active,
+                        'created_at' => $remedy->created_at,
+                        'updated_at' => $remedy->updated_at,
+                    ],
                 ],
             ], 200);
         } catch (\Exception $e) {

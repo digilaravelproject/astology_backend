@@ -80,6 +80,7 @@
                 <thead class="bg-light/30 border-b border-gray-lighter">
                     <tr>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">ID</th>
+                        <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Image</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Title</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Description</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Status</th>
@@ -92,6 +93,15 @@
                     @forelse($remedies as $remedy)
                         <tr class="hover:bg-light/30 transition-all group">
                             <td class="px-6 py-5 text-sm font-black text-dark">R-{{ $remedy->id }}</td>
+                            <td class="px-6 py-5">
+                                @if($remedy->image)
+                                    <img src="{{ $remedy->image_url }}" alt="{{ $remedy->title }}" class="w-12 h-12 rounded-lg object-cover">
+                                @else
+                                    <div class="w-12 h-12 rounded-lg bg-gray-lighter flex items-center justify-center">
+                                        <i class="fas fa-image text-gray text-xs"></i>
+                                    </div>
+                                @endif
+                            </td>
                             <td class="px-6 py-5">
                                 <div class="text-sm font-black text-dark line-clamp-1">{{ $remedy->title }}</div>
                                 <div class="text-[9px] font-bold text-gray mt-1">{{ $remedy->created_at?->format('M d, Y') }}</div>
