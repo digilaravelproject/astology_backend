@@ -132,7 +132,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/notifications/{id}', [NotificationController::class, 'show']);
             Route::put('/notifications/{id}/mark-read', [NotificationController::class, 'markRead']);
             Route::post('/matrimony/profile', [MatrimonyController::class, 'createProfile']);
+            Route::put('/matrimony/profile', [MatrimonyController::class, 'updateProfile']);
             Route::get('/matrimony/profiles', [MatrimonyController::class, 'listProfiles']);
+            Route::get('/matrimony/profiles_user_id/{user_id}', [MatrimonyController::class, 'showProfileOnUserId']);
             Route::get('/matrimony/profiles/{id}', [MatrimonyController::class, 'showProfile']);
             Route::get('/matrimony/search', [MatrimonyController::class, 'searchProfiles']);
             Route::post('/logout', [UserAuthController::class, 'logout']);

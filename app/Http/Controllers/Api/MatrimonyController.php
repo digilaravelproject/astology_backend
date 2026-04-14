@@ -99,6 +99,101 @@ class MatrimonyController extends Controller
     }
 
     /**
+     * Update matrimony profile
+     */
+    public function updateProfile(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user) {
+            return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
+        }
+
+        // Find the user's matrimony profile
+        $profile = MatrimonyProfile::where('user_id', $user->id)->first();
+        
+        if (!$profile) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Matrimony profile not found. Please create a profile first.'
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'created_for' => ['nullable', 'string', 'max:50'],
+            'first_name' => ['nullable', 'string', 'max:100'],
+            'last_name' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'date_of_birth' => ['nullable', 'date'],
+            'gender' => ['nullable', 'string', 'max:20'],
+            'height' => ['nullable', 'string', 'max:50'],
+            'marital_status' => ['nullable', 'string', 'max:50'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'education' => ['nullable', 'string', 'max:255'],
+            'job_title' => ['nullable', 'string', 'max:255'],
+            'annual_income' => ['nullable', 'string', 'max:255'],
+            'about' => ['nullable', 'string', 'max:2000'],
+            'profile_photo' => ['nullable', 'file', 'image', 'max:5120'],
+            'pan_card_number' => ['nullable', 'string', 'max:20', 'regex:/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/'],
+            'driving_licence_number' => ['nullable', 'string', 'max:50'],
+            'aadhar_card_number' => ['nullable', 'string', 'max:20', 'regex:/^[0-9]{12}$/'],
+        ]);
+
+        try {
+            return DB::transaction(function () use ($user, $profile, $validated, $request) {
+
+                // Update only the fields that are provided
+                $profile->fill($validated);
+                $profile->save();
+
+                if ($request->hasFile('profile_photo')) {
+                    $file = $request->file('profile_photo');
+
+                    $filename = time() . '_' . $user->id . '_matrimony.' .
+                        $file->getClientOriginalExtension();
+
+                    $path = 'matrimony_profiles/' . $user->id;
+
+                    if ($profile->profile_photo &&
+                        Storage::disk('public')->exists($profile->profile_photo)) {
+
+                        Storage::disk('public')->delete($profile->profile_photo);
+                    }
+
+                    $profile->profile_photo =
+                        Storage::disk('public')->putFileAs(
+                            $path,
+                            $file,
+                            $filename
+                        );
+
+                    $profile->save();
+                }
+
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Matrimony profile updated successfully.',
+                    'data' => [
+                        'profile' => $profile,
+                    ],
+                ], 200);
+            });
+
+        } catch (\Exception $e) {
+
+            Log::error(
+                'Matrimony profile update error: ' .
+                $e->getMessage()
+            );
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to update profile.'
+            ], 500);
+        }
+    }
+
+    /**
      * List other matrimony profiles
      */
     public function listProfiles(Request $request): JsonResponse
@@ -166,6 +261,42 @@ class MatrimonyController extends Controller
 
         $profile = MatrimonyProfile::with('user')
             ->find($id);
+
+        if (!$profile) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Profile not found.'
+            ], 404);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'profile' => $profile,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Show single profile on user if
+     */
+    public function showProfileOnUserId(
+        Request $request,
+        $id
+    ): JsonResponse {
+
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Unauthenticated.'
+            ], 401);
+        }
+
+        $profile = MatrimonyProfile::with('user')
+            ->where('user_id', $id)
+            ->first();
 
         if (!$profile) {
             return response()->json([
