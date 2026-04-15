@@ -1189,6 +1189,15 @@ class AstrologerAuthController extends Controller
             ]
         );
 
+        Astrologer::updateOrCreate(
+            ['id' => $astrologer->id],
+            [
+                'areas_of_expertise' => $validated['primary_skills'] ?? null,
+                'languages' => $validated['languages'] ?? null,
+                'years_of_experience' => $validated['experience_years'] ?? null,
+            ]
+        );
+
         NotificationHelper::send(
             $user->id,
             'Skill updated',
