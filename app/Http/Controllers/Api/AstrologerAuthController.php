@@ -1463,7 +1463,17 @@ class AstrologerAuthController extends Controller
     }
 
     /**
-     * Toggle astrologer online/offline status.
+     * Toggle astrologer online/offline status or specific service status.
+     * 
+     * @param Request $request
+     * @return JsonResponse
+     * 
+     * Query/Body Parameters:
+     * - type: (optional) 'chat', 'call', or 'video_call'
+     *   - If not provided: toggles is_online status
+     *   - type=chat: toggles chat_enabled status
+     *   - type=call: toggles call_enabled status
+     *   - type=video_call: toggles video_call_enabled status
      */
     public function toggleOnlineStatus(Request $request): JsonResponse
     {
@@ -1477,29 +1487,53 @@ class AstrologerAuthController extends Controller
         }
 
         $astrologer = $user->astrologer;
-        $validated = $request->validate([
-            'is_online' => 'required|boolean',
-        ]);
+        $type = $request->input('type'); // Get type from query or body
 
-        // Toggle the is_online status
-        $astrologer->is_online = (bool) $validated['is_online'];
+        // Determine which field to toggle based on type
+        if ($type === 'chat') {
+            // Toggle chat_enabled status
+            $astrologer->is_chat_enabled = !$astrologer->is_chat_enabled;
+            $fieldName = 'is_chat_enabled';
+            $displayName = 'Chat';
+        } elseif ($type === 'call') {
+            // Toggle call_enabled status
+            $astrologer->is_call_enabled = !$astrologer->is_call_enabled;
+            $fieldName = 'is_call_enabled';
+            $displayName = 'Call';
+        } elseif ($type === 'video_call') {
+            // Toggle video_call_enabled status
+            $astrologer->is_video_call_enabled = !$astrologer->is_video_call_enabled;
+            $fieldName = 'is_video_call_enabled';
+            $displayName = 'Video Call';
+        } else {
+            // Default: Toggle is_online status (when type is not provided)
+            $astrologer->is_online = !$astrologer->is_online;
+            $fieldName = 'is_online';
+            $displayName = 'Online';
+        }
+        
+        // echo'<pre>';print_r($astrologer);die;
+
         $astrologer->save();
 
         NotificationHelper::send(
             $user->id,
-            'Online status updated',
-            'Your online status has been ' . ($astrologer->is_online ? 'set to online' : 'set to offline') . '.',
-            ['is_online' => $astrologer->is_online]
+            "{$displayName} status updated",
+            "Your {$displayName} status has been " . ($astrologer->$fieldName ? 'enabled' : 'disabled') . '.',
+            [$fieldName => $astrologer->$fieldName]
         );
+
+        // Prepare response data
+        $responseData = [
+            'astrologer_id' => $astrologer->id,
+            $fieldName => (bool) $astrologer->$fieldName,
+            'updated_at' => $astrologer->updated_at,
+        ];
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Online status updated successfully.',
-            'data' => [
-                'astrologer_id' => $astrologer->id,
-                'is_online' => (bool) $astrologer->is_online,
-                'updated_at' => $astrologer->updated_at,
-            ],
+            'message' => "{$displayName} status updated successfully.",
+            'data' => $responseData,
         ], 200);
     }
 }
