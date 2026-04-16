@@ -49,6 +49,24 @@ Route::prefix('admin')->group(function () {
         Route::post('astrologers/community/{community}/toggle-block', [\App\Http\Controllers\Admin\AstrologerCommunityController::class, 'toggleBlock'])->name('admin.astrologers.community.toggle-block');
         Route::delete('astrologers/community/{community}', [\App\Http\Controllers\Admin\AstrologerCommunityController::class, 'destroy'])->name('admin.astrologers.community.destroy');
         Route::get('astrologers/live', function() { return view('admin.astrologers.live'); })->name('admin.astrologers.live');
+        
+        // Gallery Management
+        Route::prefix('astrologers/gallery')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\AstrologerGalleryController::class, 'index'])->name('admin.astrologers.gallery.index');
+            Route::get('/{astrologerId}', [\App\Http\Controllers\Admin\AstrologerGalleryController::class, 'show'])->name('admin.astrologers.gallery.show');
+            Route::post('/{id}/approve', [\App\Http\Controllers\Admin\AstrologerGalleryController::class, 'approve'])->name('admin.astrologers.gallery.approve');
+            Route::post('/{id}/disapprove', [\App\Http\Controllers\Admin\AstrologerGalleryController::class, 'disapprove'])->name('admin.astrologers.gallery.disapprove');
+            Route::delete('/{id}', [\App\Http\Controllers\Admin\AstrologerGalleryController::class, 'destroy'])->name('admin.astrologers.gallery.destroy');
+        });
+
+        // Live Sessions Management
+        Route::prefix('astrologers/live-sessions')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\LiveSessionController::class, 'index'])->name('admin.astrologers.live-sessions.index');
+            Route::get('/{id}', [\App\Http\Controllers\Admin\LiveSessionController::class, 'show'])->name('admin.astrologers.live-sessions.show');
+            Route::post('/{id}/status', [\App\Http\Controllers\Admin\LiveSessionController::class, 'updateStatus'])->name('admin.astrologers.live-sessions.update-status');
+            Route::delete('/{id}', [\App\Http\Controllers\Admin\LiveSessionController::class, 'destroy'])->name('admin.astrologers.live-sessions.destroy');
+        });
+
         Route::resource('astrologers', \App\Http\Controllers\Admin\AstrologerController::class)->names('admin.astrologers');
 
         // Order Management

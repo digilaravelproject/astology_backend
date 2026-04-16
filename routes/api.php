@@ -5,12 +5,14 @@ use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\Api\{
     AstrologerAuthController,
     AstrologerController,
+    AstrologerGalleryController,
     BlogController,
     CallController,
     ChatController,
     FeedbackController,
     FoundersWordController,
     KundliController,
+    LiveSessionController,
     MatrimonyController,
     NoticeController,
     NotificationController,
@@ -54,6 +56,8 @@ Route::prefix('v1')->group(function () {
             Route::put('/profile', [AstrologerAuthController::class, 'updateProfile']);
             Route::get('/home', [AstrologerAuthController::class, 'getHomeStatus']);
             Route::put('/home', [AstrologerAuthController::class, 'updateHomeStatus']);
+            Route::get('/home-settings', [AstrologerAuthController::class, 'getHomeSettings']);
+            Route::put('/home-settings', [AstrologerAuthController::class, 'updateHomeSettings']);
             Route::put('/profile/skills', [AstrologerAuthController::class, 'updateSkill']);
             Route::put('/profile/other-details', [AstrologerAuthController::class, 'updateOtherDetails']);
             Route::post('/profile/photo', [AstrologerAuthController::class, 'updateProfilePhoto']);
@@ -74,6 +78,25 @@ Route::prefix('v1')->group(function () {
             Route::get('/sleep-hours', [AstrologerAuthController::class, 'getSleepHours']);
             Route::post('/sleep-hours', [AstrologerAuthController::class, 'setSleepHours']);
             Route::post('/toggle-online', [AstrologerAuthController::class, 'toggleOnlineStatus']);
+
+            // Gallery routes
+            Route::prefix('gallery')->group(function () {
+                Route::post('/upload', [AstrologerGalleryController::class, 'storeMultiple']);
+                Route::get('/', [AstrologerGalleryController::class, 'index']);
+                Route::get('/count', [AstrologerGalleryController::class, 'getTotalImages']);
+                Route::put('/{id}/toggle-visibility', [AstrologerGalleryController::class, 'toggleVisibility']);
+                Route::delete('/{id}', [AstrologerGalleryController::class, 'destroy']);
+            });
+
+            // Live Session routes
+            Route::prefix('live')->group(function () {
+                Route::post('/', [LiveSessionController::class, 'store']);
+                Route::get('/', [LiveSessionController::class, 'index']);
+                Route::get('/{id}', [LiveSessionController::class, 'show']);
+                Route::put('/{id}', [LiveSessionController::class, 'update']);
+                Route::delete('/{id}', [LiveSessionController::class, 'destroy']);
+            });
+
             Route::post('/logout', [AstrologerAuthController::class, 'logout']);
             Route::delete('/delete-account', [AstrologerAuthController::class, 'deleteAccount']);
         });

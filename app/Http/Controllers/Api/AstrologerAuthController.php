@@ -600,6 +600,130 @@ class AstrologerAuthController extends Controller
     }
 
     /**
+     * Get home settings (rate settings) for the authenticated astrologer
+     * GET /api/v1/astrologer/home-settings
+     */
+    public function getHomeSettings(): JsonResponse
+    {
+        $user = Auth::user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        $astrologer = $user->astrologer;
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Rate settings retrieved successfully.',
+            'data' => [
+                'is_chat_enabled' => (bool) $astrologer->is_chat_enabled,
+                'is_call_enabled' => (bool) $astrologer->is_call_enabled,
+                'is_video_call_enabled' => (bool) $astrologer->is_video_call_enabled,
+                'chat_rate' => (float) $astrologer->chat_rate_per_minute,
+                'call_rate' => (float) $astrologer->call_rate_per_minute,
+                'video_call_rate' => (float) $astrologer->video_call_rate_per_minute,
+                'po5_enabled' => (bool) $astrologer->po_at_5_enabled,
+                'po5_user_rate' => $astrologer->po_at_5_rate_per_minute ? (float) $astrologer->po_at_5_rate_per_minute : null,
+                'po5_astrologer_rate' => null, // Add if needed
+                'updated_at' => $astrologer->updated_at,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Update home settings (rate settings) for the authenticated astrologer
+     * Only updates the provided fields, does not touch other fields
+     * PUT /api/v1/astrologer/home-settings
+     */
+    public function updateHomeSettings(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer profile not found.',
+            ], 404);
+        }
+
+        // Validate input - all fields are optional
+        $validator = Validator::make($request->all(), [
+            'is_chat_enabled' => 'sometimes|boolean',
+            'is_call_enabled' => 'sometimes|boolean',
+            'is_video_call_enabled' => 'sometimes|boolean',
+            'chat_rate' => 'sometimes|numeric|min:0|max:9999.99',
+            'call_rate' => 'sometimes|numeric|min:0|max:9999.99',
+            'video_call_rate' => 'sometimes|numeric|min:0|max:9999.99',
+            'po5_enabled' => 'sometimes|boolean',
+            'po5_user_rate' => 'sometimes|numeric|min:0|max:9999.99',
+            'po5_astrologer_rate' => 'sometimes|numeric|min:0|max:9999.99',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $astrologer = $user->astrologer;
+        $validated = $validator->validated();
+
+        // Map incoming field names to database column names
+        $fieldMapping = [
+            'is_chat_enabled' => 'is_chat_enabled',
+            'is_call_enabled' => 'is_call_enabled',
+            'is_video_call_enabled' => 'is_video_call_enabled',
+            'chat_rate' => 'chat_rate_per_minute',
+            'call_rate' => 'call_rate_per_minute',
+            'video_call_rate' => 'video_call_rate_per_minute',
+            'po5_enabled' => 'po_at_5_enabled',
+            'po5_user_rate' => 'po_at_5_rate_per_minute',
+        ];
+
+        // Update only provided fields
+        $updateData = [];
+        foreach ($fieldMapping as $inputField => $dbField) {
+            if (array_key_exists($inputField, $validated)) {
+                $updateData[$dbField] = $validated[$inputField];
+            }
+        }
+
+        // Update the astrologer with only the provided fields
+        $astrologer->update($updateData);
+
+        // Send notification
+        NotificationHelper::send(
+            $user->id,
+            'Rate settings updated',
+            'Your rate settings have been updated successfully.',
+            []
+        );
+
+        // Return updated settings
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Rate settings updated successfully.',
+            'data' => [
+                'is_chat_enabled' => (bool) $astrologer->is_chat_enabled,
+                'is_call_enabled' => (bool) $astrologer->is_call_enabled,
+                'is_video_call_enabled' => (bool) $astrologer->is_video_call_enabled,
+                'chat_rate' => (float) $astrologer->chat_rate_per_minute,
+                'call_rate' => (float) $astrologer->call_rate_per_minute,
+                'video_call_rate' => (float) $astrologer->video_call_rate_per_minute,
+                'po5_enabled' => (bool) $astrologer->po_at_5_enabled,
+                'po5_user_rate' => $astrologer->po_at_5_rate_per_minute ? (float) $astrologer->po_at_5_rate_per_minute : null,
+                'updated_at' => $astrologer->updated_at,
+            ],
+        ], 200);
+    }
+
+    /**
      * Add astrologer phone number and send OTP.
      */
     public function addPhoneNumber(Request $request): JsonResponse

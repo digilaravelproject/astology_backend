@@ -160,6 +160,18 @@
                                     <i class="fas fa-circle text-[6px]"></i> Live Now
                                 </a>
                             </li>
+                            <li>
+                                <a href="{{ route('admin.astrologers.gallery.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.astrologers.gallery.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Gallery
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.astrologers.live-sessions.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.astrologers.live-sessions.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Live Sessions
+                                </a>
+                            </li>
                         </ul>
                     </li>
 

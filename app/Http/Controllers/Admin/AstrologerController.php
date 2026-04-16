@@ -16,7 +16,7 @@ class AstrologerController extends Controller
     {
         $query = User::query()
             ->where('user_type', 'astrologer')
-            ->with('astrologer');
+            ->with('astrologer', 'astrologer.galleries');
 
         if ($request->filled('search')) {
             $search = $request->input('search');

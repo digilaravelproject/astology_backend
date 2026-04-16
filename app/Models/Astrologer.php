@@ -54,9 +54,9 @@ class Astrologer extends Model
         'sleep_duration_minutes' => 'integer',
         'otp_verified_at' => 'datetime',
         'is_online' => 'boolean',
-        'chat_enabled' => 'boolean',
-        'call_enabled' => 'boolean',
-        'video_call_enabled' => 'boolean',
+        'is_chat_enabled' => 'boolean',
+        'is_call_enabled' => 'boolean',
+        'is_video_call_enabled' => 'boolean',
         'chat_rate_per_minute' => 'decimal:2',
         'call_rate_per_minute' => 'decimal:2',
         'video_call_rate_per_minute' => 'decimal:2',
@@ -121,5 +121,15 @@ class Astrologer extends Model
     public function bankAccounts()
     {
         return $this->hasMany(AstrologerBankAccount::class);
+    }
+
+    public function galleries()
+    {
+        return $this->hasMany(AstrologerGallery::class);
+    }
+
+    public function liveSessions()
+    {
+        return $this->hasMany(LiveSession::class);
     }
 }
