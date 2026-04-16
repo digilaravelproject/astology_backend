@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\{
     ChatController,
     FeedbackController,
     FoundersWordController,
+    KundliController,
     MatrimonyController,
     NoticeController,
     NotificationController,
@@ -203,5 +204,18 @@ Route::prefix('v1')->group(function () {
     Route::post('/feedback', [FeedbackController::class, 'store'])->middleware('auth:sanctum');
     Route::get('/feedbacks', [FeedbackController::class, 'index']);
     Route::get('/feedbacks/{id}', [FeedbackController::class, 'show']);
+
+    /*
+    |--------------------------------------------------------------------------
+    | KUNDLI (BIRTH CHART)
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('kundli')->group(function () {
+        Route::post('/create', [KundliController::class, 'store']);
+        Route::get('/', [KundliController::class, 'index']);
+        Route::get('/{id}', [KundliController::class, 'show']);
+        Route::put('/{id}', [KundliController::class, 'update']);
+        Route::delete('/{id}', [KundliController::class, 'destroy']);
+    });
 
 });
