@@ -742,18 +742,33 @@ class AstrologerAuthController extends Controller
 
         $astrologer = $user->astrologer;
 
-        $exists = AstrologerPhoneNumber::where('astrologer_id', $astrologer->id)
+        $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $expiry = now()->addMinutes(10);
+
+        // Check if phone number already exists
+        $phoneRecord = AstrologerPhoneNumber::where('astrologer_id', $astrologer->id)
             ->where('country_code', $validated['country_code'])
             ->where('phone', $validated['phone'])
             ->first();
 
-        if ($exists) {
-            return response()->json(['status' => 'error', 'message' => 'Number already exists.'], 409);
+        if ($phoneRecord) {
+            // Update existing phone number with new OTP
+            $phoneRecord->update([
+                'otp' => $otp,
+                'otp_expires_at' => $expiry,
+            ]);
+
+            NotificationHelper::send(
+                $user->id,
+                'Phone OTP sent',
+                "OTP sent to {$validated['country_code']} {$validated['phone']}.",
+                ['phone_number_id' => $phoneRecord->id]
+            );
+
+            return response()->json(['status' => 'success', 'message' => 'Phone number updated with new OTP.', 'data' => ['phone' => $phoneRecord]], 200);
         }
 
-        $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        $expiry = now()->addMinutes(10);
-
+        // Create new phone number if it doesn't exist
         $phoneRecord = AstrologerPhoneNumber::create([
             'astrologer_id' => $astrologer->id,
             'country_code' => $validated['country_code'],
@@ -771,7 +786,7 @@ class AstrologerAuthController extends Controller
             ['phone_number_id' => $phoneRecord->id]
         );
 
-        return response()->json(['status' => 'success', 'data' => ['phone' => $phoneRecord]], 201);
+        return response()->json(['status' => 'success', 'message' => 'Phone number added successfully.', 'data' => ['phone' => $phoneRecord]], 201);
     }
 
     /**

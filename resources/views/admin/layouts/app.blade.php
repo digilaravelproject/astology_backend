@@ -432,6 +432,116 @@
                         </a>
                     </li>
 
+                    <!-- Financial Management -->
+                    <li x-data="{ open: {{ request()->routeIs('admin.wallet-transactions.*') || request()->routeIs('admin.astrologer-bank-accounts.*') ? 'true' : 'false' }} }">
+                        <button @click="open = !open" 
+                                class="w-full flex items-center justify-between px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                       {{ request()->routeIs('admin.wallet-transactions.*') || request()->routeIs('admin.astrologer-bank-accounts.*')
+                                          ? 'bg-sidebar-hover text-primary'
+                                          : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-credit-card w-5 text-center text-base"></i>
+                                <span>Financial</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-[10px] transition-transform duration-300" :class="open ? 'rotate-90' : ''"></i>
+                        </button>
+                        <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
+                            <li>
+                                <a href="{{ route('admin.wallet-transactions.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.wallet-transactions.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Wallet Transactions
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.astrologer-bank-accounts.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.astrologer-bank-accounts.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Bank Accounts
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- Verification & KYC -->
+                    <li x-data="{ open: {{ request()->routeIs('admin.astrologer-phone-numbers.*') ? 'true' : 'false' }} }">
+                        <button @click="open = !open" 
+                                class="w-full flex items-center justify-between px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                       {{ request()->routeIs('admin.astrologer-phone-numbers.*')
+                                          ? 'bg-sidebar-hover text-primary'
+                                          : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-shield-alt w-5 text-center text-base"></i>
+                                <span>Verification</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-[10px] transition-transform duration-300" :class="open ? 'rotate-90' : ''"></i>
+                        </button>
+                        <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
+                            <li>
+                                <a href="{{ route('admin.astrologer-phone-numbers.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.astrologer-phone-numbers.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Phone Numbers
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- Communication Management -->
+                    <li x-data="{ open: {{ request()->routeIs('admin.notices.*') || request()->routeIs('admin.app-notifications.*') ? 'true' : 'false' }} }">
+                        <button @click="open = !open" 
+                                class="w-full flex items-center justify-between px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                       {{ request()->routeIs('admin.notices.*') || request()->routeIs('admin.app-notifications.*')
+                                          ? 'bg-sidebar-hover text-primary'
+                                          : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-bell w-5 text-center text-base"></i>
+                                <span>Communication</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-[10px] transition-transform duration-300" :class="open ? 'rotate-90' : ''"></i>
+                        </button>
+                        <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
+                            <li>
+                                <a href="{{ route('admin.notices.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.notices.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Notices
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.app-notifications.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.app-notifications.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Notifications
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
+                    <!-- Data Management -->
+                    <li x-data="{ open: {{ request()->routeIs('admin.kundlis.*') ? 'true' : 'false' }} }">
+                        <button @click="open = !open" 
+                                class="w-full flex items-center justify-between px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                       {{ request()->routeIs('admin.kundlis.*')
+                                          ? 'bg-sidebar-hover text-primary'
+                                          : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-book w-5 text-center text-base"></i>
+                                <span>Kundli Management</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-[10px] transition-transform duration-300" :class="open ? 'rotate-90' : ''"></i>
+                        </button>
+                        <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
+                            <li>
+                                <a href="{{ route('admin.kundlis.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.kundlis.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> All Kundlis
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.kundlis.create') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-gray hover:text-primary">
+                                    <i class="fas fa-circle text-[6px]"></i> Create Kundli
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+
                     <!-- Reports -->
                     <li>
                         <a href="{{ route('admin.reports.index') }}" 

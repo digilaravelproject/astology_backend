@@ -112,6 +112,54 @@ Route::prefix('admin')->group(function () {
         Route::resource('plans', \App\Http\Controllers\Admin\PlanController::class)->names('admin.plans')->except(['show']);
         Route::get('plans/subscriptions', [\App\Http\Controllers\Admin\SubscriptionController::class, 'index'])->name('admin.plans.subscriptions');
 
+        // Astrologer Bank Accounts Management
+        Route::prefix('astrologer-bank-accounts')->group(function() {
+            Route::get('/', [\App\Http\Controllers\Admin\AstrologerBankAccountController::class, 'index'])->name('admin.astrologer-bank-accounts.index');
+            Route::get('/create', [\App\Http\Controllers\Admin\AstrologerBankAccountController::class, 'create'])->name('admin.astrologer-bank-accounts.create');
+            Route::post('/', [\App\Http\Controllers\Admin\AstrologerBankAccountController::class, 'store'])->name('admin.astrologer-bank-accounts.store');
+            Route::get('/{id}', [\App\Http\Controllers\Admin\AstrologerBankAccountController::class, 'show'])->name('admin.astrologer-bank-accounts.show');
+            Route::get('/{id}/edit', [\App\Http\Controllers\Admin\AstrologerBankAccountController::class, 'edit'])->name('admin.astrologer-bank-accounts.edit');
+            Route::put('/{id}', [\App\Http\Controllers\Admin\AstrologerBankAccountController::class, 'update'])->name('admin.astrologer-bank-accounts.update');
+            Route::post('/{id}/toggle-verification', [\App\Http\Controllers\Admin\AstrologerBankAccountController::class, 'toggleVerification'])->name('admin.astrologer-bank-accounts.toggle-verification');
+            Route::delete('/{id}', [\App\Http\Controllers\Admin\AstrologerBankAccountController::class, 'destroy'])->name('admin.astrologer-bank-accounts.destroy');
+        });
+
+        // Astrologer Phone Numbers Management
+        Route::prefix('astrologer-phone-numbers')->group(function() {
+            Route::get('/', [\App\Http\Controllers\Admin\AstrologerPhoneNumberController::class, 'index'])->name('admin.astrologer-phone-numbers.index');
+            Route::get('/{id}', [\App\Http\Controllers\Admin\AstrologerPhoneNumberController::class, 'show'])->name('admin.astrologer-phone-numbers.show');
+            Route::post('/{id}/toggle-verification', [\App\Http\Controllers\Admin\AstrologerPhoneNumberController::class, 'toggleVerification'])->name('admin.astrologer-phone-numbers.toggle-verification');
+            Route::post('/{id}/set-default', [\App\Http\Controllers\Admin\AstrologerPhoneNumberController::class, 'setDefault'])->name('admin.astrologer-phone-numbers.set-default');
+            Route::delete('/{id}', [\App\Http\Controllers\Admin\AstrologerPhoneNumberController::class, 'destroy'])->name('admin.astrologer-phone-numbers.destroy');
+        });
+
+        // Notices Management
+        Route::resource('notices', \App\Http\Controllers\Admin\NoticeController::class)->names('admin.notices');
+        Route::post('notices/{id}/toggle-status', [\App\Http\Controllers\Admin\NoticeController::class, 'toggleStatus'])->name('admin.notices.toggle-status');
+
+        // App Notifications Management
+        Route::prefix('app-notifications')->group(function() {
+            Route::get('/', [\App\Http\Controllers\Admin\AppNotificationController::class, 'index'])->name('admin.app-notifications.index');
+            Route::get('/{id}', [\App\Http\Controllers\Admin\AppNotificationController::class, 'show'])->name('admin.app-notifications.show');
+            Route::post('/{id}/mark-read', [\App\Http\Controllers\Admin\AppNotificationController::class, 'markAsRead'])->name('admin.app-notifications.mark-read');
+            Route::post('/{id}/mark-unread', [\App\Http\Controllers\Admin\AppNotificationController::class, 'markAsUnread'])->name('admin.app-notifications.mark-unread');
+            Route::delete('/{id}', [\App\Http\Controllers\Admin\AppNotificationController::class, 'destroy'])->name('admin.app-notifications.destroy');
+            Route::delete('/bulk/delete-read', [\App\Http\Controllers\Admin\AppNotificationController::class, 'bulkDeleteRead'])->name('admin.app-notifications.bulk-delete-read');
+        });
+
+        // Wallet Transactions Management
+        Route::prefix('wallet-transactions')->group(function() {
+            Route::get('/', [\App\Http\Controllers\Admin\WalletTransactionController::class, 'index'])->name('admin.wallet-transactions.index');
+            Route::get('/{id}', [\App\Http\Controllers\Admin\WalletTransactionController::class, 'show'])->name('admin.wallet-transactions.show');
+            Route::post('/{id}/update-status', [\App\Http\Controllers\Admin\WalletTransactionController::class, 'updateStatus'])->name('admin.wallet-transactions.update-status');
+            Route::post('/{id}/refund', [\App\Http\Controllers\Admin\WalletTransactionController::class, 'refund'])->name('admin.wallet-transactions.refund');
+            Route::post('/wallet/{walletId}/adjust', [\App\Http\Controllers\Admin\WalletTransactionController::class, 'adjust'])->name('admin.wallet-transactions.adjust');
+            Route::get('/export', [\App\Http\Controllers\Admin\WalletTransactionController::class, 'export'])->name('admin.wallet-transactions.export');
+        });
+
+        // Kundli Management
+        Route::resource('kundlis', \App\Http\Controllers\Admin\KundliController::class)->names('admin.kundlis');
+
         // Reports & Analytics
         Route::get('reports', function() { return view('admin.reports.index'); })->name('admin.reports.index');
 
