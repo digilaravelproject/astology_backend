@@ -9,10 +9,12 @@ use App\Http\Requests\UpdateAstrologerProfileRequest;
 use App\Http\Requests\UpdateAstrologerSkillRequest;
 use App\Http\Requests\UpdateAstrologerOtherDetailsRequest;
 use App\Http\Requests\UpdateAstrologerHomeRequest;
+use App\Http\Requests\UpdateAstrologerBillingAddressRequest;
 use App\Models\User;
 use App\Models\Astrologer;
 use App\Models\AstrologerPhoneNumber;
 use App\Models\AstrologerBankAccount;
+use App\Models\AstrologerBillingAddress;
 use App\Services\NotificationHelper;
 use App\Models\AstrologerSkill;
 use App\Models\AstrologerOtherDetail;
@@ -1668,5 +1670,67 @@ class AstrologerAuthController extends Controller
             'message' => "{$displayName} status updated successfully.",
             'data' => $responseData,
         ], 200);
+    }
+
+    /**
+     * Get astrologer billing address.
+     */
+    public function getBillingAddress(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $billingAddress = AstrologerBillingAddress::where('astrologer_id', $user->astrologer->id)->first();
+
+        if (!$billingAddress) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'No billing address found.',
+                'data' => ['billing_address' => null]
+            ], 200);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => ['billing_address' => $billingAddress]
+        ], 200);
+    }
+
+    /**
+     * Update or create astrologer billing address.
+     */
+    public function updateBillingAddress(UpdateAstrologerBillingAddressRequest $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $validated = $request->validated();
+        $astrologer = $user->astrologer;
+
+        // Update or create billing address
+        $billingAddress = AstrologerBillingAddress::where('astrologer_id', $astrologer->id)->first();
+
+        if ($billingAddress) {
+            // Update existing
+            $billingAddress->update($validated);
+            $message = 'Billing address updated successfully.';
+            $statusCode = 200;
+        } else {
+            // Create new
+            $validated['astrologer_id'] = $astrologer->id;
+            $billingAddress = AstrologerBillingAddress::create($validated);
+            $message = 'Billing address added successfully.';
+            $statusCode = 201;
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => $message,
+            'data' => ['billing_address' => $billingAddress]
+        ], $statusCode);
     }
 }

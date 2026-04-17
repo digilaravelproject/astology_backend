@@ -72,6 +72,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/bank-accounts', [AstrologerAuthController::class, 'getBankAccounts']);
             Route::post('/bank-accounts', [AstrologerAuthController::class, 'addBankAccount']);
             Route::post('/bank-accounts/{id}/set-default', [AstrologerAuthController::class, 'setDefaultBankAccount']);
+            Route::get('/billing-address', [AstrologerAuthController::class, 'getBillingAddress']);
+            Route::put('/billing-address', [AstrologerAuthController::class, 'updateBillingAddress']);
             Route::get('/availability', [AstrologerAuthController::class, 'getAvailability']);
             Route::put('/availability', [AstrologerAuthController::class, 'setAvailability']);
             Route::delete('/availability/{day}/{slotIndex}', [AstrologerAuthController::class, 'deleteAvailability']);
