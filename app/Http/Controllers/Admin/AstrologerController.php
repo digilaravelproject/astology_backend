@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Astrologer;
 use App\Models\User;
+use App\Models\AstrologerBillingAddress;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -120,7 +121,9 @@ class AstrologerController extends Controller
             ->with('astrologer')
             ->findOrFail($id);
 
-        return view('admin.astrologers.show', compact('user'));
+        $billingAddress = AstrologerBillingAddress::where('astrologer_id', $user->astrologer->id)->first();
+
+        return view('admin.astrologers.show', compact('user', 'billingAddress'));
     }
 
     public function edit($id)

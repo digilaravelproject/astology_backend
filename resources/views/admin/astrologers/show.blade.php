@@ -98,6 +98,59 @@
                     </div>
                 </div>
             </div>
+
+            <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-6">
+                <div class="flex items-center gap-3 mb-5">
+                    <div class="w-11 h-11 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+                        <i class="fas fa-map-marker-alt"></i>
+                    </div>
+                    <div>
+                        <p class="text-xs uppercase tracking-[0.2em] text-slate-500">Billing</p>
+                        <h3 class="text-lg font-bold text-slate-900">Address</h3>
+                    </div>
+                </div>
+                <div class="space-y-4 text-sm text-slate-700">
+                    @if($billingAddress)
+                        <div>
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Address Line 1</p>
+                            <p class="font-semibold text-slate-900">{{ $billingAddress->address_line1 }}</p>
+                        </div>
+                        @if($billingAddress->address_line2)
+                            <div>
+                                <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Address Line 2</p>
+                                <p class="font-semibold text-slate-900">{{ $billingAddress->address_line2 }}</p>
+                            </div>
+                        @endif
+                        <div>
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">City</p>
+                            <p class="font-semibold text-slate-900">{{ $billingAddress->city }}</p>
+                        </div>
+                        @if($billingAddress->state)
+                            <div>
+                                <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">State</p>
+                                <p class="font-semibold text-slate-900">{{ $billingAddress->state }}</p>
+                            </div>
+                        @endif
+                        <div>
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Postal Code</p>
+                            <p class="font-semibold text-slate-900">{{ $billingAddress->postal_code }}</p>
+                        </div>
+                        <div>
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Country</p>
+                            <p class="font-semibold text-slate-900">{{ $billingAddress->country }}</p>
+                        </div>
+                        @if($billingAddress->invoice_name)
+                            <div>
+                                <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-1">Invoice Name</p>
+                                <p class="font-semibold text-slate-900">{{ $billingAddress->invoice_name }}</p>
+                            </div>
+                        @endif
+                    @else
+                        <p class="text-slate-500 italic">No billing address added yet.</p>
+                    @endif
+                </div>
+            </div>
+
             <div class="bg-white border border-slate-200 rounded-3xl shadow-sm p-6">
                 <div class="flex items-center gap-3 mb-5">
                     <div class="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
