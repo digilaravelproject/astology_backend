@@ -38,6 +38,10 @@ class RazorpayService
     public function createOrder($amount, $currency = 'INR', $receipt = null, $notes = [])
     {
         try {
+            if (!$this->api) {
+                throw new Exception("Razorpay API is not initialized. Please verify RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your .env file.");
+            }
+
             $data = [
                 'amount' => $amount,
                 'currency' => $currency,

@@ -75,8 +75,8 @@ class WalletController extends Controller
                 'INR',
                 'topup_' . $user->id . '_' . time(),
                 [
-                    'user_id' => $user->id,
-                    'amount' => $amount,
+                    'user_id' => (string)$user->id,
+                    'amount' => (string)$amount,
                     'description' => 'Wallet top-up',
                 ]
             );
