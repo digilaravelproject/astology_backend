@@ -40,7 +40,8 @@ class CallService
                 // Eager load provider and astrologer details to prevent N+1
                 $provider = User::with('astrologer')->lockForUpdate()->findOrFail($providerId);
                 
-                if (!$provider->is_online) {
+                $isOnline = $provider->is_online || ($provider->astrologer && $provider->astrologer->is_online);
+                if (!$isOnline) {
                     throw new Exception("Astrologer is currently offline.");
                 }
 
