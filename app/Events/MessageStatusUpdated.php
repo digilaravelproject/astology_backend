@@ -28,7 +28,7 @@ class MessageStatusUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('private-user.' . $this->receiverId)];
+        return [new PrivateChannel('user.' . $this->receiverId)];
     }
 
     public function broadcastWith(): array
