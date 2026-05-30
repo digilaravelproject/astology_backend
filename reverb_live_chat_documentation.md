@@ -427,9 +427,60 @@ Manually synchronize status for specific messages using their unique database ID
     }
     ```
 
+### 10. Get Current Active Session (If Any)
+Queries and returns the current active chat session (status is either `initiated` or `ongoing`) for the authenticated user. If no active session exists, it returns `null` inside the `session` object. This is highly recommended to call when the app launches or boots, so you can dynamically resume the ongoing chat ringing/messaging screen.
+
+*   **Method**: `GET`
+*   **URL**: `/api/v1/chat/current-session`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_OR_ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload — Active Session Exists (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Current active session retrieved successfully",
+        "data": {
+            "session": {
+                "id": 50,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "ongoing",
+                "rate_per_minute": 15,
+                "started_at": "2026-05-30T12:00:15.000000Z",
+                "created_at": "2026-05-30T12:00:00.000000Z",
+                "updated_at": "2026-05-30T12:00:15.000000Z",
+                "consumer": {
+                    "id": 20,
+                    "name": "Aniket Kumar"
+                },
+                "provider": {
+                    "id": 1,
+                    "name": "Aacharya Suresh Shastri",
+                    "astrologer": {
+                        "chat_rate_per_minute": 15
+                    }
+                }
+            }
+        }
+    }
+    ```
+*   **Response Payload — No Active Session (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Current active session retrieved successfully",
+        "data": {
+            "session": null
+        }
+    }
+    ```
+
 ---
 
-### 10. Get User's Active & Past Chat Sessions
+### 11. Get User's Active & Past Chat Sessions
 Retrieves all historical and active sessions the authenticated user participated in.
 
 *   **Method**: `GET`

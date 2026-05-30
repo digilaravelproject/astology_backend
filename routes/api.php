@@ -196,6 +196,7 @@ Route::prefix('v1')->group(function () {
 
         Route::prefix('chat')->group(function () {
             Route::get('/sessions', [ChatController::class, 'getSessions']);
+            Route::get('/current-session', [ChatController::class, 'getCurrentSession']);
             Route::post('/upload-attachment', [ChatController::class, 'uploadAttachment']);
             Route::post('/initiate', [ChatController::class, 'initiateChat']);
             Route::post('/{sessionId}/accept', [ChatController::class, 'acceptChat']);

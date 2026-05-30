@@ -228,4 +228,18 @@ class ChatController extends Controller
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
+
+    public function getCurrentSession(Request $request)
+    {
+        try {
+            $userId = $request->user()->id;
+            $session = $this->chatService->getActiveSession($userId);
+            
+            return ApiResponse::success([
+                'session' => $session
+            ], 'Current active session retrieved successfully');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
 }

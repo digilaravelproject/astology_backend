@@ -180,4 +180,19 @@ class ChatService
     {
         return $this->chatRepo->getSessionsByUserId($userId);
     }
+
+    /**
+     * Get the current active session (initiated or ongoing) for a user.
+     */
+    public function getActiveSession($userId)
+    {
+        return \App\Models\ChatSession::with(['consumer', 'provider.astrologer'])
+            ->where(function ($query) use ($userId) {
+                $query->where('consumer_id', $userId)
+                      ->orWhere('provider_id', $userId);
+            })
+            ->whereIn('status', ['initiated', 'accepted', 'ongoing'])
+            ->latest()
+            ->first();
+    }
 }
