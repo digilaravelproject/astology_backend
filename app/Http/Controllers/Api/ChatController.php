@@ -65,7 +65,27 @@ class ChatController extends Controller
         try {
             $session = $this->chatService->endChat($sessionId, $request->user()->id);
             broadcast(new ChatEnded($session, $request->user()->id));
-            return ApiResponse::success(['session' => $session], 'Chat ended successfully');
+            
+            // Calculate billing and duration breakdown details
+            $durationSeconds = (int) ($session->duration_seconds ?? 0);
+            $totalCost = (float) ($session->total_cost ?? 0.00);
+
+            $billingDetails = [
+                'duration_seconds' => $durationSeconds,
+                'user_details' => [
+                    'duration_seconds' => $durationSeconds,
+                    'amount_deducted' => (float) $totalCost,
+                ],
+                'astrologer_details' => [
+                    'duration_seconds' => $durationSeconds,
+                    'amount_added' => (float) $totalCost,
+                ],
+            ];
+
+            return ApiResponse::success([
+                'session' => $session,
+                'billing' => $billingDetails
+            ], 'Chat ended successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 403);
         }
@@ -240,6 +260,21 @@ class ChatController extends Controller
             ], 'Current active session retrieved successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    public function cancelChat(Request $request, $sessionId)
+    {
+        try {
+            $userId = $request->user()->id;
+            $session = $this->chatService->cancelChat($sessionId, $userId);
+            
+            // Broadcast ChatDismissed to notify the other participant (provider/astrologer)
+            broadcast(new \App\Events\ChatDismissed($session, $userId));
+            
+            return ApiResponse::success(['session' => $session], 'Chat cancelled successfully');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 400);
         }
     }
 }

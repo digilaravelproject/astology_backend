@@ -131,7 +131,7 @@ class ChatService
                 }
 
                 $endTime = now();
-                $durationSeconds = $session->started_at ? $session->started_at->diffInSeconds($endTime) : 0;
+                $durationSeconds = $session->started_at ? (int) $session->started_at->diffInSeconds($endTime) : 0;
                 $finalCost = ceil($durationSeconds / 60) * $session->rate_per_minute;
                 
                 // Calculate unbilled amount
@@ -195,4 +195,80 @@ class ChatService
             ->latest()
             ->first();
     }
+
+    /**
+     * Cancel/dismiss an initiated chat session by the consumer.
+     */
+    public function cancelChat($sessionId, $userId)
+    {
+        return DB::transaction(function () use ($sessionId, $userId) {
+            try {
+                $session = $this->chatRepo->findById($sessionId);
+                if (!$session) {
+                    throw new Exception("Chat session not found.");
+                }
+
+                // Security: Only the consumer can cancel their own initiated chat
+                if ($session->consumer_id != $userId) {
+                    throw new Exception("You are not authorized to cancel this chat.");
+                }
+
+                if ($session->status !== 'initiated') {
+                    throw new Exception("Only initiated chats can be cancelled.");
+                }
+
+                $this->chatRepo->update($sessionId, [
+                    'status' => 'rejected', // Mark as rejected/cancelled
+                    'ended_at' => now(),
+                ]);
+
+                // Reset busy status for both consumer and provider
+                $this->presenceService->setFree($session->consumer_id);
+                $this->presenceService->setFree($session->provider_id);
+
+                $session->refresh();
+                return $session;
+
+            } catch (Exception $e) {
+                Log::error("Cancelling Chat Failed: session " . $sessionId . " error: " . $e->getMessage());
+                throw $e;
+            }
+        });
+    }
+
+    /**
+     * Automatically timeout/dismiss an initiated chat session by the system.
+     */
+    public function systemTimeoutChat($sessionId)
+    {
+        return DB::transaction(function () use ($sessionId) {
+            try {
+                $session = $this->chatRepo->findById($sessionId);
+                if (!$session) {
+                    throw new Exception("Chat session not found.");
+                }
+
+                if ($session->status !== 'initiated') {
+                    return $session; // Already accepted or cancelled
+                }
+
+                $this->chatRepo->update($sessionId, [
+                    'status' => 'rejected', // Mark as rejected/cancelled due to timeout
+                    'ended_at' => now(),
+                ]);
+
+                // Reset busy status for both consumer and provider
+                $this->presenceService->setFree($session->consumer_id);
+                $this->presenceService->setFree($session->provider_id);
+
+                $session->refresh();
+                return $session;
+
+            } catch (Exception $e) {
+                Log::error("System Timing Out Chat Failed: session " . $sessionId . " error: " . $e->getMessage());
+                throw $e;
+            }
+        });
+    }
 }
+

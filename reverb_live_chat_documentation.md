@@ -227,7 +227,41 @@ The Astrologer calls this to reject an initiated chat request, ending the sessio
 
 ---
 
-### 4. End Ongoing Chat Session (By User or Astrologer)
+### 4. Cancel/Dismiss Chat Request (Consumer side)
+The User (Consumer) calls this endpoint to cancel or dismiss an active ringing request (`status = 'initiated'`) before the astrologer accepts it. The API shifts the status to `'rejected'`, resets the players' availability, and fires the `ChatDismissed` real-time WebSocket event to dismiss the incoming call ringing view on the astrologer's screen. 
+
+*   *Note: If the consumer went offline or closed their app abruptly, the presence system automatically fires this cancellation logic on connection lost to save the astrologer's time.*
+
+*   **Method**: `POST`
+*   **URL**: `/api/v1/chat/{sessionId}/cancel`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Chat cancelled successfully",
+        "data": {
+            "session": {
+                "id": 50,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "rejected",
+                "rate_per_minute": 15,
+                "ended_at": "2026-05-30T12:00:25.000000Z",
+                "created_at": "2026-05-30T12:00:00.000000Z",
+                "updated_at": "2026-05-30T12:00:25.000000Z"
+            }
+        }
+    }
+    ```
+
+---
+
+### 5. End Ongoing Chat Session (By User or Astrologer)
 Either participant can call this to end the chat. The system stops the billing, calculates final costs (rounding up to the nearest minute), deducts the consumer's wallet balance, credits the provider, and resets the `is_busy` flags to `0` for both.
 
 *   **Method**: `POST`
@@ -240,7 +274,7 @@ Either participant can call this to end the chat. The system stops the billing, 
 *   **Response Payload (`200 OK`)**:
     ```json
     {
-        "success": true,
+        "status": "success",
         "message": "Chat ended successfully",
         "data": {
             "session": {
@@ -255,6 +289,17 @@ Either participant can call this to end the chat. The system stops the billing, 
                 "ended_at": "2026-05-30T12:02:20.000000Z",
                 "created_at": "2026-05-30T12:00:00.000000Z",
                 "updated_at": "2026-05-30T12:02:20.000000Z"
+            },
+            "billing": {
+                "duration_seconds": 125,
+                "user_details": {
+                    "duration_seconds": 125,
+                    "amount_deducted": 45.0
+                },
+                "astrologer_details": {
+                    "duration_seconds": 125,
+                    "amount_added": 45.0
+                }
             }
         }
     }
@@ -262,7 +307,7 @@ Either participant can call this to end the chat. The system stops the billing, 
 
 ---
 
-### 5. Upload Chat Attachment
+### 6. Upload Chat Attachment
 Allows users and astrologers to upload chat files (images, PDFs, documents, audio, videos, etc.) to the server. The API stores the file on the public disk under `chat-attachments/{userId}` and returns its full public URL. This returned URL can then be passed to the **Send Message** API inside the `attachment_url` field.
 
 *   **Method**: `POST`
@@ -292,7 +337,7 @@ Allows users and astrologers to upload chat files (images, PDFs, documents, audi
 
 ---
 
-### 6. Send Message (Ongoing Chatting)
+### 7. Send Message (Ongoing Chatting)
 Sends a message within an active chat session. Supports `text`, `image` attachments, and `system` message types.
 
 *   **Method**: `POST`
@@ -336,7 +381,7 @@ Sends a message within an active chat session. Supports `text`, `image` attachme
 
 ---
 
-### 7. Get Paginated Message History
+### 8. Get Paginated Message History
 Retrieves previous messages in a chat session.
 
 *   **Method**: `GET`
@@ -378,7 +423,7 @@ Retrieves previous messages in a chat session.
 
 ---
 
-### 8. Mark Messages as Read
+### 9. Mark Messages as Read
 Mark all incoming messages in the session as read (`is_read = true`, `is_delivered = true`).
 
 *   **Method**: `POST`
@@ -399,7 +444,7 @@ Mark all incoming messages in the session as read (`is_read = true`, `is_deliver
 
 ---
 
-### 9. Sync Messages Status (Delivered vs Seen)
+### 10. Sync Messages Status (Delivered vs Seen)
 Manually synchronize status for specific messages using their unique database IDs.
 
 *   **Method**: `POST`
@@ -427,7 +472,9 @@ Manually synchronize status for specific messages using their unique database ID
     }
     ```
 
-### 10. Get Current Active Session (If Any)
+---
+
+### 11. Get Current Active Session (If Any)
 Queries and returns the current active chat session (status is either `initiated` or `ongoing`) for the authenticated user. If no active session exists, it returns `null` inside the `session` object. This is highly recommended to call when the app launches or boots, so you can dynamically resume the ongoing chat ringing/messaging screen.
 
 *   **Method**: `GET`
@@ -480,7 +527,7 @@ Queries and returns the current active chat session (status is either `initiated
 
 ---
 
-### 11. Get User's Active & Past Chat Sessions
+### 12. Get User's Active & Past Chat Sessions
 Retrieves all historical and active sessions the authenticated user participated in.
 
 *   **Method**: `GET`
@@ -580,7 +627,7 @@ These events are broadcasted over Reverb. When the backend fires an event, Rever
 
 ### 🔔 3. `ChatEnded`
 *   **Broadcasts to**: `private-user.{receiverId}` (The other participant's channel)
-*   **Fired When**: The chat session is ended or rejected by either the astrologer or the consumer.
+*   **Fired When**: The ongoing chat session is ended or completed by either the astrologer or the consumer.
 *   **JSON Event Payload**:
     ```json
     {
@@ -594,14 +641,49 @@ These events are broadcasted over Reverb. When the backend fires an event, Rever
                 "total_cost": 30,
                 "ended_at": "2026-05-30T12:02:20.000000Z"
             },
-            "endedById": 1
+            "endedById": 1,
+            "billing": {
+                "duration_seconds": 120,
+                "user_details": {
+                    "duration_seconds": 120,
+                    "amount_deducted": 30.0
+                },
+                "astrologer_details": {
+                    "duration_seconds": 120,
+                    "amount_added": 30.0
+                }
+            }
         }
     }
     ```
 
 ---
 
-### 🔔 4. `MessageSent`
+### 🔔 4. `ChatDismissed`
+*   **Broadcasts to**: `private-user.{receiverId}` (or both private channels if dismissed by system timeout)
+*   **Fired When**: An initiated chat request is explicitly cancelled by the consumer, automatically timed out by the system, or cancelled due to a participant disconnecting or going offline. This is the exact event to listen to for hiding the astrologer's accept/reject dialog box.
+*   **JSON Event Payload**:
+    ```json
+    {
+        "event": "ChatDismissed",
+        "channel": "private-user.1",
+        "data": {
+            "session": {
+                "id": 50,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "rejected",
+                "ended_at": "2026-05-30T12:00:25.000000Z"
+            },
+            "dismissedById": 20
+        }
+    }
+    ```
+    *Note: `dismissedById` will be `null` if the cancellation/dismissal was automatically triggered by the system timeout.*
+
+---
+
+### 🔔 5. `MessageSent`
 *   **Broadcasts to**: `private-user.{receiverId}` (The recipient's private channel)
 *   **Fired When**: A new message is successfully saved in the database via the API.
 *   **JSON Event Payload**:
@@ -627,7 +709,7 @@ These events are broadcasted over Reverb. When the backend fires an event, Rever
 
 ---
 
-### 🔔 5. `MessageStatusUpdated`
+### 🔔 6. `MessageStatusUpdated`
 *   **Broadcasts to**: `private-user.private-user.{receiverId}` (Wait! The backend broadcasts to the exact string matching `private-user.{receiverId}`)
 *   **Fired When**: The recipient marks messages as read or syncs delivery status.
 *   **JSON Event Payload**:

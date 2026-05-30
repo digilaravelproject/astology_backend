@@ -22,6 +22,9 @@ class ChatSession extends Model
         'started_at' => 'datetime',
         'ended_at' => 'datetime',
         'last_billed_at' => 'datetime',
+        'duration_seconds' => 'integer',
+        'total_cost' => 'float',
+        'rate_per_minute' => 'float',
     ];
 
     public function consumer()

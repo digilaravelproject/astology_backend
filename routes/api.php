@@ -201,6 +201,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/initiate', [ChatController::class, 'initiateChat']);
             Route::post('/{sessionId}/accept', [ChatController::class, 'acceptChat']);
             Route::post('/{sessionId}/reject', [ChatController::class, 'rejectChat']);
+            Route::post('/{sessionId}/cancel', [ChatController::class, 'cancelChat']);
             Route::post('/{sessionId}/end', [ChatController::class, 'endChat']);
             Route::post('/{sessionId}/message', [ChatController::class, 'sendMessage']);
             Route::post('/{sessionId}/read', [ChatController::class, 'markAsRead']);

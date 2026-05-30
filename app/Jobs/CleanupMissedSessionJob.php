@@ -42,8 +42,8 @@ class CleanupMissedSessionJob implements ShouldQueue
             $session = ChatSession::find($this->sessionId);
             if ($session && $session->status === 'initiated') {
                 $chatService = app(ChatService::class);
-                $chatService->endChat($this->sessionId);
-                broadcast(new ChatEnded($session, null));
+                $chatService->systemTimeoutChat($this->sessionId);
+                broadcast(new \App\Events\ChatDismissed($session, null));
                 Log::info("Chat session {$this->sessionId} timed out (missed).");
             }
         }

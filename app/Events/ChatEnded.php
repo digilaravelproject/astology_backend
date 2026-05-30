@@ -16,11 +16,27 @@ class ChatEnded implements ShouldBroadcastNow
 
     public $session;
     public $endedById;
+    public $billing;
 
     public function __construct($session, $endedById)
     {
         $this->session = $session;
         $this->endedById = $endedById;
+
+        $durationSeconds = (int) ($session->duration_seconds ?? 0);
+        $totalCost = (float) ($session->total_cost ?? 0.00);
+
+        $this->billing = [
+            'duration_seconds' => $durationSeconds,
+            'user_details' => [
+                'duration_seconds' => $durationSeconds,
+                'amount_deducted' => $totalCost,
+            ],
+            'astrologer_details' => [
+                'duration_seconds' => $durationSeconds,
+                'amount_added' => $totalCost,
+            ],
+        ];
     }
 
     public function broadcastOn(): array

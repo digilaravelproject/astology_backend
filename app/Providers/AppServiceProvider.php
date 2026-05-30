@@ -19,6 +19,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Automatically handle initiated chat cancellations when a user goes offline/leaves presence channel
+        \Illuminate\Support\Facades\Event::listen(
+            \Illuminate\Broadcasting\Events\PresenceChannelMemberLeft::class,
+            [\App\Services\PresenceService::class, 'handleMemberLeft']
+        );
     }
 }
