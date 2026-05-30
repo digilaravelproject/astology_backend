@@ -12,6 +12,7 @@ use App\Events\ChatInitiated;
 use App\Events\ChatEnded;
 use App\Events\ChatAccepted;
 use App\Events\MessageStatusUpdated;
+use Illuminate\Support\Facades\Storage;
 use Exception;
 
 class ChatController extends Controller
@@ -196,6 +197,33 @@ class ChatController extends Controller
             $userId = $request->user()->id;
             $sessions = $this->chatService->getSessions($userId);
             return ApiResponse::success($sessions, 'Sessions retrieved');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    public function uploadAttachment(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|file|max:10240', // Limit to 10MB
+        ]);
+
+        try {
+            $userId = $request->user()->id;
+            $file = $request->file('file');
+            
+            // Store file inside public disk under chat-attachments/{userId}
+            $path = $file->store("chat-attachments/{$userId}", 'public');
+            
+            // Generate full public URL
+            $url = Storage::disk('public')->url($path);
+
+            return ApiResponse::success([
+                'file_path' => $path,
+                'attachment_url' => $url,
+            ], 'File uploaded successfully', 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return ApiResponse::error('Validation failed', 422, $e->errors());
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
         }
