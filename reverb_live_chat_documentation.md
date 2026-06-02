@@ -796,3 +796,66 @@ Laravel Reverb automatically drops connections after **30 seconds** of inactivit
 1.  **Configure automatic reconnection** inside your client options so that the user's connection resumes automatically when toggling between mobile network towers.
 2.  **Graceful Ringing Timeout**: Handle the 60-second unanswered ringing locally on the client to stop the ringing audio, while relying on the backend job `CleanupMissedSessionJob` as a failsafe.
 3.  **Wallet Lock Gate**: Prevent starting chats if the consumer's wallet is less than `chat_rate_per_minute * 5` to secure astrologers' billable time.
+
+---
+
+## 💰 SECTION 8: WALLET TRANSACTION RECORDS & ATOMIC BILLING
+
+To maintain strict financial compliance, all paid consultations (chats, calls, etc.) are billed atomically. This section outlines how wallet deductions, credits, and transaction logging behave in the backend.
+
+### 🔒 1. Atomic Transaction & Locking Flow
+Every billing update—including real-time billing ticks and session termination billing—is wrapped in an atomic database transaction using row-level locking (`lockForUpdate` in Laravel).
+*   **Locked Rows**: The `chat_sessions`/`call_sessions` row, the `consumer` user wallet, and the `provider` user wallet are locked to prevent race conditions, duplicate billing ticks, double deductions, or duplicate credits.
+*   **Atomic Rollback**: If any of the following steps fail, the entire transaction is rolled back:
+    1. Deducting the consumer's wallet.
+    2. Crediting the provider's wallet.
+    3. Creating the consumer's debit transaction record.
+    4. Creating the provider's credit transaction record.
+    5. Updating the session's total billed cost and billing timestamp.
+
+### 📝 2. Wallet Transaction Log Schema & Details
+
+All successful billing operations result in a transaction log with `status = 'completed'` in the `wallet_transactions` table.
+
+#### A. User Side (Debit Transaction)
+*   **Transaction Type**: `debit`
+*   **Status**: `completed`
+*   **Description**: Resolved automatically to `"Chat session with Astrologer <Name>"` or `"Call session with Astrologer <Name>"`.
+*   **Reference**: `reference_type` (`App\Models\ChatSession` or `App\Models\CallSession`) and `reference_id` (session database ID).
+*   **Balances**: Includes `balance_before` and `balance_after` to preserve full audit trails.
+*   **Meta Payload**:
+    ```json
+    {
+        "type": "chat",
+        "astrologer_id": 1,
+        "astrologer_name": "Aacharya Suresh Shastri",
+        "session_id": 50,
+        "session_reference": "Chat session reference #50"
+    }
+    ```
+
+#### B. Astrologer Side (Credit Transaction)
+*   **Transaction Type**: `credit`
+*   **Status**: `completed`
+*   **Description**: Resolved automatically to `"Chat consultation with User <Name>"` or `"Call consultation with User <Name>"`.
+*   **Reference**: Same `reference_type` and `reference_id` to link both records.
+*   **Balances**: Includes `balance_before` and `balance_after`.
+*   **Meta Payload**:
+    ```json
+    {
+        "type": "chat",
+        "user_id": 20,
+        "user_name": "Aniket Kumar",
+        "session_id": 50,
+        "session_reference": "Chat session reference #50"
+    }
+    ```
+
+### 📉 3. Wallet Balance Exhaustion / Session Ending
+When a chat or call session ends, the remaining unbilled balance is calculated.
+*   If the user has insufficient balance to cover the calculated final unbilled amount, the deduction is capped at the user's remaining wallet balance:
+    ```php
+    $chargeAmount = min($unbilledBalance, $consumerWallet->balance);
+    ```
+*   The system deducts `$chargeAmount` from the user, credits the same to the astrologer, logs the completed transactions, updates the session's total cost to the actual amount charged, and marks the session as `completed`. This prevents sessions from getting stuck in an `ongoing` status when a user's wallet is completely drained.
+

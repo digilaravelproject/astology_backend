@@ -124,7 +124,7 @@ class CallService
     {
         return DB::transaction(function () use ($sessionId, $userId) {
             try {
-                $session = $this->callRepo->findById($sessionId);
+                $session = \App\Models\CallSession::where('id', $sessionId)->lockForUpdate()->first();
                 
                 if (!$session || !in_array($session->status, ['initiated', 'ringing', 'accepted', 'ongoing'])) {
                     return $session;
@@ -135,6 +135,10 @@ class CallService
                     throw new Exception("You are not authorized to end this call.");
                 }
 
+                // Lock wallets inside the transaction
+                $consumerWallet = \App\Models\Wallet::where('user_id', $session->consumer_id)->lockForUpdate()->first();
+                $providerWallet = \App\Models\Wallet::where('user_id', $session->provider_id)->lockForUpdate()->first();
+
                 $endTime = now();
                 $durationSeconds = $session->started_at ? $session->started_at->diffInSeconds($endTime) : 0;
                 $finalCost = $this->calculateCost($durationSeconds, $session->rate_per_minute);
@@ -143,16 +147,20 @@ class CallService
                 $alreadyBilled = $session->total_cost ?? 0;
                 $unbilledBalance = $finalCost - $alreadyBilled;
 
-                if ($unbilledBalance > 0) {
-                    $this->walletService->deductForCall($session->consumer_id, $unbilledBalance, $session->id);
-                    $this->walletService->creditProviderForCall($session->provider_id, $unbilledBalance, $session->id);
+                $chargeAmount = 0.00;
+                if ($unbilledBalance > 0 && $consumerWallet) {
+                    $chargeAmount = min($unbilledBalance, $consumerWallet->balance);
+                    if ($chargeAmount > 0) {
+                        $this->walletService->deductForCall($session->consumer_id, $chargeAmount, $session->id);
+                        $this->walletService->creditProviderForCall($session->provider_id, $chargeAmount, $session->id);
+                    }
                 }
 
                 $this->callRepo->update($sessionId, [
                     'status' => 'completed',
                     'ended_at' => $endTime,
                     'duration_seconds' => $durationSeconds,
-                    'total_cost' => $finalCost,
+                    'total_cost' => $alreadyBilled + $chargeAmount,
                 ]);
 
                 // Reset presence status for both users

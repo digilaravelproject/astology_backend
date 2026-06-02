@@ -28,36 +28,41 @@ class ChatBillingTickJob implements ShouldQueue
 
     public function handle(WalletService $walletService, ChatService $chatService)
     {
-        $session = ChatSession::find($this->sessionId);
-        
-        if (!$session || $session->status !== 'ongoing') {
-            return;
-        }
-
         try {
-            $deducted = $walletService->deductForChat($session->consumer_id, $session->rate_per_minute, $session->id);
-            
-            if (!$deducted) {
-                // Insufficient funds, end the chat
-                $chatService->endChat($session->id);
-                event(new ChatEnded($session, $session->consumer_id));
-                return;
-            }
+            \Illuminate\Support\Facades\DB::transaction(function () use ($walletService) {
+                // Lock the session
+                $session = ChatSession::where('id', $this->sessionId)->lockForUpdate()->first();
+                if (!$session || $session->status !== 'ongoing') {
+                    throw new Exception("Session is not ongoing or not found.");
+                }
 
-            // Credit provider
-            $walletService->creditProviderForChat($session->provider_id, $session->rate_per_minute, $session->id);
+                // Lock consumer wallet
+                $consumerWallet = \App\Models\Wallet::where('user_id', $session->consumer_id)->lockForUpdate()->first();
+                if (!$consumerWallet || $consumerWallet->balance < $session->rate_per_minute) {
+                    throw new Exception("Insufficient balance for chat session tick.");
+                }
 
-            // Update session
-            $session->last_billed_at = now();
-            $session->total_cost += $session->rate_per_minute;
-            $session->save();
+                // Perform debit (throws exception on failure)
+                $walletService->deductForChat($session->consumer_id, $session->rate_per_minute, $session->id);
+
+                // Perform credit (throws exception on failure)
+                $walletService->creditProviderForChat($session->provider_id, $session->rate_per_minute, $session->id);
+
+                // Update session
+                $session->last_billed_at = now();
+                $session->total_cost += $session->rate_per_minute;
+                $session->save();
+            });
 
             // Re-dispatch for next minute
             ChatBillingTickJob::dispatch($this->sessionId)->delay(now()->addMinute());
 
         } catch (Exception $e) {
-            $chatService->endChat($session->id);
-            event(new ChatEnded($session, $session->consumer_id));
+            $session = ChatSession::find($this->sessionId);
+            if ($session && in_array($session->status, ['initiated', 'accepted', 'ongoing'])) {
+                $chatService->endChat($session->id);
+                event(new ChatEnded($session, $session->consumer_id));
+            }
         }
     }
 }

@@ -19,22 +19,22 @@ class WalletService
         return $wallet ? $wallet->balance : 0;
     }
 
-    public function deductForCall($userId, $amount, $callSessionId): bool
+    public function deductForCall($userId, $amount, $callSessionId): \App\Models\WalletTransaction
     {
         return $this->walletRepo->debit($userId, $amount, 'call_deduction', 'App\Models\CallSession', $callSessionId);
     }
 
-    public function creditProviderForCall($providerId, $amount, $callSessionId): bool
+    public function creditProviderForCall($providerId, $amount, $callSessionId): \App\Models\WalletTransaction
     {
         return $this->walletRepo->credit($providerId, $amount, 'call_credit', 'App\Models\CallSession', $callSessionId);
     }
     
-    public function deductForChat($userId, $amount, $chatSessionId): bool
+    public function deductForChat($userId, $amount, $chatSessionId): \App\Models\WalletTransaction
     {
         return $this->walletRepo->debit($userId, $amount, 'chat_deduction', 'App\Models\ChatSession', $chatSessionId);
     }
 
-    public function creditProviderForChat($providerId, $amount, $chatSessionId): bool
+    public function creditProviderForChat($providerId, $amount, $chatSessionId): \App\Models\WalletTransaction
     {
         return $this->walletRepo->credit($providerId, $amount, 'chat_credit', 'App\Models\ChatSession', $chatSessionId);
     }

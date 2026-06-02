@@ -120,7 +120,7 @@ class ChatService
     {
         return DB::transaction(function () use ($sessionId, $userId) {
             try {
-                $session = $this->chatRepo->findById($sessionId);
+                $session = \App\Models\ChatSession::where('id', $sessionId)->lockForUpdate()->first();
                 if (!$session || !in_array($session->status, ['initiated', 'accepted', 'ongoing'])) {
                     return $session;
                 }
@@ -130,6 +130,10 @@ class ChatService
                     throw new Exception("You are not authorized to end this chat.");
                 }
 
+                // Lock wallets inside the transaction
+                $consumerWallet = \App\Models\Wallet::where('user_id', $session->consumer_id)->lockForUpdate()->first();
+                $providerWallet = \App\Models\Wallet::where('user_id', $session->provider_id)->lockForUpdate()->first();
+
                 $endTime = now();
                 $durationSeconds = $session->started_at ? (int) $session->started_at->diffInSeconds($endTime) : 0;
                 $finalCost = ceil($durationSeconds / 60) * $session->rate_per_minute;
@@ -137,17 +141,21 @@ class ChatService
                 // Calculate unbilled amount
                 $alreadyBilled = $session->total_cost ?? 0;
                 $unbilledBalance = $finalCost - $alreadyBilled;
-
-                if ($unbilledBalance > 0) {
-                    $this->walletService->deductForChat($session->consumer_id, $unbilledBalance, $session->id);
-                    $this->walletService->creditProviderForChat($session->provider_id, $unbilledBalance, $session->id);
+                
+                $chargeAmount = 0.00;
+                if ($unbilledBalance > 0 && $consumerWallet) {
+                    $chargeAmount = min($unbilledBalance, $consumerWallet->balance);
+                    if ($chargeAmount > 0) {
+                        $this->walletService->deductForChat($session->consumer_id, $chargeAmount, $session->id);
+                        $this->walletService->creditProviderForChat($session->provider_id, $chargeAmount, $session->id);
+                    }
                 }
 
                 $this->chatRepo->update($sessionId, [
                     'status' => 'completed',
                     'ended_at' => $endTime,
                     'duration_seconds' => $durationSeconds,
-                    'total_cost' => $finalCost,
+                    'total_cost' => $alreadyBilled + $chargeAmount,
                 ]);
 
                 $this->presenceService->setFree($session->consumer_id);
