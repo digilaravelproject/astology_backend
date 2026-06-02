@@ -87,11 +87,11 @@ class CallController extends Controller
     public function rejectCall(Request $request, $sessionId)
     {
         try {
-            $session = $this->callService->endCall($sessionId, $request->user()->id);
+            $session = $this->callService->rejectCall($sessionId, $request->user()->id);
             broadcast(new CallEnded($session, $request->user()->id));
             return ApiResponse::success(null, 'Call rejected');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 403);
+            return ApiResponse::error($e->getMessage(), 400);
         }
     }
 

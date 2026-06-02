@@ -53,6 +53,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/training-videos/{id}', [TrainingVideoController::class, 'show']);
 
         Route::middleware('auth:sanctum')->group(function () {
+            Route::get('/orders', [AstrologerController::class, 'getOrders']);
             Route::put('/profile', [AstrologerAuthController::class, 'updateProfile']);
             Route::get('/home', [AstrologerAuthController::class, 'getHomeStatus']);
             Route::put('/home', [AstrologerAuthController::class, 'updateHomeStatus']);

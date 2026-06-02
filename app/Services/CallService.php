@@ -45,13 +45,35 @@ class CallService
                     throw new Exception("Astrologer is currently offline.");
                 }
 
-                if ($provider->is_busy) {
-                    throw new Exception("Astrologer is currently busy with another session.");
+                // Dynamic busy status check
+                $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
+                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->exists();
+                $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->exists();
+                $isBusy = $isChatBusy || $isCallBusy;
+
+                // Dynamic check for consumer
+                $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
+                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->exists();
+                $isConsumerCallBusy = \App\Models\CallSession::where('consumer_id', $consumerId)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->exists();
+                if ($isConsumerChatBusy || $isConsumerCallBusy) {
+                    throw new Exception("You are already in an active session.");
                 }
 
-                $consumer = User::findOrFail($consumerId);
-                if ($consumer->is_busy) {
-                    throw new Exception("You are already in an active session.");
+                // Prevent duplicate pending or waiting requests
+                $existingChatPending = \App\Models\ChatSession::where('consumer_id', $consumerId)
+                    ->whereIn('status', ['initiated', 'waiting'])
+                    ->exists();
+                $existingCallPending = \App\Models\CallSession::where('consumer_id', $consumerId)
+                    ->whereIn('status', ['initiated', 'ringing', 'waiting'])
+                    ->exists();
+                if ($existingChatPending || $existingCallPending) {
+                    throw new Exception("You already have a pending or waiting request.");
                 }
 
                 $rate = $provider->astrologer->call_rate_per_minute ?? 15.00;
@@ -62,15 +84,19 @@ class CallService
                     throw new Exception("Insufficient balance. You need minimum " . ($rate * 5) . " in your wallet to start this call.");
                 }
 
+                $status = $isBusy ? 'waiting' : 'initiated';
+
                 $session = $this->callRepo->create([
                     'consumer_id' => $consumerId,
                     'provider_id' => $providerId,
-                    'status' => 'initiated',
+                    'status' => $status,
                     'rate_per_minute' => $rate,
                 ]);
 
-                // Dispatch timeout cleanup (60 seconds ringing timeout)
-                \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
+                if ($status === 'initiated') {
+                    // Dispatch timeout cleanup (60 seconds ringing timeout)
+                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
+                }
 
                 return $session;
 
@@ -88,10 +114,25 @@ class CallService
     {
         return DB::transaction(function () use ($sessionId, $providerId) {
             try {
+                // Lock provider row to prevent concurrent accepts
+                $provider = User::where('id', $providerId)->lockForUpdate()->first();
+
                 $session = $this->callRepo->findById($sessionId);
                 
-                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing'])) {
+                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing', 'waiting'])) {
                     throw new Exception("The call session is no longer valid or has been cancelled.");
+                }
+
+                // Check dynamic busy check under lock to prevent double booking
+                $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
+                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->exists();
+                $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->where('id', '!=', $sessionId)
+                    ->exists();
+                if ($isChatBusy || $isCallBusy) {
+                    throw new Exception("You are already in an active session.");
                 }
                 
                 // Atomically update participants
@@ -112,6 +153,45 @@ class CallService
 
             } catch (Exception $e) {
                 Log::error("Call Acceptance Failed: " . $e->getMessage());
+                throw $e;
+            }
+        });
+    }
+
+    /**
+     * Reject an initiated or waiting call request.
+     */
+    public function rejectCall($sessionId, $providerId)
+    {
+        return DB::transaction(function () use ($sessionId, $providerId) {
+            try {
+                $session = \App\Models\CallSession::where('id', $sessionId)->lockForUpdate()->first();
+                if (!$session) {
+                    throw new Exception("Call session not found.");
+                }
+
+                if ($session->provider_id != $providerId) {
+                    throw new Exception("You are not authorized to reject this call.");
+                }
+
+                if (!in_array($session->status, ['initiated', 'ringing', 'waiting'])) {
+                    throw new Exception("Only initiated, ringing, or waiting calls can be rejected.");
+                }
+
+                $this->callRepo->update($sessionId, [
+                    'status' => 'rejected',
+                    'ended_at' => now(),
+                ]);
+
+                // Reset presence status for both users
+                $this->presenceService->setFree($session->consumer_id);
+                $this->presenceService->setFree($session->provider_id);
+
+                $session->refresh();
+                return $session;
+
+            } catch (Exception $e) {
+                Log::error("Rejecting Call Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
         });

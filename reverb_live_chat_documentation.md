@@ -970,3 +970,76 @@ When a chat or call session ends, the remaining unbilled balance is calculated.
     ```
 *   The system deducts `$chargeAmount` from the user, credits the same to the astrologer, logs the completed transactions, updates the session's total cost to the actual amount charged, and marks the session as `completed`. This prevents sessions from getting stuck in an `ongoing` status when a user's wallet is completely drained.
 
+---
+
+## ⏳ SECTION 9: ASTROLOGER BUSY STATUS & UNIFIED ORDER HISTORY / WAITING LIST
+
+To provide complete transparency to consumers and astrologers, the system dynamically calculates the astrologer's availability and supports a waiting queue list if they are busy in an active session.
+
+### 🕒 1. Real-time Dynamic Busy Status Check
+The astrologer's `is_busy` status is calculated dynamically from the database to avoid stale flag conditions:
+- **Busy condition**: If the astrologer has an active `ChatSession` (status in `['accepted', 'ongoing']`) OR an active `CallSession` (status in `['ringing', 'accepted', 'ongoing']`).
+- **Profile & Listing APIs**: The user profile and listing APIs dynamically fetch and inject this calculated status into the `is_busy` field of the astrologer's response payload.
+
+### 📋 2. Waiting List Queuing Flow
+If a user initiates a chat or call session, and the astrologer is dynamically busy but online:
+1. The request is created in the database with `status = 'waiting'`.
+2. The user sees a clear status: `"Astrologer is currently busy. Your request is in the waiting list."`
+3. The queue priority/position is calculated dynamically by counting older `waiting` sessions for that astrologer.
+4. When the astrologer accepts a waiting session, it transitions to `'ongoing'`.
+5. Concurrency checks with row-level locks prevent an astrologer from accepting multiple concurrent active calls or chats.
+
+### 📥 3. Unified Astrologer Order History / Waiting List API
+Provides a single endpoint for authenticated astrologers to view history and waiting lists.
+- **Endpoint**: `GET /api/v1/astrologer/orders`
+- **Method**: `GET`
+- **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+- **Query Parameters**:
+  - `status` (Optional): Filter by `waiting`, `pending` (initiated), `completed`, `rejected` (cancelled/rejected).
+  - `type` (Optional): Filter by `chat` or `call`.
+  - `per_page` (Optional): Number of records per page (default: 15).
+  - `page` (Optional): Paginated page index (default: 1).
+- **Sorting Logic**:
+  - For waiting list (`status = waiting`), results are sorted oldest first (`created_at ASC`) to maintain FIFO queue priority.
+  - For history/other lists, results are sorted newest first (`created_at DESC`).
+- **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "status": "success",
+        "message": "Orders retrieved successfully.",
+        "data": {
+            "orders": [
+                {
+                    "session_id": 51,
+                    "order_id": 51,
+                    "user_id": 20,
+                    "user_name": "Aniket Kumar",
+                    "user_profile_image": "https://suryapathkundli.com/storage/profile_20.jpg",
+                    "request_type": "chat",
+                    "status": "waiting",
+                    "requested_at": "2026-05-30T12:05:00.000000Z",
+                    "started_at": null,
+                    "ended_at": null,
+                    "duration_seconds": 0,
+                    "amount": 0.0,
+                    "rate_per_minute": 10.0,
+                    "payment_status": "pending",
+                    "last_message": null,
+                    "queue_position": 1
+                }
+            ],
+            "pagination": {
+                "total": 1,
+                "per_page": 15,
+                "current_page": 1,
+                "last_page": 1
+            }
+        }
+    }
+    ```
+
+

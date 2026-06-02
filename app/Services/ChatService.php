@@ -44,13 +44,35 @@ class ChatService
                     throw new Exception("Astrologer is currently offline.");
                 }
 
-                if ($provider->is_busy) {
-                    throw new Exception("Astrologer is currently busy or offline.");
+                // Dynamic busy status check
+                $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
+                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->exists();
+                $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->exists();
+                $isBusy = $isChatBusy || $isCallBusy;
+
+                // Dynamic check for consumer
+                $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
+                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->exists();
+                $isConsumerCallBusy = \App\Models\CallSession::where('consumer_id', $consumerId)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->exists();
+                if ($isConsumerChatBusy || $isConsumerCallBusy) {
+                    throw new Exception("You are already in an active session.");
                 }
 
-                $consumer = User::findOrFail($consumerId);
-                if ($consumer->is_busy) {
-                    throw new Exception("You are already in an active session.");
+                // Prevent duplicate pending or waiting requests
+                $existingChatPending = \App\Models\ChatSession::where('consumer_id', $consumerId)
+                    ->whereIn('status', ['initiated', 'waiting'])
+                    ->exists();
+                $existingCallPending = \App\Models\CallSession::where('consumer_id', $consumerId)
+                    ->whereIn('status', ['initiated', 'ringing', 'waiting'])
+                    ->exists();
+                if ($existingChatPending || $existingCallPending) {
+                    throw new Exception("You already have a pending or waiting request.");
                 }
                 
                 $rate = $provider->astrologer->chat_rate_per_minute ?? 15.00;
@@ -60,15 +82,19 @@ class ChatService
                     throw new Exception("Insufficient balance. Minimum 5 minutes required (" . ($rate * 5) . ").");
                 }
 
+                $status = $isBusy ? 'waiting' : 'initiated';
+
                 $session = $this->chatRepo->create([
                     'consumer_id' => $consumerId,
                     'provider_id' => $providerId,
-                    'status' => 'initiated',
+                    'status' => $status,
                     'rate_per_minute' => $rate,
                 ]);
                 
-                // Dispatch timeout cleanup (60 seconds ringing timeout)
-                \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'chat')->delay(now()->addSeconds(60));
+                if ($status === 'initiated') {
+                    // Dispatch timeout cleanup (60 seconds ringing timeout)
+                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'chat')->delay(now()->addSeconds(60));
+                }
 
                 return $session;
 
@@ -86,9 +112,24 @@ class ChatService
     {
         return DB::transaction(function () use ($sessionId, $providerId) {
             try {
+                // Lock provider row to prevent concurrent accepts
+                $provider = User::where('id', $providerId)->lockForUpdate()->first();
+
                 $session = $this->chatRepo->findById($sessionId);
-                if (!$session || $session->provider_id != $providerId || $session->status !== 'initiated') {
+                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'waiting'])) {
                     throw new Exception("Chat cannot be accepted. Session might have expired.");
+                }
+
+                // Check dynamic busy check under lock to prevent double booking
+                $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
+                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->where('id', '!=', $sessionId)
+                    ->exists();
+                $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->exists();
+                if ($isChatBusy || $isCallBusy) {
+                    throw new Exception("You are already in an active session.");
                 }
                 
                 $this->chatRepo->update($sessionId, [
@@ -108,6 +149,45 @@ class ChatService
 
             } catch (Exception $e) {
                 Log::error("Chat Acceptance Failed: " . $e->getMessage());
+                throw $e;
+            }
+        });
+    }
+
+    /**
+     * Reject an initiated or waiting chat request.
+     */
+    public function rejectChat($sessionId, $providerId)
+    {
+        return DB::transaction(function () use ($sessionId, $providerId) {
+            try {
+                $session = \App\Models\ChatSession::where('id', $sessionId)->lockForUpdate()->first();
+                if (!$session) {
+                    throw new Exception("Chat session not found.");
+                }
+
+                if ($session->provider_id != $providerId) {
+                    throw new Exception("You are not authorized to reject this chat.");
+                }
+
+                if (!in_array($session->status, ['initiated', 'waiting'])) {
+                    throw new Exception("Only initiated or waiting chats can be rejected.");
+                }
+
+                $this->chatRepo->update($sessionId, [
+                    'status' => 'rejected',
+                    'ended_at' => now(),
+                ]);
+
+                // Reset presence status for both users
+                $this->presenceService->setFree($session->consumer_id);
+                $this->presenceService->setFree($session->provider_id);
+
+                $session->refresh();
+                return $session;
+
+            } catch (Exception $e) {
+                Log::error("Rejecting Chat Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
         });

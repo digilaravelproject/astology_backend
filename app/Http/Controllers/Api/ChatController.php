@@ -94,11 +94,11 @@ class ChatController extends Controller
     public function rejectChat(Request $request, $sessionId)
     {
         try {
-            $session = $this->chatService->endChat($sessionId, $request->user()->id);
-            broadcast(new ChatEnded($session, $request->user()->id));
+            $session = $this->chatService->rejectChat($sessionId, $request->user()->id);
+            broadcast(new \App\Events\ChatDismissed($session, $request->user()->id));
             return ApiResponse::success(null, 'Chat rejected');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 403);
+            return ApiResponse::error($e->getMessage(), 400);
         }
     }
 
