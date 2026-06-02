@@ -38,4 +38,26 @@ class ChatSessionRepository
             ->latest()
             ->paginate(15);
     }
+
+    public function getUserSessions($userId)
+    {
+        return ChatSession::with(['provider.astrologer', 'latestMessage'])
+            ->withCount(['messages as unread_count' => function ($query) use ($userId) {
+                $query->where('receiver_id', $userId)->where('is_read', false);
+            }])
+            ->where('consumer_id', $userId)
+            ->latest()
+            ->paginate(15);
+    }
+
+    public function getAstrologerSessions($userId)
+    {
+        return ChatSession::with(['consumer', 'latestMessage'])
+            ->withCount(['messages as unread_count' => function ($query) use ($userId) {
+                $query->where('receiver_id', $userId)->where('is_read', false);
+            }])
+            ->where('provider_id', $userId)
+            ->latest()
+            ->paginate(15);
+    }
 }

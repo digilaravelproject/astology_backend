@@ -527,11 +527,112 @@ Queries and returns the current active chat session (status is either `initiated
 
 ---
 
-### 12. Get User's Active & Past Chat Sessions
-Retrieves all historical and active sessions the authenticated user participated in.
+### 12. Get User's Active & Past Chat Sessions (Customer side)
+Retrieves all historical and active sessions where the authenticated user participated as the customer (`consumer_id`). Eager loads the astrologer's profile details, the latest message preview, and the count of unread messages.
 
 *   **Method**: `GET`
-*   **URL**: `/api/v1/chat/sessions`
+*   **URL**: `/api/v1/chat/sessions/user`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "User sessions retrieved successfully",
+        "data": {
+            "current_page": 1,
+            "data": [
+                {
+                    "id": 50,
+                    "consumer_id": 20,
+                    "provider_id": 1,
+                    "status": "completed",
+                    "rate_per_minute": 15,
+                    "duration_seconds": 120,
+                    "total_cost": 30,
+                    "created_at": "2026-05-30T12:00:00.000000Z",
+                    "unread_count": 1,
+                    "provider": {
+                        "id": 1,
+                        "name": "Aacharya Suresh Shastri",
+                        "astrologer": {
+                            "chat_rate_per_minute": 15
+                        }
+                    },
+                    "latest_message": {
+                        "id": 255,
+                        "chat_session_id": 50,
+                        "sender_id": 1,
+                        "receiver_id": 20,
+                        "message": "Pranam Guruji! Mera career kaisa rahega?",
+                        "type": "text",
+                        "created_at": "2026-05-30T12:01:10.000000Z"
+                    }
+                }
+            ]
+        }
+    }
+    ```
+
+---
+
+### 13. Get Astrologer's Active & Past Chat Sessions (Astrologer side)
+Retrieves all historical and active sessions where the authenticated user participated as the astrologer (`provider_id`). Eager loads the customer's profile details, the latest message preview, and the count of unread messages.
+
+*   **Method**: `GET`
+*   **URL**: `/api/v1/chat/sessions/astrologer`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Astrologer sessions retrieved successfully",
+        "data": {
+            "current_page": 1,
+            "data": [
+                {
+                    "id": 50,
+                    "consumer_id": 20,
+                    "provider_id": 1,
+                    "status": "completed",
+                    "rate_per_minute": 15,
+                    "duration_seconds": 120,
+                    "total_cost": 30,
+                    "created_at": "2026-05-30T12:00:00.000000Z",
+                    "unread_count": 0,
+                    "consumer": {
+                        "id": 20,
+                        "name": "Aniket Kumar"
+                    },
+                    "latest_message": {
+                        "id": 255,
+                        "chat_session_id": 50,
+                        "sender_id": 1,
+                        "receiver_id": 20,
+                        "message": "Pranam Guruji! Mera career kaisa rahega?",
+                        "type": "text",
+                        "created_at": "2026-05-30T12:01:10.000000Z"
+                    }
+                }
+            ]
+        }
+    }
+    ```
+
+---
+
+### 14. Get Paginated Message History (Session Detail with Security Guards)
+Retrieves previous messages in a chat session. This endpoint enforces strict ownership checks: the authenticated user MUST be either the `consumer_id` or the `provider_id` of the session, otherwise a `403 Forbidden` response is returned.
+
+*   **Method**: `GET`
+*   **URL**: `/api/v1/chat/{sessionId}/messages`
 *   **Headers**:
     ```http
     Authorization: Bearer <USER_OR_ASTROLOGER_TOKEN>
@@ -541,19 +642,29 @@ Retrieves all historical and active sessions the authenticated user participated
     ```json
     {
         "success": true,
-        "message": "Sessions retrieved",
-        "data": [
-            {
-                "id": 50,
-                "consumer_id": 20,
-                "provider_id": 1,
-                "status": "completed",
-                "rate_per_minute": 15,
-                "duration_seconds": 120,
-                "total_cost": 30,
-                "created_at": "2026-05-30T12:00:00.000000Z"
-            }
-        ]
+        "message": "Messages retrieved",
+        "data": {
+            "current_page": 1,
+            "data": [
+                {
+                    "id": 255,
+                    "chat_session_id": 50,
+                    "sender_id": 20,
+                    "receiver_id": 1,
+                    "message": "Pranam Guruji! Mera career kaisa rahega?",
+                    "type": "text",
+                    "is_read": false,
+                    "created_at": "2026-05-30T12:01:10.000000Z"
+                }
+            ]
+        }
+    }
+    ```
+*   **Response Payload (`403 Forbidden`)**:
+    ```json
+    {
+        "success": false,
+        "message": "You are not authorized to access this chat history."
     }
     ```
 

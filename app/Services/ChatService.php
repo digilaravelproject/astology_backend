@@ -172,8 +172,22 @@ class ChatService
     }
 
     /**
-     * Retrieve chat history for a session with pagination.
+     * Retrieve chat history for a session with pagination and ownership check.
      */
+    public function getMessagesForSession($sessionId, $userId)
+    {
+        $session = \App\Models\ChatSession::findOrFail($sessionId);
+
+        // Security check: must be a participant of the session
+        if ($session->consumer_id != $userId && $session->provider_id != $userId) {
+            throw new Exception("You are not authorized to access this chat history.", 403);
+        }
+
+        return \App\Models\Message::where('chat_session_id', $sessionId)
+            ->latest()
+            ->paginate(30);
+    }
+
     public function getMessages($sessionId)
     {
         return \App\Models\Message::where('chat_session_id', $sessionId)
@@ -187,6 +201,16 @@ class ChatService
     public function getSessions($userId)
     {
         return $this->chatRepo->getSessionsByUserId($userId);
+    }
+
+    public function getUserSessions($userId)
+    {
+        return $this->chatRepo->getUserSessions($userId);
+    }
+
+    public function getAstrologerSessions($userId)
+    {
+        return $this->chatRepo->getAstrologerSessions($userId);
     }
 
     /**

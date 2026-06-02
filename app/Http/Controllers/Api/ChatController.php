@@ -147,10 +147,12 @@ class ChatController extends Controller
     public function getMessages(Request $request, $sessionId)
     {
         try {
-            $messages = $this->chatService->getMessages($sessionId);
+            $userId = $request->user()->id;
+            $messages = $this->chatService->getMessagesForSession($sessionId, $userId);
             return ApiResponse::success($messages, 'Messages retrieved');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 500);
+            $code = $e->getCode() == 403 ? 403 : 500;
+            return ApiResponse::error($e->getMessage(), $code);
         }
     }
 
@@ -206,6 +208,28 @@ class ChatController extends Controller
             broadcast(new MessageStatusUpdated($messageIds, $status, $senderToNotify, $sessionId));
 
             return ApiResponse::success(null, 'Status updated');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    public function getUserSessions(Request $request)
+    {
+        try {
+            $userId = $request->user()->id;
+            $sessions = $this->chatService->getUserSessions($userId);
+            return ApiResponse::success($sessions, 'User sessions retrieved successfully');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    public function getAstrologerSessions(Request $request)
+    {
+        try {
+            $userId = $request->user()->id;
+            $sessions = $this->chatService->getAstrologerSessions($userId);
+            return ApiResponse::success($sessions, 'Astrologer sessions retrieved successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
         }
