@@ -198,11 +198,18 @@ Route::prefix('v1')->group(function () {
         Route::post('/presence/offline', [PresenceController::class, 'offline']);
 
         Route::prefix('call')->group(function () {
-            Route::post('/initiate', [CallController::class, 'initiateCall']);
-            Route::post('/{sessionId}/accept', [CallController::class, 'acceptCall']);
-            Route::post('/{sessionId}/reject', [CallController::class, 'rejectCall']);
-            Route::post('/{sessionId}/end', [CallController::class, 'endCall']);
-            Route::post('/{sessionId}/ice-candidate', [CallController::class, 'sendIceCandidate']);
+            // History & Status (GET endpoints — no throttle needed)
+            Route::get('/sessions/user',       [CallController::class, 'getUserSessions']);
+            Route::get('/sessions/astrologer', [CallController::class, 'getAstrologerSessions']);
+            Route::get('/current-session',     [CallController::class, 'getCurrentSession']);
+
+            // Lifecycle mutations (POST endpoints)
+            Route::post('/initiate',                    [CallController::class, 'initiateCall'])->middleware('throttle:10,1');
+            Route::post('/{sessionId}/accept',          [CallController::class, 'acceptCall']);
+            Route::post('/{sessionId}/reject',          [CallController::class, 'rejectCall']);
+            Route::post('/{sessionId}/cancel',          [CallController::class, 'cancelCall']);
+            Route::post('/{sessionId}/end',             [CallController::class, 'endCall']);
+            Route::post('/{sessionId}/ice-candidate',  [CallController::class, 'sendIceCandidate']);
         });
 
         Route::prefix('chat')->group(function () {

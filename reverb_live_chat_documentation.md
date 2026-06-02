@@ -1278,3 +1278,547 @@ Updates or sets the consumer's profile and birth details.
     *   `relationship_status`: Optional, string, max 255.
     *   `occupation`: Optional, string, max 255.
     *   `languages`: Required, array. Allowed values: `English`, `Hindi`, `Tamil`, `Bengali`, `Telugu`, `Marathi`.
+
+---
+
+## 📞 SECTION 12: CALL LIFECYCLE REST APIs
+
+All endpoints are prefixed with `/api/v1/call` and protected by `auth:sanctum` middleware.
+
+```
+              [ LIVE CALL FLOW LIFECYCLE ]
+
+ [User]                                [Astrologer]
+   │                                        │
+   │── 1. initiate (POST) ─────────────────>│ (Triggers "CallInitiated" WS event with offer SDP)
+   │                                        │
+   │         ┌── Astrologer rejects ────────│ (Triggers "CallDismissed" WS event, reason="rejected")
+   │         │                              │
+   │         └── Astrologer accepts ────────│ (Triggers "CallAccepted" WS event with answer SDP)
+   │                                        │
+   │<──── 2. ICE exchange ─────────────────>│ (Bi-directional "IceCandidateSent" WS events)
+   │                                        │
+   │── 3. end (POST) ──────────────────────>│ (Triggers "CallEnded" WS event, billing calculated)
+   │
+   │  [OR] User may cancel before accept:
+   │── cancel (POST) ─────────────────────>│ (Triggers "CallDismissed" WS event, reason="cancelled")
+```
+
+---
+
+### 1. Initiate Call (User Dials Astrologer)
+
+Creates a call session and delivers the SDP offer to the astrologer via WebSocket.
+- Validates wallet balance (minimum 5 minutes required).
+- If astrologer is offline → **Error 400**.
+- If astrologer is available → session status = `initiated`.
+- If astrologer is busy → session status = `waiting` (queued).
+- A 60-second timeout job is dispatched; if unanswered, session becomes `missed`.
+
+*   **Method**: `POST`
+*   **URL**: `/api/v1/call/initiate`
+*   **Throttle**: 10 requests per minute per user
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_TOKEN>
+    Accept: application/json
+    ```
+*   **Request Payload**:
+    ```json
+    {
+        "provider_id": 1,
+        "offer": "<WebRTC SDP Offer String>"
+    }
+    ```
+*   **Response Payload (`200 OK`) — Direct Ring**:
+    ```json
+    {
+        "success": true,
+        "message": "Call initiated successfully",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "initiated",
+                "rate_per_minute": 15,
+                "created_at": "2026-06-02T08:00:00.000000Z"
+            }
+        }
+    }
+    ```
+*   **Response Payload (`200 OK`) — Astrologer Busy (Queued)**:
+    ```json
+    {
+        "success": true,
+        "message": "Call initiated successfully",
+        "data": {
+            "session": {
+                "id": 56,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "waiting",
+                "rate_per_minute": 15,
+                "created_at": "2026-06-02T08:00:00.000000Z"
+            }
+        }
+    }
+    ```
+
+---
+
+### 2. Accept Call (Astrologer Answers)
+
+Astrologer accepts the incoming call and sends the WebRTC SDP answer. This transitions the session to `ongoing`, marks both participants as busy, and starts the billing ticker (first tick after 1 minute).
+
+*   **Method**: `POST`
+*   **URL**: `/api/v1/call/{sessionId}/accept`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Request Payload**:
+    ```json
+    {
+        "answer": "<WebRTC SDP Answer String>"
+    }
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Call accepted successfully",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "ongoing",
+                "rate_per_minute": 15,
+                "started_at": "2026-06-02T08:00:10.000000Z",
+                "last_billed_at": "2026-06-02T08:00:10.000000Z",
+                "answer": "<WebRTC SDP Answer String>"
+            }
+        }
+    }
+    ```
+
+---
+
+### 3. Reject Call (Astrologer Refuses)
+
+Astrologer rejects the ringing call. Session status becomes `rejected`.
+Fires `CallDismissed` event (with `reason = "rejected"`) to both channels.
+
+*   **Method**: `POST`
+*   **URL**: `/api/v1/call/{sessionId}/reject`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Call rejected",
+        "data": null
+    }
+    ```
+
+---
+
+### 4. Cancel Call (User Withdraws Before Acceptance)
+
+The user cancels their own outgoing call request before the astrologer answers. Session status becomes `cancelled`.
+Fires `CallDismissed` event (with `reason = "cancelled"`) to both channels — dismisses the astrologer's ringing screen.
+
+> **Important**: This endpoint is only available to the `consumer` (user who initiated the call). Astrologers must use `reject`.
+
+*   **Method**: `POST`
+*   **URL**: `/api/v1/call/{sessionId}/cancel`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Call cancelled successfully",
+        "data": null
+    }
+    ```
+*   **Response Payload (`400 Bad Request`) — Cannot Cancel Ongoing Call**:
+    ```json
+    {
+        "success": false,
+        "message": "Only pending or waiting calls can be cancelled."
+    }
+    ```
+
+---
+
+### 5. End Call (Either Participant)
+
+Either the user or the astrologer can end the active call. The system:
+1. Calculates total duration in seconds.
+2. Determines unbilled cost (total - already billed via tick jobs).
+3. Deducts the consumer wallet and credits the astrologer wallet.
+4. Marks session `completed` and resets both participants' busy status.
+
+*   **Method**: `POST`
+*   **URL**: `/api/v1/call/{sessionId}/end`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_OR_ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Call ended successfully",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "completed",
+                "duration_seconds": 185,
+                "total_cost": 45,
+                "rate_per_minute": 15,
+                "started_at": "2026-06-02T08:00:10.000000Z",
+                "ended_at": "2026-06-02T08:03:15.000000Z"
+            }
+        }
+    }
+    ```
+
+---
+
+### 6. Send ICE Candidate (WebRTC Signaling)
+
+Relays a WebRTC ICE candidate to the other participant. Only actual session participants may call this endpoint.
+
+*   **Method**: `POST`
+*   **URL**: `/api/v1/call/{sessionId}/ice-candidate`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_OR_ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Request Payload**:
+    ```json
+    {
+        "candidate": "<WebRTC ICE Candidate String>"
+    }
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Candidate sent",
+        "data": null
+    }
+    ```
+*   **Response Payload (`403 Forbidden`)** — Non-participant attempt:
+    ```json
+    {
+        "success": false,
+        "message": "Unauthorized participation in this session"
+    }
+    ```
+
+---
+
+### 7. Get Current Active Call Session
+
+Returns the active call session (if any) for the authenticated user. Use this on app launch or reconnect to detect and resume an in-progress call.
+
+*   **Method**: `GET`
+*   **URL**: `/api/v1/call/current-session`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_OR_ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload — Active Session (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Current active call session retrieved successfully",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "ongoing",
+                "rate_per_minute": 15,
+                "started_at": "2026-06-02T08:00:10.000000Z",
+                "consumer": { "id": 20, "name": "Aniket Kumar" },
+                "provider": {
+                    "id": 1,
+                    "name": "Aacharya Suresh Shastri",
+                    "astrologer": { "call_rate_per_minute": 15 }
+                }
+            }
+        }
+    }
+    ```
+*   **Response Payload — No Active Session (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Current active call session retrieved successfully",
+        "data": { "session": null }
+    }
+    ```
+
+---
+
+### 8. Get User's Call History (Consumer Side)
+
+*   **Method**: `GET`
+*   **URL**: `/api/v1/call/sessions/user`
+*   **Query Params**: `per_page` (default: 15, max: 50)
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Call sessions retrieved successfully",
+        "data": {
+            "current_page": 1,
+            "data": [
+                {
+                    "id": 55,
+                    "consumer_id": 20,
+                    "provider_id": 1,
+                    "status": "completed",
+                    "duration_seconds": 185,
+                    "total_cost": 45,
+                    "rate_per_minute": 15,
+                    "started_at": "2026-06-02T08:00:10.000000Z",
+                    "ended_at": "2026-06-02T08:03:15.000000Z",
+                    "provider": {
+                        "id": 1,
+                        "name": "Aacharya Suresh Shastri",
+                        "astrologer": { "call_rate_per_minute": 15 }
+                    }
+                }
+            ],
+            "per_page": 15,
+            "total": 1
+        }
+    }
+    ```
+
+---
+
+### 9. Get Astrologer's Call History (Provider Side)
+
+*   **Method**: `GET`
+*   **URL**: `/api/v1/call/sessions/astrologer`
+*   **Query Params**: `per_page` (default: 15, max: 50)
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Call sessions retrieved successfully",
+        "data": {
+            "current_page": 1,
+            "data": [
+                {
+                    "id": 55,
+                    "consumer_id": 20,
+                    "provider_id": 1,
+                    "status": "completed",
+                    "duration_seconds": 185,
+                    "total_cost": 45,
+                    "rate_per_minute": 15,
+                    "consumer": {
+                        "id": 20,
+                        "name": "Aniket Kumar",
+                        "profile_photo": "https://suryapathkundli.com/storage/user_20.jpg"
+                    }
+                }
+            ],
+            "per_page": 15,
+            "total": 1
+        }
+    }
+    ```
+
+---
+
+## ⚡ SECTION 13: CALL WEBSOCKET EVENTS (PAYLOADS & CHANNELS)
+
+These events are broadcasted over Reverb on the `private-user.{id}` channel when call state changes.
+
+---
+
+### 🔔 1. `CallInitiated`
+*   **Broadcasts to**: `private-user.{provider_id}` (Astrologer's Channel)
+*   **Fired When**: User initiates a call.
+*   **JSON Event Payload**:
+    ```json
+    {
+        "event": "CallInitiated",
+        "channel": "private-user.1",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "initiated",
+                "rate_per_minute": 15,
+                "created_at": "2026-06-02T08:00:00.000000Z"
+            },
+            "callerData": {
+                "id": 20,
+                "name": "Aniket Kumar",
+                "profile_photo": "https://suryapathkundli.com/storage/user_20.jpg",
+                "offer": "<WebRTC SDP Offer String>"
+            }
+        }
+    }
+    ```
+    > *Note: `status` will be `"initiated"` for a direct ring or `"waiting"` if the astrologer is currently busy with another session.*
+
+---
+
+### 🔔 2. `CallAccepted`
+*   **Broadcasts to**: `private-user.{consumer_id}` (User's Channel)
+*   **Fired When**: Astrologer accepts the incoming call.
+*   **JSON Event Payload**:
+    ```json
+    {
+        "event": "CallAccepted",
+        "channel": "private-user.20",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "ongoing",
+                "rate_per_minute": 15,
+                "started_at": "2026-06-02T08:00:10.000000Z",
+                "answer": "<WebRTC SDP Answer String>"
+            }
+        }
+    }
+    ```
+
+---
+
+### 🔔 3. `CallDismissed`
+*   **Broadcasts to**: **BOTH** `private-user.{consumer_id}` AND `private-user.{provider_id}`
+*   **Fired When**:
+    -   Astrologer **rejects** the call (`reason = "rejected"`)
+    -   User **cancels** the call before acceptance (`reason = "cancelled"`)
+    -   System **timeout** — call unanswered in 60s (`reason = "timeout"`)
+    -   Either party goes **offline** during ringing (`reason = "cancelled"`)
+*   **JSON Event Payload**:
+    ```json
+    {
+        "event": "CallDismissed",
+        "channel": "private-user.20",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "rejected",
+                "ended_at": "2026-06-02T08:00:20.000000Z"
+            },
+            "dismissedById": 1,
+            "reason": "rejected"
+        }
+    }
+    ```
+    > *Note: `dismissedById` will be `null` when the system automatically times out the session.*
+
+    **Possible `reason` values**:
+    | Value | Meaning |
+    |-------|---------|
+    | `"rejected"` | Astrologer explicitly rejected the call |
+    | `"cancelled"` | User cancelled their own call request |
+    | `"timeout"` | System: call unanswered for 60 seconds (missed) |
+
+---
+
+### 🔔 4. `CallEnded`
+*   **Broadcasts to**: `private-user.{the OTHER participant}` (the one who did not call `/end`)
+*   **Fired When**: An active ongoing call is ended by either participant.
+*   **JSON Event Payload**:
+    ```json
+    {
+        "event": "CallEnded",
+        "channel": "private-user.1",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "completed",
+                "duration_seconds": 185,
+                "total_cost": 45,
+                "ended_at": "2026-06-02T08:03:15.000000Z"
+            },
+            "endedById": 20
+        }
+    }
+    ```
+
+---
+
+### 🔔 5. `IceCandidateSent`
+*   **Broadcasts to**: `private-user.{receiver_id}` (the other participant)
+*   **Fired When**: Either participant sends an ICE candidate for WebRTC peer connection.
+*   **JSON Event Payload**:
+    ```json
+    {
+        "event": "IceCandidateSent",
+        "channel": "private-user.1",
+        "data": {
+            "session": {
+                "id": 55,
+                "consumer_id": 20,
+                "provider_id": 1,
+                "status": "ongoing"
+            },
+            "candidate": "<WebRTC ICE Candidate String>",
+            "receiverId": 1
+        }
+    }
+    ```
+
+---
+
+### 📊 Call Session Status Values Reference
+
+| Status | Meaning | Next State(s) |
+|--------|---------|---------------|
+| `initiated` | User dialed; astrologer's phone ringing | `ongoing` (accept), `rejected` (reject), `cancelled` (cancel/offline), `missed` (timeout) |
+| `ringing` | Deprecated — use `initiated` | — |
+| `waiting` | Astrologer busy; user in queue | `ongoing` (accept when free), `rejected` (reject), `cancelled` (cancel) |
+| `accepted` | Reserved for future RTC handshake state | — |
+| `ongoing` | Active call; billing running per minute | `completed` (end call) |
+| `completed` | Call ended normally; billing finalized | Terminal |
+| `rejected` | Astrologer rejected the call | Terminal |
+| `cancelled` | User cancelled before acceptance | Terminal |
+| `missed` | 60-second timeout, no answer | Terminal |
+| `failed` | Technical failure | Terminal |
+

@@ -32,10 +32,12 @@ class CleanupMissedSessionJob implements ShouldQueue
     {
         if ($this->type === 'call') {
             $session = CallSession::find($this->sessionId);
+            // Only act if the call is still in 'initiated' state (unanswered)
             if ($session && $session->status === 'initiated') {
                 $callService = app(CallService::class);
-                $callService->endCall($this->sessionId); // System timeout
-                broadcast(new CallEnded($session, null)); // null means system/timeout
+                $callService->missedCall($this->sessionId);
+                // CallDismissed (not CallEnded) — this was a missed/timed-out ring
+                broadcast(new \App\Events\CallDismissed($session->refresh(), null, 'timeout'));
                 Log::info("Call session {$this->sessionId} timed out (missed).");
             }
         } else {

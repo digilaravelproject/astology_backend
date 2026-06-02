@@ -262,4 +262,85 @@ class CallService
         $activeMinutes = ceil($durationSeconds / 60);
         return $activeMinutes * $rate;
     }
+
+    /**
+     * Mark a call as missed (timed-out without being answered).
+     * Called by CleanupMissedSessionJob instead of endCall().
+     * No billing occurs for missed calls.
+     */
+    public function missedCall($sessionId)
+    {
+        return DB::transaction(function () use ($sessionId) {
+            try {
+                $session = \App\Models\CallSession::where('id', $sessionId)
+                    ->lockForUpdate()
+                    ->first();
+
+                // Only act if still in the 'initiated' state (not yet answered or already cleaned up)
+                if (!$session || $session->status !== 'initiated') {
+                    return $session;
+                }
+
+                $this->callRepo->update($sessionId, [
+                    'status'   => 'missed',
+                    'ended_at' => now(),
+                ]);
+
+                // Free both parties' presence so they can start new sessions
+                $this->presenceService->setFree($session->consumer_id);
+                $this->presenceService->setFree($session->provider_id);
+
+                $session->refresh();
+                return $session;
+
+            } catch (Exception $e) {
+                Log::error("Marking call as missed failed: session {$sessionId} — " . $e->getMessage());
+                throw $e;
+            }
+        });
+    }
+
+    /**
+     * Cancel a pending/waiting call request initiated by the consumer.
+     * Only the consumer who created the session may cancel it.
+     */
+    public function cancelCall($sessionId, $consumerId)
+    {
+        return DB::transaction(function () use ($sessionId, $consumerId) {
+            try {
+                $session = \App\Models\CallSession::where('id', $sessionId)
+                    ->lockForUpdate()
+                    ->first();
+
+                if (!$session) {
+                    throw new Exception('Call session not found.');
+                }
+
+                if ($session->consumer_id != $consumerId) {
+                    throw new Exception('You are not authorized to cancel this call.');
+                }
+
+                if (!in_array($session->status, ['initiated', 'ringing', 'waiting'])) {
+                    throw new Exception('Only pending or waiting calls can be cancelled.');
+                }
+
+                $this->callRepo->update($sessionId, [
+                    'status'   => 'cancelled',
+                    'ended_at' => now(),
+                ]);
+
+                // Reset presence for both parties
+                $this->presenceService->setFree($session->consumer_id);
+                $this->presenceService->setFree($session->provider_id);
+
+                $session->refresh();
+                return $session;
+
+            } catch (Exception $e) {
+                Log::error("Cancelling call failed: session {$sessionId} — " . $e->getMessage());
+                throw $e;
+            }
+        });
+    }
 }
+

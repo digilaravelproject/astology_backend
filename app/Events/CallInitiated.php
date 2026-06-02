@@ -37,9 +37,28 @@ class CallInitiated implements ShouldBroadcast
             new PrivateChannel('user.' . $this->session->provider_id),
         ];
     }
-    
-    public function broadcastAs()
+
+    public function broadcastAs(): string
     {
         return 'CallInitiated';
+    }
+
+    /**
+     * Explicit payload so the frontend knows the call status
+     * ('initiated' = direct ring, 'waiting' = queued behind busy astrologer).
+     */
+    public function broadcastWith(): array
+    {
+        return [
+            'session' => [
+                'id'              => $this->session->id,
+                'consumer_id'     => $this->session->consumer_id,
+                'provider_id'     => $this->session->provider_id,
+                'status'          => $this->session->status, // 'initiated' or 'waiting'
+                'rate_per_minute' => $this->session->rate_per_minute,
+                'created_at'      => optional($this->session->created_at)?->toISOString(),
+            ],
+            'callerData' => $this->callerData,
+        ];
     }
 }
