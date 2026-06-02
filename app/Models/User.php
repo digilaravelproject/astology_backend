@@ -31,6 +31,8 @@ class User extends Authenticatable
         'date_of_birth',
         'time_of_birth',
         'place_of_birth',
+        'relationship_status',
+        'occupation',
         'languages',
         'otp',
         'otp_expires_at',

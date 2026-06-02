@@ -370,24 +370,38 @@ class AstrologerController extends Controller
                     ->keyBy('chat_session_id');
             }
 
+            // Fetch waiting positions globally to prevent N+1 query loops
+            $waitingPositions = [];
+            $hasWaiting = $results->contains('status', 'waiting');
+            if ($hasWaiting) {
+                $waitingChats = \Illuminate\Support\Facades\DB::table('chat_sessions')
+                    ->select(['id', 'created_at', \Illuminate\Support\Facades\DB::raw("'chat' as type")])
+                    ->where('provider_id', $astrologerUserId)
+                    ->where('status', 'waiting');
+
+                $waitingCalls = \Illuminate\Support\Facades\DB::table('call_sessions')
+                    ->select(['id', 'created_at', \Illuminate\Support\Facades\DB::raw("'call' as type")])
+                    ->where('provider_id', $astrologerUserId)
+                    ->where('status', 'waiting');
+
+                $allWaiting = $waitingChats->unionAll($waitingCalls)
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                foreach ($allWaiting as $index => $wItem) {
+                    $waitingPositions[$wItem->type . '_' . $wItem->id] = $index + 1;
+                }
+            }
+
             // Format order collection
-            $formattedOrders = $results->map(function ($item) use ($consumers, $latestMessages) {
+            $formattedOrders = $results->map(function ($item) use ($consumers, $latestMessages, $waitingPositions) {
                 $consumer = $consumers->get($item->consumer_id);
                 
                 // Calculate queue priority dynamically if waiting
                 $queuePosition = null;
                 if ($item->status === 'waiting') {
-                    $chatBefore = \Illuminate\Support\Facades\DB::table('chat_sessions')
-                        ->where('provider_id', $item->provider_id)
-                        ->where('status', 'waiting')
-                        ->where('created_at', '<', $item->created_at)
-                        ->count();
-                    $callBefore = \Illuminate\Support\Facades\DB::table('call_sessions')
-                        ->where('provider_id', $item->provider_id)
-                        ->where('status', 'waiting')
-                        ->where('created_at', '<', $item->created_at)
-                        ->count();
-                    $queuePosition = $chatBefore + $callBefore + 1;
+                    $key = $item->type . '_' . $item->id;
+                    $queuePosition = $waitingPositions[$key] ?? 1;
                 }
 
                 return [

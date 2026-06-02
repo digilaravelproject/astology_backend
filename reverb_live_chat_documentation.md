@@ -138,9 +138,11 @@ Users call this endpoint to start a chat request with an astrologer. The system 
 *   **Request Payload**:
     ```json
     {
-        "provider_id": 1
+        "provider_id": 1,
+        "question": "Mera career kaisa rahega?"
     }
     ```
+    *Note: `question` is an optional string field used to describe the user's inquiry.*
 *   **Response Payload (`200 OK`)**:
     ```json
     {
@@ -153,6 +155,7 @@ Users call this endpoint to start a chat request with an astrologer. The system 
                 "provider_id": 1,
                 "status": "initiated",
                 "rate_per_minute": 15,
+                "question": "Mera career kaisa rahega?",
                 "created_at": "2026-05-30T12:00:00.000000Z",
                 "updated_at": "2026-05-30T12:00:00.000000Z"
             }
@@ -164,6 +167,10 @@ Users call this endpoint to start a chat request with an astrologer. The system 
 
 ### 2. Accept Chat Request (Astrologer Answers)
 The Astrologer calls this endpoint to pick up and accept the ringing chat. This transitions the status to `ongoing`, starts the billing ticker, and flags both participants as `is_busy = 1`.
+
+#### 🤖 Automated Flows Triggered Upon Acceptance
+1. **User Profile Sharing**: The system automatically compiles a snapshot of the consumer's latest birth details (Name, Date of Birth, Time of Birth, Place of Birth, Gender, Relationship Status, Occupation, Question) and saves it as a `system` message in the database. This is immediately broadcasted via `MessageSent` to the astrologer's channel.
+2. **Personalized Greeting**: If the astrologer has an active default message template, the system personalizes it using placeholder substitutions (e.g., `{{user_name}}`, `{{astrologer_name}}`, `{{date_of_birth}}`, `{{time_of_birth}}`, `{{place_of_birth}}`, `{{session_id}}`), saves it as a `text` message, and broadcasts it via `MessageSent` to the user's channel.
 
 *   **Method**: `POST`
 *   **URL**: `/api/v1/chat/{sessionId}/accept`
@@ -1040,6 +1047,234 @@ Provides a single endpoint for authenticated astrologers to view history and wai
             }
         }
     }
+}
+
+---
+
+## 📝 SECTION 10: ASTROLOGER DEFAULT MESSAGE TEMPLATES (CRUD)
+
+Astrologers can manage pre-configured greeting/welcome message templates. These templates can include dynamic placeholders that are automatically filled with the consumer's details when a chat request is accepted.
+
+### 🔄 Supported Dynamic Placeholders
+*   `{{user_name}}`: Consumer's name (e.g. "Aniket Kumar").
+*   `{{astrologer_name}}`: Astrologer's name (e.g. "Aacharya Suresh Shastri").
+*   `{{date_of_birth}}`: Consumer's date of birth in `YYYY-MM-DD` format.
+*   `{{time_of_birth}}`: Consumer's time of birth in `HH:MM` format.
+*   `{{place_of_birth}}`: Consumer's place of birth.
+*   `{{session_id}}`: The dynamic ID of the active chat session.
+
+---
+
+### 1. Get All Message Templates
+Retrieves all default message templates created by the authenticated astrologer.
+*   **Method**: `GET`
+*   **URL**: `/api/v1/astrologer/default-messages`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Default messages retrieved successfully.",
+        "data": [
+            {
+                "id": 1,
+                "astrologer_id": 1,
+                "title": "Standard Welcome",
+                "content": "Namaste {{user_name}}! Welcome to Suryapath Kundli. How can I help you today?",
+                "is_default": true,
+                "created_at": "2026-06-02T12:00:00.000000Z",
+                "updated_at": "2026-06-02T12:00:00.000000Z"
+            }
+        ]
+    }
     ```
 
+---
 
+### 2. Get Active Message Template
+Retrieves the template currently set as the active default for the authenticated astrologer.
+*   **Method**: `GET`
+*   **URL**: `/api/v1/astrologer/default-messages/active`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Active default message retrieved successfully.",
+        "data": {
+            "id": 1,
+            "astrologer_id": 1,
+            "title": "Standard Welcome",
+            "content": "Namaste {{user_name}}! Welcome to Suryapath Kundli. How can I help you today?",
+            "is_default": true,
+            "created_at": "2026-06-02T12:00:00.000000Z",
+            "updated_at": "2026-06-02T12:00:00.000000Z"
+        }
+    }
+    ```
+
+---
+
+### 3. Create Message Template
+Creates a new message template. Setting `is_default` to `true` will atomically mark this template as the default and deactivate all other templates for this astrologer.
+*   **Method**: `POST`
+*   **URL**: `/api/v1/astrologer/default-messages`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Request Payload**:
+    ```json
+    {
+        "title": "Standard Welcome",
+        "content": "Namaste {{user_name}}! Welcome to Suryapath Kundli. How can I help you today?",
+        "is_default": true
+    }
+    ```
+*   **Response Payload (`201 Created`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Default message created successfully.",
+        "data": {
+            "id": 1,
+            "astrologer_id": 1,
+            "title": "Standard Welcome",
+            "content": "Namaste {{user_name}}! Welcome to Suryapath Kundli. How can I help you today?",
+            "is_default": true,
+            "created_at": "2026-06-02T12:00:00.000000Z",
+            "updated_at": "2026-06-02T12:00:00.000000Z"
+        }
+    }
+    ```
+
+---
+
+### 4. Update Message Template
+Updates an existing template by ID.
+*   **Method**: `PUT`
+*   **URL**: `/api/v1/astrologer/default-messages/{id}`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Request Payload**:
+    ```json
+    {
+        "title": "Updated Welcome",
+        "content": "Pranam {{user_name}}! Let me help you with your concern. Session reference is {{session_id}}.",
+        "is_default": true
+    }
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Default message updated successfully.",
+        "data": {
+            "id": 1,
+            "astrologer_id": 1,
+            "title": "Updated Welcome",
+            "content": "Pranam {{user_name}}! Let me help you with your concern. Session reference is {{session_id}}.",
+            "is_default": true,
+            "created_at": "2026-06-02T12:00:00.000000Z",
+            "updated_at": "2026-06-02T12:15:00.000000Z"
+        }
+    }
+    ```
+
+---
+
+### 5. Set Active Default Template
+Atomically sets the specified template as the active default for the authenticated astrologer and deactivates all others.
+*   **Method**: `POST`
+*   **URL**: `/api/v1/astrologer/default-messages/{id}/set-default`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Message template set as active default.",
+        "data": {
+            "id": 1,
+            "astrologer_id": 1,
+            "title": "Updated Welcome",
+            "content": "Pranam {{user_name}}! Let me help you with your concern. Session reference is {{session_id}}.",
+            "is_default": true,
+            "created_at": "2026-06-02T12:00:00.000000Z",
+            "updated_at": "2026-06-02T12:20:00.000000Z"
+        }
+    }
+    ```
+
+---
+
+### 6. Delete Message Template
+Deletes a template by ID.
+*   **Method**: `DELETE`
+*   **URL**: `/api/v1/astrologer/default-messages/{id}`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "Default message deleted successfully.",
+        "data": null
+    }
+    ```
+
+---
+
+## 👤 SECTION 11: USER PROFILE & BIRTH DETAILS
+
+To ensure accurate system messages during chat/call acceptance, consumers must provide complete profile and birth details.
+
+### 🔄 Update User Profile Endpoint
+Updates or sets the consumer's profile and birth details.
+*   **Method**: `PUT`
+*   **URL**: `/api/v1/user/profileInAppUpdate`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_TOKEN>
+    Accept: application/json
+    ```
+*   **Request Payload**:
+    ```json
+    {
+        "name": "Aniket Kumar",
+        "gender": "male",
+        "date_of_birth": "1998-05-15",
+        "time_of_birth": "14:30",
+        "place_of_birth": "New Delhi, India",
+        "relationship_status": "Single",
+        "occupation": "Software Engineer",
+        "languages": ["English", "Hindi"]
+    }
+    ```
+*   **Validation Constraints**:
+    *   `name`: Required, string, max 255.
+    *   `gender`: Required, must be `male` or `female`.
+    *   `date_of_birth`: Required, must be a valid date in the past.
+    *   `time_of_birth`: Required, must be in `HH:MM` format (24-hour style).
+    *   `place_of_birth`: Required, string, max 255.
+    *   `relationship_status`: Optional, string, max 255.
+    *   `occupation`: Optional, string, max 255.
+    *   `languages`: Required, array. Allowed values: `English`, `Hindi`, `Tamil`, `Bengali`, `Telugu`, `Marathi`.

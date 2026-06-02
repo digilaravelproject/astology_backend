@@ -27,12 +27,17 @@ class ChatController extends Controller
     public function initiateChat(Request $request)
     {
         $request->validate([
-            'provider_id' => 'required|exists:users,id'
+            'provider_id' => 'required|exists:users,id',
+            'question' => 'nullable|string',
         ]);
 
         try {
             $consumerId = $request->user()->id;
-            $session = $this->chatService->initiateChat($consumerId, $request->provider_id);
+            $session = $this->chatService->initiateChat(
+                $consumerId,
+                $request->provider_id,
+                $request->input('question')
+            );
             
             // Broadcast ChatInitiated with full consumer details
             broadcast(new ChatInitiated($session, $request->user()));

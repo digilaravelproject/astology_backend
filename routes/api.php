@@ -54,6 +54,16 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('auth:sanctum')->group(function () {
             Route::get('/orders', [AstrologerController::class, 'getOrders']);
+            
+            Route::prefix('default-messages')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Api\AstrologerDefaultMessageController::class, 'index']);
+                Route::get('/active', [\App\Http\Controllers\Api\AstrologerDefaultMessageController::class, 'getActive']);
+                Route::post('/', [\App\Http\Controllers\Api\AstrologerDefaultMessageController::class, 'store']);
+                Route::put('/{id}', [\App\Http\Controllers\Api\AstrologerDefaultMessageController::class, 'update']);
+                Route::delete('/{id}', [\App\Http\Controllers\Api\AstrologerDefaultMessageController::class, 'destroy']);
+                Route::post('/{id}/set-default', [\App\Http\Controllers\Api\AstrologerDefaultMessageController::class, 'setDefault']);
+            });
+
             Route::put('/profile', [AstrologerAuthController::class, 'updateProfile']);
             Route::get('/home', [AstrologerAuthController::class, 'getHomeStatus']);
             Route::put('/home', [AstrologerAuthController::class, 'updateHomeStatus']);

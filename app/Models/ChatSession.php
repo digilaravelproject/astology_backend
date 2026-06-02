@@ -16,6 +16,7 @@ class ChatSession extends Model
         'rate_per_minute',
         'total_cost',
         'last_billed_at',
+        'question',
     ];
 
     protected $casts = [

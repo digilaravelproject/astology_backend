@@ -30,7 +30,10 @@ class ChatSessionRepository
 
     public function getSessionsByUserId($userId)
     {
-        return ChatSession::with(['consumer', 'provider'])
+        return ChatSession::with(['consumer', 'provider', 'latestMessage'])
+            ->withCount(['messages as unread_count' => function ($query) use ($userId) {
+                $query->where('receiver_id', $userId)->where('is_read', false);
+            }])
             ->where(function ($query) use ($userId) {
                 $query->where('consumer_id', $userId)
                       ->orWhere('provider_id', $userId);

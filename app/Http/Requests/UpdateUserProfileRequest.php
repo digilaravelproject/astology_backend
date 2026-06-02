@@ -26,6 +26,8 @@ class UpdateUserProfileRequest extends FormRequest
             'date_of_birth' => ['required', 'date', 'before:today'],
             'time_of_birth' => ['required', 'date_format:H:i'],
             'place_of_birth' => ['required', 'string', 'max:255'],
+            'relationship_status' => ['nullable', 'string', 'max:255'],
+            'occupation' => ['nullable', 'string', 'max:255'],
             'languages' => ['required', 'array', 'min:1'],
             'languages.*' => [
                 'required',

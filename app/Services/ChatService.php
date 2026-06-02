@@ -33,9 +33,9 @@ class ChatService
     /**
      * Initiate a chat session with rate validation and balance check.
      */
-    public function initiateChat($consumerId, $providerId)
+    public function initiateChat($consumerId, $providerId, $question = null)
     {
-        return DB::transaction(function () use ($consumerId, $providerId) {
+        return DB::transaction(function () use ($consumerId, $providerId, $question) {
             try {
                 $provider = User::with('astrologer')->lockForUpdate()->findOrFail($providerId);
                 
@@ -89,6 +89,7 @@ class ChatService
                     'provider_id' => $providerId,
                     'status' => $status,
                     'rate_per_minute' => $rate,
+                    'question' => $question,
                 ]);
                 
                 if ($status === 'initiated') {
@@ -140,6 +141,45 @@ class ChatService
                 
                 $this->presenceService->setBusy($session->consumer_id, $sessionId);
                 $this->presenceService->setBusy($providerId, $sessionId);
+
+                // Fetch latest consumer profile details
+                $consumer = User::findOrFail($session->consumer_id);
+
+                // Format consumer details as system message
+                $detailsMsg = $this->formatUserDetailsMessage($consumer, $session);
+
+                // Store system message
+                $systemMessage = \App\Models\Message::create([
+                    'chat_session_id' => $session->id,
+                    'sender_id' => $session->consumer_id,
+                    'receiver_id' => $session->provider_id,
+                    'message' => $detailsMsg,
+                    'type' => 'system',
+                ]);
+
+                // Broadcast user details system message to the astrologer
+                broadcast(new \App\Events\MessageSent($systemMessage, $session->provider_id));
+
+                // Check for astrologer's active default message
+                $defaultMessage = \App\Models\AstrologerDefaultMessage::where('astrologer_id', $providerId)
+                    ->where('is_default', true)
+                    ->first();
+
+                if ($defaultMessage) {
+                    $personalizedMsg = $this->personalizeDefaultMessage($defaultMessage->content, $consumer, $provider, $session);
+                    
+                    // Store personalized default message
+                    $textMsg = \App\Models\Message::create([
+                        'chat_session_id' => $session->id,
+                        'sender_id' => $session->provider_id,
+                        'receiver_id' => $session->consumer_id,
+                        'message' => $personalizedMsg,
+                        'type' => 'text',
+                    ]);
+
+                    // Broadcast personalized greeting message to the consumer (user)
+                    broadcast(new \App\Events\MessageSent($textMsg, $session->consumer_id));
+                }
                 
                 // Start billing ticker (delayed by 1 minute)
                 ChatBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
@@ -152,6 +192,53 @@ class ChatService
                 throw $e;
             }
         });
+    }
+
+    private function formatUserDetailsMessage($consumer, $session)
+    {
+        $lines = ["Birth Details:"];
+        $lines[] = "- Name: " . ($consumer->name ?? 'N/A');
+        
+        $dob = $consumer->date_of_birth;
+        $lines[] = "- Date of Birth: " . ($dob ? ($dob instanceof \Carbon\Carbon ? $dob->format('Y-m-d') : $dob) : 'N/A');
+        
+        $tob = $consumer->time_of_birth;
+        $lines[] = "- Time of Birth: " . ($tob ? ($tob instanceof \Carbon\Carbon ? $tob->format('H:i') : $tob) : 'N/A');
+        
+        $lines[] = "- Place of Birth: " . ($consumer->place_of_birth ?? 'N/A');
+        $lines[] = "- Gender: " . ($consumer->gender ?? 'N/A');
+        
+        if (isset($consumer->relationship_status)) {
+            $lines[] = "- Relationship Status: " . ($consumer->relationship_status ?? 'N/A');
+        }
+        if (isset($consumer->occupation)) {
+            $lines[] = "- Occupation: " . ($consumer->occupation ?? 'N/A');
+        }
+        if ($session->question) {
+            $lines[] = "- Question: " . $session->question;
+        }
+        
+        return implode("\n", $lines);
+    }
+
+    private function personalizeDefaultMessage($content, $consumer, $provider, $session)
+    {
+        $dob = $consumer->date_of_birth;
+        $dobStr = $dob ? ($dob instanceof \Carbon\Carbon ? $dob->format('Y-m-d') : $dob) : 'N/A';
+
+        $tob = $consumer->time_of_birth;
+        $tobStr = $tob ? ($tob instanceof \Carbon\Carbon ? $tob->format('H:i') : $tob) : 'N/A';
+
+        $replacements = [
+            '{{user_name}}' => $consumer->name ?? 'User',
+            '{{astrologer_name}}' => $provider->name ?? 'Astrologer',
+            '{{date_of_birth}}' => $dobStr,
+            '{{time_of_birth}}' => $tobStr,
+            '{{place_of_birth}}' => $consumer->place_of_birth ?? 'N/A',
+            '{{session_id}}' => $session->id,
+        ];
+
+        return str_replace(array_keys($replacements), array_values($replacements), $content);
     }
 
     /**

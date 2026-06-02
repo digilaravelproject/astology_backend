@@ -27,12 +27,15 @@ class CallController extends Controller
     {
         $request->validate([
             'provider_id' => 'required|exists:users,id',
-            'offer' => 'required|string'
+            'offer' => 'required|string',
         ]);
 
         try {
             $consumerId = $request->user()->id;
-            $session = $this->callService->initiateCall($consumerId, $request->provider_id);
+            $session = $this->callService->initiateCall(
+                $consumerId,
+                $request->provider_id
+            );
             
             // Broadcast
             broadcast(new CallInitiated($session, [

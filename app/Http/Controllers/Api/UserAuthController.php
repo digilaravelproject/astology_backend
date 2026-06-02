@@ -260,6 +260,8 @@ class UserAuthController extends Controller
                 'date_of_birth' => $request->input('date_of_birth'),
                 'time_of_birth' => $request->input('time_of_birth'),
                 'place_of_birth' => $request->input('place_of_birth'),
+                'relationship_status' => $request->input('relationship_status'),
+                'occupation' => $request->input('occupation'),
                 'languages' => $request->input('languages'),
                 'profile_completed' => true,
             ]);
@@ -369,6 +371,8 @@ class UserAuthController extends Controller
                 'date_of_birth' => $request->input('date_of_birth'),
                 'time_of_birth' => $request->input('time_of_birth'),
                 'place_of_birth' => $request->input('place_of_birth'),
+                'relationship_status' => $request->input('relationship_status'),
+                'occupation' => $request->input('occupation'),
                 'languages' => $request->input('languages'),
                 'profile_completed' => true,
             ]);
