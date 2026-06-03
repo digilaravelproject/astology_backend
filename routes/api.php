@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\{
     AstrologerAuthController,
     AstrologerController,
     AstrologerGalleryController,
+    AstrologerWalletController,
     BlogController,
     CallController,
     ChatController,
@@ -91,6 +92,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/sleep-hours', [AstrologerAuthController::class, 'getSleepHours']);
             Route::post('/sleep-hours', [AstrologerAuthController::class, 'setSleepHours']);
             Route::post('/toggle-online', [AstrologerAuthController::class, 'toggleOnlineStatus']);
+
+            // Wallet routes
+            Route::prefix('wallet')->middleware('astrologer')->group(function () {
+                Route::get('/', [AstrologerWalletController::class, 'show']);
+                Route::get('/earnings', [AstrologerWalletController::class, 'earnings']);
+                Route::get('/withdrawals', [AstrologerWalletController::class, 'withdrawals']);
+                Route::post('/withdraw', [AstrologerWalletController::class, 'withdraw']);
+            });
 
             // Gallery routes
             Route::prefix('gallery')->group(function () {
