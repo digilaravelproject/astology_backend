@@ -194,7 +194,8 @@ Submits a request to withdraw funds from the wallet balance to a specified activ
 Retrieves the top 10 astrologers based on the current week's completed credit earnings. Along with the list, it includes the logged-in astrologer's own current weekly rank and weekly earnings.
 
 * **Method:** `GET`
-* **URL:** `/wallet/weekly-rankings`
+* **URL:** `/astrologer/wallet/weekly-rankings`
+* **Full URL Example:** `https://yourdomain.com/api/v1/astrologer/wallet/weekly-rankings`
 * **Response (Success - 200 OK):**
   ```json
   {
