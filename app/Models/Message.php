@@ -14,10 +14,12 @@ class Message extends Model
         'attachment_url',
         'type',
         'is_read',
+        'is_delivered',
     ];
 
     protected $casts = [
         'is_read' => 'boolean',
+        'is_delivered' => 'boolean',
     ];
 
     public function chatSession()

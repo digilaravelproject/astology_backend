@@ -431,7 +431,7 @@ Retrieves previous messages in a chat session.
 ---
 
 ### 9. Mark Messages as Read
-Mark all incoming messages in the session as read (`is_read = true`, `is_delivered = true`).
+Mark all incoming messages in the session as read (`is_read = true`, `is_delivered = true`). Only marks messages where the authenticated user is the receiver. If no unread messages exist, returns early without broadcasting any event.
 
 *   **Method**: `POST`
 *   **URL**: `/api/v1/chat/{sessionId}/read`
@@ -440,14 +440,27 @@ Mark all incoming messages in the session as read (`is_read = true`, `is_deliver
     Authorization: Bearer <USER_OR_ASTROLOGER_TOKEN>
     Accept: application/json
     ```
-*   **Response Payload (`200 OK`)**:
+*   **Authorization**: The authenticated user must be a participant (`consumer_id` or `provider_id`) in the session. Returns `403` otherwise.
+*   **Response Payload — Messages Marked (`200 OK`)**:
     ```json
     {
         "success": true,
         "message": "Messages marked as read",
+        "data": {
+            "marked_count": 3,
+            "message_ids": [255, 256, 257]
+        }
+    }
+    ```
+*   **Response Payload — No Unread Messages (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "message": "No unread messages to mark",
         "data": null
     }
     ```
+*   **Side Effect**: When messages are marked, a `MessageStatusUpdated` event is broadcasted to the **sender** (the other participant) on their private channel with `status: "seen"`, `reader_id`, and `read_at` timestamp.
 
 ---
 
@@ -478,6 +491,8 @@ Manually synchronize status for specific messages using their unique database ID
         "data": null
     }
     ```
+*   **Authorization**: The authenticated user must be a participant (`consumer_id` or `provider_id`) in the session. Returns `403` otherwise.
+*   **Side Effect**: Broadcasts a `MessageStatusUpdated` event to the **sender** (the other participant) with enriched payload including `reader_id` and `read_at`.
 
 ---
 
@@ -889,22 +904,38 @@ These events are broadcasted over Reverb. When the backend fires an event, Rever
 
 ---
 
-### 🔔 6. `MessageStatusUpdated`
-*   **Broadcasts to**: `private-user.private-user.{receiverId}` (Wait! The backend broadcasts to the exact string matching `private-user.{receiverId}`)
-*   **Fired When**: The recipient marks messages as read or syncs delivery status.
+### 🔔 6. `MessageStatusUpdated` (Read Receipt / Delivery Receipt)
+*   **Broadcasts to**: `private-user.{senderId}` — the original message sender receives this event.
+*   **Fired When**: The recipient marks messages as read (`POST /{sessionId}/read`) or syncs delivery status (`POST /{sessionId}/sync-status`).
 *   **JSON Event Payload**:
     ```json
     {
         "event": "MessageStatusUpdated",
-        "channel": "private-user.private-user.20",
+        "channel": "private-user.20",
         "data": {
             "message_ids": [255, 256],
             "status": "seen",
-            "session_id": 50
+            "session_id": 50,
+            "reader_id": 15,
+            "read_at": "2026-06-04T12:30:45+00:00"
         }
     }
     ```
-    *Note: Notice that in `MessageStatusUpdated.php`, the channel is configured as `new PrivateChannel('private-user.' . $this->receiverId)`. Under the hood, Laravel prepends `private-`, resulting in `private-user.private-user.{id}`. Clients should listen to this exact channel for status updates.*
+    **Fields**:
+    | Field | Type | Description |
+    |---|---|---|
+    | `message_ids` | `array<int>` | IDs of messages whose status changed |
+    | `status` | `string` | New status: `"delivered"` or `"seen"` |
+    | `session_id` | `int` | Chat session ID |
+    | `reader_id` | `int` | User ID who read/received the messages |
+    | `read_at` | `string` | ISO 8601 timestamp of when the status change occurred |
+
+    **How to Use (Read Receipts)**:
+    1. When User A sends a message to User B, the message shows a **single tick** (✓ sent).
+    2. When User B's device receives the message and calls `sync-status` with `status: "delivered"`, User A receives this event with `status: "delivered"` → show **double tick** (✓✓).
+    3. When User B opens the chat and calls `mark-as-read`, User A receives this event with `status: "seen"` → show **blue double tick** (✓✓).
+    4. Use `reader_id` to confirm who read the message. Use `read_at` to display "Read at" timestamps.
+    5. Use `message_ids` to update the status of specific messages in the local UI without a full refresh.
 
 ---
 

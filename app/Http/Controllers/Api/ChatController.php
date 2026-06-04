@@ -165,23 +165,47 @@ class ChatController extends Controller
     {
         try {
             $userId = $request->user()->id;
-            Message::where('chat_session_id', $sessionId)
-                ->where('receiver_id', $userId)
-                ->where('is_read', false)
-                ->update(['is_read' => true, 'is_delivered' => true, 'updated_at' => now()]);
 
+            // Verify user is a participant of this session
             $session = $this->chatService->getSession($sessionId);
-            $senderToNotify = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
-            
-            $messageIds = Message::where('chat_session_id', $sessionId)
-                ->where('receiver_id', $userId)
-                ->pluck('id')->toArray();
-
-            if (!empty($messageIds)) {
-                broadcast(new MessageStatusUpdated($messageIds, 'seen', $senderToNotify, $sessionId));
+            if (!$session || ($session->consumer_id != $userId && $session->provider_id != $userId)) {
+                return ApiResponse::error('You are not authorized to access this session', 403);
             }
 
-            return ApiResponse::success(null, 'Messages marked as read');
+            // Collect unread message IDs BEFORE marking them (to avoid stale queries)
+            $unreadMessageIds = Message::where('chat_session_id', $sessionId)
+                ->where('receiver_id', $userId)
+                ->where('is_read', false)
+                ->pluck('id')
+                ->toArray();
+
+            // If nothing to mark, return early without broadcasting
+            if (empty($unreadMessageIds)) {
+                return ApiResponse::success(null, 'No unread messages to mark');
+            }
+
+            // Mark messages as read
+            $readAt = now();
+            Message::whereIn('id', $unreadMessageIds)
+                ->update(['is_read' => true, 'is_delivered' => true, 'updated_at' => $readAt]);
+
+            // Determine the sender to notify (the other participant)
+            $senderToNotify = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
+
+            // Broadcast enriched read receipt event to the sender
+            broadcast(new MessageStatusUpdated(
+                $unreadMessageIds,
+                'seen',
+                $senderToNotify,
+                (int) $sessionId,
+                $userId,
+                $readAt->toIso8601String()
+            ));
+
+            return ApiResponse::success([
+                'marked_count' => count($unreadMessageIds),
+                'message_ids' => $unreadMessageIds,
+            ], 'Messages marked as read');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
         }
@@ -198,19 +222,33 @@ class ChatController extends Controller
                 return ApiResponse::error('No message IDs provided', 400);
             }
 
+            // Verify user is a participant of this session
+            $session = $this->chatService->getSession($sessionId);
+            if (!$session || ($session->consumer_id != $userId && $session->provider_id != $userId)) {
+                return ApiResponse::error('You are not authorized to access this session', 403);
+            }
+
             $query = Message::where('chat_session_id', $sessionId)
                 ->whereIn('id', $messageIds)
                 ->where('receiver_id', $userId);
 
+            $syncedAt = now();
+
             if ($status === 'delivered') {
-                $query->update(['is_delivered' => true, 'updated_at' => now()]);
+                $query->update(['is_delivered' => true, 'updated_at' => $syncedAt]);
             } elseif ($status === 'seen') {
-                $query->update(['is_read' => true, 'is_delivered' => true, 'updated_at' => now()]);
+                $query->update(['is_read' => true, 'is_delivered' => true, 'updated_at' => $syncedAt]);
             }
 
-            $session = $this->chatService->getSession($sessionId);
             $senderToNotify = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
-            broadcast(new MessageStatusUpdated($messageIds, $status, $senderToNotify, $sessionId));
+            broadcast(new MessageStatusUpdated(
+                $messageIds,
+                $status,
+                $senderToNotify,
+                (int) $sessionId,
+                $userId,
+                $syncedAt->toIso8601String()
+            ));
 
             return ApiResponse::success(null, 'Status updated');
         } catch (Exception $e) {
