@@ -55,7 +55,10 @@ class ChatSessionRepository
 
     public function getAstrologerSessions($userId)
     {
-        return ChatSession::with(['consumer', 'latestMessage'])
+        return ChatSession::with([
+                'consumer:id,name,profile_photo,gender,date_of_birth,time_of_birth,place_of_birth',
+                'latestMessage'
+            ])
             ->withCount(['messages as unread_count' => function ($query) use ($userId) {
                 $query->where('receiver_id', $userId)->where('is_read', false);
             }])
