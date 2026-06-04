@@ -38,8 +38,7 @@ class CurrentChatSessionApiTest extends TestCase
         ]);
     }
 
-    /** @test */
-    public function it_returns_null_when_no_active_chat_session_exists()
+    public function test_it_returns_null_when_no_active_chat_session_exists()
     {
         // Consumer checks current chat session
         $response = $this->actingAs($this->consumer)->getJson('/api/v1/chat/sessions/current');
@@ -64,8 +63,7 @@ class CurrentChatSessionApiTest extends TestCase
         ]);
     }
 
-    /** @test */
-    public function it_returns_the_session_details_for_both_consumer_and_provider_when_active()
+    public function test_it_returns_the_session_details_for_both_consumer_and_provider_when_active()
     {
         $acceptedTime = now()->subMinutes(5);
 
@@ -137,8 +135,7 @@ class CurrentChatSessionApiTest extends TestCase
         $responseProvider->assertJsonPath('data.unread_count', 0);
     }
 
-    /** @test */
-    public function it_returns_the_latest_session_if_multiple_active_sessions_exist()
+    public function test_it_returns_the_latest_session_if_multiple_active_sessions_exist()
     {
         $time1 = now()->subMinutes(10);
         $time2 = now()->subMinutes(2);
