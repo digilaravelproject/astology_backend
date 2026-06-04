@@ -136,6 +136,7 @@ class ChatService
                 $this->chatRepo->update($sessionId, [
                     'status' => 'ongoing',
                     'started_at' => now(),
+                    'accepted_at' => now(),
                     'last_billed_at' => now()
                 ]);
                 

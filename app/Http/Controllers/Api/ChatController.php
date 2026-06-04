@@ -292,6 +292,50 @@ class ChatController extends Controller
         }
     }
 
+    public function getCurrentAcceptedSession(Request $request)
+    {
+        try {
+            $user = $request->user();
+            $userId = $user->id;
+            $userType = $user->user_type;
+
+            $session = \App\Models\ChatSession::with(['consumer', 'provider.astrologer', 'latestMessage'])
+                ->withCount(['messages as unread_count' => function ($query) use ($userId) {
+                    $query->where('receiver_id', $userId)->where('is_read', false);
+                }])
+                ->where(function ($query) use ($userId, $userType) {
+                    if ($userType === 'user') {
+                        $query->where('consumer_id', $userId);
+                    } else {
+                        $query->where('provider_id', $userId);
+                    }
+                })
+                ->whereIn('status', ['accepted', 'ongoing', 'active'])
+                ->orderBy('accepted_at', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if (!$session) {
+                return response()->json([
+                    'success' => true,
+                    'status' => 'success',
+                    'message' => 'No current chat session found',
+                    'data' => null
+                ], 200);
+            }
+
+            return response()->json([
+                'success' => true,
+                'status' => 'success',
+                'message' => 'Current chat session retrieved successfully',
+                'data' => $session
+            ], 200);
+
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
     public function cancelChat(Request $request, $sessionId)
     {
         try {

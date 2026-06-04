@@ -635,7 +635,69 @@ Retrieves all historical and active sessions where the authenticated user partic
 
 ---
 
-### 14. Get Paginated Message History (Session Detail with Security Guards)
+### 14. Get Current Accepted Chat Session
+Retrieves the currently accepted/active chat session for the authenticated logged-in user (consumer or astrologer/provider). If multiple ongoing sessions exist, it returns the latest one based on `accepted_at` (or `created_at` as fallback). If no active session exists, it returns `null` inside the `data` payload.
+
+*   **Method**: `GET`
+*   **URL**: `/api/v1/chat/sessions/current`
+*   **Headers**:
+    ```http
+    Authorization: Bearer <USER_OR_ASTROLOGER_TOKEN>
+    Accept: application/json
+    ```
+*   **Response Payload — Current Session Found (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "status": "success",
+        "message": "Current chat session retrieved successfully",
+        "data": {
+            "id": 50,
+            "consumer_id": 20,
+            "provider_id": 1,
+            "status": "ongoing",
+            "rate_per_minute": 15,
+            "duration_seconds": 0,
+            "total_cost": 0,
+            "created_at": "2026-05-30T12:00:00.000000Z",
+            "accepted_at": "2026-05-30T12:00:25.000000Z",
+            "unread_count": 1,
+            "provider": {
+                "id": 1,
+                "name": "Aacharya Suresh Shastri",
+                "astrologer": {
+                    "chat_rate_per_minute": 15
+                }
+            },
+            "consumer": {
+                "id": 20,
+                "name": "Aniket Kumar"
+            },
+            "latest_message": {
+                "id": 255,
+                "chat_session_id": 50,
+                "sender_id": 1,
+                "receiver_id": 20,
+                "message": "Pranam Guruji! Mera career kaisa rahega?",
+                "type": "text",
+                "created_at": "2026-05-30T12:01:10.000000Z"
+            }
+        }
+    }
+    ```
+*   **Response Payload — No Current Session Found (`200 OK`)**:
+    ```json
+    {
+        "success": true,
+        "status": "success",
+        "message": "No current chat session found",
+        "data": null
+    }
+    ```
+
+---
+
+### 15. Get Paginated Message History (Session Detail with Security Guards)
 Retrieves previous messages in a chat session. This endpoint enforces strict ownership checks: the authenticated user MUST be either the `consumer_id` or the `provider_id` of the session, otherwise a `403 Forbidden` response is returned.
 
 *   **Method**: `GET`

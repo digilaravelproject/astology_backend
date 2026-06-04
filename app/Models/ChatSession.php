@@ -11,6 +11,7 @@ class ChatSession extends Model
         'provider_id',
         'status',
         'started_at',
+        'accepted_at',
         'ended_at',
         'duration_seconds',
         'rate_per_minute',
@@ -21,6 +22,7 @@ class ChatSession extends Model
 
     protected $casts = [
         'started_at' => 'datetime',
+        'accepted_at' => 'datetime',
         'ended_at' => 'datetime',
         'last_billed_at' => 'datetime',
         'duration_seconds' => 'integer',
