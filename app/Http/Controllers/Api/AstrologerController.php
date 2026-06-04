@@ -279,7 +279,7 @@ class AstrologerController extends Controller
                 'waiting' => ['waiting'],
                 'pending' => ['initiated'],
                 'rejected' => ['rejected'],
-                'cancelled' => ['rejected'],
+                'cancelled' => ['cancelled'],
                 'completed' => ['completed'],
             ];
 

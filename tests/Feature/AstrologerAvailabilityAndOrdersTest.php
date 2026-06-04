@@ -8,6 +8,7 @@ use App\Models\Wallet;
 use App\Models\Astrologer;
 use App\Models\ChatSession;
 use App\Models\CallSession;
+use App\Events\ChatQueueUpdated;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
@@ -120,6 +121,57 @@ class AstrologerAvailabilityAndOrdersTest extends TestCase
     }
 
     /** @test */
+    public function it_orders_waiting_chat_queue_fifo_and_blocks_out_of_order_acceptance()
+    {
+        ChatSession::create([
+            'consumer_id' => User::factory()->create()->id,
+            'provider_id' => $this->provider->id,
+            'status' => 'ongoing',
+            'rate_per_minute' => 10.00,
+            'started_at' => now(),
+        ]);
+
+        $userB = User::factory()->create(['name' => 'User B']);
+        $userC = User::factory()->create(['name' => 'User C']);
+        Wallet::create(['user_id' => $userB->id, 'balance' => 300.00]);
+        Wallet::create(['user_id' => $userC->id, 'balance' => 300.00]);
+
+        $sessionB = ChatSession::create([
+            'consumer_id' => $userB->id,
+            'provider_id' => $this->provider->id,
+            'status' => 'waiting',
+            'rate_per_minute' => 10.00,
+            'created_at' => now()->subMinute(),
+        ]);
+
+        $sessionC = ChatSession::create([
+            'consumer_id' => $userC->id,
+            'provider_id' => $this->provider->id,
+            'status' => 'waiting',
+            'rate_per_minute' => 10.00,
+            'created_at' => now(),
+        ]);
+
+        $ordersResponse = $this->actingAs($this->provider)->getJson('/api/v1/astrologer/orders?status=waiting&type=chat');
+
+        $ordersResponse->assertStatus(200);
+        $this->assertEquals($sessionB->id, $ordersResponse->json('data.orders.0.session_id'));
+        $this->assertEquals(1, $ordersResponse->json('data.orders.0.queue_position'));
+        $this->assertEquals($sessionC->id, $ordersResponse->json('data.orders.1.session_id'));
+        $this->assertEquals(2, $ordersResponse->json('data.orders.1.queue_position'));
+
+        ChatSession::where('provider_id', $this->provider->id)
+            ->where('status', 'ongoing')
+            ->update(['status' => 'completed']);
+
+        $acceptResponse = $this->actingAs($this->provider)->postJson("/api/v1/chat/{$sessionC->id}/accept");
+        $acceptResponse->assertStatus(400);
+        $acceptResponse->assertJsonFragment([
+            'message' => 'Please accept the oldest waiting chat request first.',
+        ]);
+    }
+
+    /** @test */
     public function it_prevents_astrologer_from_accepting_multiple_ongoing_sessions()
     {
         // 1. Create a waiting chat request
@@ -163,6 +215,7 @@ class AstrologerAvailabilityAndOrdersTest extends TestCase
         // Assert it is rejected in DB
         $chatSession->refresh();
         $this->assertEquals('rejected', $chatSession->status);
+        Event::assertDispatched(ChatQueueUpdated::class);
 
         // Create initiated call
         $callSession = CallSession::create([

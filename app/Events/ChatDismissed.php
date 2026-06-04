@@ -16,14 +16,16 @@ class ChatDismissed implements ShouldBroadcastNow
 
     public $session;
     public $dismissedById;
+    public $reason;
 
     /**
      * Create a new event instance.
      */
-    public function __construct($session, $dismissedById = null)
+    public function __construct($session, $dismissedById = null, $reason = null)
     {
         $this->session = $session;
         $this->dismissedById = $dismissedById;
+        $this->reason = $reason;
     }
 
     /**
@@ -35,6 +37,7 @@ class ChatDismissed implements ShouldBroadcastNow
             'session_id' => $this->session ? $this->session->id : 'NULL',
             'status' => $this->session ? $this->session->status : 'NULL',
             'dismissed_by' => $this->dismissedById,
+            'reason' => $this->reason,
             'consumer_id' => $this->session ? $this->session->consumer_id : 'NULL',
             'provider_id' => $this->session ? $this->session->provider_id : 'NULL',
         ]);

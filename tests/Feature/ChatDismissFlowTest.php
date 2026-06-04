@@ -8,6 +8,7 @@ use App\Models\Wallet;
 use App\Models\Astrologer;
 use App\Models\ChatSession;
 use App\Events\ChatDismissed;
+use App\Jobs\CleanupMissedSessionJob;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -43,6 +44,9 @@ class ChatDismissFlowTest extends TestCase
         ]);
         $response->assertStatus(200);
         $sessionId = $response->json('data.session.id');
+        Queue::assertPushed(CleanupMissedSessionJob::class, function ($job) {
+            return $job->delay && abs($job->delay->diffInSeconds(now(), false)) >= 119;
+        });
 
         // Verify session was initiated
         $this->assertDatabaseHas('chat_sessions', [
@@ -54,10 +58,10 @@ class ChatDismissFlowTest extends TestCase
         $cancelResponse = $this->actingAs($consumer)->postJson("/api/v1/chat/{$sessionId}/cancel");
         $cancelResponse->assertStatus(200);
 
-        // Verify status transitioned to rejected and players are free/available
+        // Verify status transitioned to cancelled and players are free/available
         $this->assertDatabaseHas('chat_sessions', [
             'id' => $sessionId,
-            'status' => 'rejected'
+            'status' => 'cancelled'
         ]);
         $this->assertDatabaseHas('users', ['id' => $consumer->id, 'is_busy' => false]);
         $this->assertDatabaseHas('users', ['id' => $provider->id, 'is_busy' => false]);
@@ -188,17 +192,17 @@ class ChatDismissFlowTest extends TestCase
         $job = new \App\Jobs\CleanupMissedSessionJob($sessionId, 'chat');
         $job->handle();
 
-        // 5. Verify status transitioned to rejected and players are free/available
+        // 5. Verify status transitioned to cancelled and players are free/available
         $this->assertDatabaseHas('chat_sessions', [
             'id' => $sessionId,
-            'status' => 'rejected'
+            'status' => 'cancelled'
         ]);
         $this->assertDatabaseHas('users', ['id' => $consumer->id, 'is_busy' => false]);
         $this->assertDatabaseHas('users', ['id' => $provider->id, 'is_busy' => false]);
 
         // Verify ChatDismissed broadcast was dispatched to notify astrologer & consumer
         Event::assertDispatched(ChatDismissed::class, function ($event) {
-            return empty($event->dismissedById);
+            return empty($event->dismissedById) && $event->reason === 'timeout';
         });
     }
 }

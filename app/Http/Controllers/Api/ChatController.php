@@ -11,6 +11,7 @@ use App\Events\MessageSent;
 use App\Events\ChatInitiated;
 use App\Events\ChatEnded;
 use App\Events\ChatAccepted;
+use App\Events\ChatQueueUpdated;
 use App\Events\MessageStatusUpdated;
 use Illuminate\Support\Facades\Storage;
 use Exception;
@@ -41,6 +42,7 @@ class ChatController extends Controller
             
             // Broadcast ChatInitiated with full consumer details
             broadcast(new ChatInitiated($session, $request->user()));
+            broadcast(new ChatQueueUpdated($session->provider_id, $session, 'initiated'));
             
             return ApiResponse::success(['session' => $session], 'Chat initiated successfully');
             
@@ -53,13 +55,26 @@ class ChatController extends Controller
     {
         try {
             $providerId = $request->user()->id;
-            $session = $this->chatService->acceptChat($sessionId, $providerId);
+            $acceptData = $this->chatService->acceptChat($sessionId, $providerId);
+            $session = $acceptData['session'];
             
             // Broadcast ChatAccepted to the consumer with full provider details
             $session->load(['provider.astrologer', 'consumer']);
             broadcast(new ChatAccepted($session, $session->provider));
+            broadcast(new ChatQueueUpdated($session->provider_id, $session, 'accepted'));
+
+            if ($acceptData['system_message']) {
+                broadcast(new MessageSent($acceptData['system_message'], $session->provider_id));
+            }
+
+            if ($acceptData['default_message']) {
+                broadcast(new MessageSent($acceptData['default_message'], $session->consumer_id));
+            }
             
-            return ApiResponse::success(['session' => $session], 'Chat accepted successfully');
+            return ApiResponse::success([
+                'session' => $session,
+                'default_message' => $acceptData['default_message'],
+            ], 'Chat accepted successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 400);
         }
@@ -70,6 +85,9 @@ class ChatController extends Controller
         try {
             $session = $this->chatService->endChat($sessionId, $request->user()->id);
             broadcast(new ChatEnded($session, $request->user()->id));
+            if ($session) {
+                broadcast(new ChatQueueUpdated($session->provider_id, $session, 'ended'));
+            }
             
             // Calculate billing and duration breakdown details
             $durationSeconds = (int) ($session->duration_seconds ?? 0);
@@ -100,7 +118,8 @@ class ChatController extends Controller
     {
         try {
             $session = $this->chatService->rejectChat($sessionId, $request->user()->id);
-            broadcast(new \App\Events\ChatDismissed($session, $request->user()->id));
+            broadcast(new \App\Events\ChatDismissed($session, $request->user()->id, 'rejected'));
+            broadcast(new ChatQueueUpdated($session->provider_id, $session, 'rejected'));
             return ApiResponse::success(null, 'Chat rejected');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 400);
@@ -381,11 +400,15 @@ class ChatController extends Controller
             $session = $this->chatService->cancelChat($sessionId, $userId);
             
             // Broadcast ChatDismissed to notify the other participant (provider/astrologer)
-            broadcast(new \App\Events\ChatDismissed($session, $userId));
+            broadcast(new \App\Events\ChatDismissed($session, $userId, 'cancelled'));
+            broadcast(new ChatQueueUpdated($session->provider_id, $session, 'cancelled'));
             
-            return ApiResponse::success(['session' => $session], 'Chat cancelled successfully');
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Chat cancelled successfully.',
+            ], 200);
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 400);
+            return ApiResponse::error($e->getMessage(), $e->getCode() === 403 ? 403 : 400);
         }
     }
 }

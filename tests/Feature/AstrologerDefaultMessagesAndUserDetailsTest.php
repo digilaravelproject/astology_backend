@@ -10,6 +10,7 @@ use App\Models\AstrologerDefaultMessage;
 use App\Models\ChatSession;
 use App\Models\Message;
 use App\Events\MessageSent;
+use App\Events\ChatAccepted;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -168,7 +169,7 @@ class AstrologerDefaultMessagesAndUserDetailsTest extends TestCase
     /** @test */
     public function accepting_chat_sends_personalized_greeting_message()
     {
-        Event::fake([MessageSent::class]);
+        Event::fake([ChatAccepted::class, MessageSent::class]);
         Queue::fake();
 
         // 1. Create consumer with complete details
@@ -228,6 +229,42 @@ class AstrologerDefaultMessagesAndUserDetailsTest extends TestCase
         Event::assertDispatched(MessageSent::class, function ($event) use ($consumer, $message) {
             return (int) $event->receiverId === (int) $consumer->id && (int) $event->messageData->id === (int) $message->id;
         });
+        Event::assertDispatched(ChatAccepted::class);
+        $acceptResponse->assertJsonPath('data.default_message.message', $expectedContent);
+    }
+
+    /** @test */
+    public function accepting_chat_without_default_message_does_not_send_default_text_message()
+    {
+        Event::fake([ChatAccepted::class, MessageSent::class]);
+        Queue::fake();
+
+        $consumer = User::factory()->create(['is_online' => true, 'is_busy' => false]);
+        Wallet::create(['user_id' => $consumer->id, 'balance' => 500.00]);
+
+        $provider = User::factory()->create(['name' => 'No Default Guru', 'is_online' => true, 'is_busy' => false]);
+        Astrologer::create([
+            'user_id' => $provider->id,
+            'is_online' => true,
+            'chat_enabled' => true,
+            'chat_rate_per_minute' => 10.00
+        ]);
+
+        $initResponse = $this->actingAs($consumer)->postJson('/api/v1/chat/initiate', [
+            'provider_id' => $provider->id,
+        ]);
+        $sessionId = $initResponse->json('data.session.id');
+
+        $acceptResponse = $this->actingAs($provider)->postJson("/api/v1/chat/{$sessionId}/accept");
+        $acceptResponse->assertStatus(200);
+        $acceptResponse->assertJsonPath('data.default_message', null);
+
+        $this->assertDatabaseMissing('messages', [
+            'chat_session_id' => $sessionId,
+            'type' => 'text',
+            'sender_id' => $provider->id,
+            'receiver_id' => $consumer->id,
+        ]);
     }
 
     /** @test */

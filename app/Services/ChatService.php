@@ -51,7 +51,10 @@ class ChatService
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
                     ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->exists();
-                $isBusy = $isChatBusy || $isCallBusy;
+                $hasWaitingQueue = \App\Models\ChatSession::where('provider_id', $providerId)
+                    ->where('status', 'waiting')
+                    ->exists();
+                $isBusy = $isChatBusy || $isCallBusy || $hasWaitingQueue;
 
                 // Dynamic check for consumer
                 $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
@@ -93,8 +96,8 @@ class ChatService
                 ]);
                 
                 if ($status === 'initiated') {
-                    // Dispatch timeout cleanup (60 seconds ringing timeout)
-                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'chat')->delay(now()->addSeconds(60));
+                    // Dispatch timeout cleanup (120 seconds ringing timeout)
+                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'chat')->delay(now()->addSeconds(120));
                 }
 
                 return $session;
@@ -116,9 +119,21 @@ class ChatService
                 // Lock provider row to prevent concurrent accepts
                 $provider = User::where('id', $providerId)->lockForUpdate()->first();
 
-                $session = $this->chatRepo->findById($sessionId);
+                $session = \App\Models\ChatSession::where('id', $sessionId)->lockForUpdate()->first();
                 if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'waiting'])) {
                     throw new Exception("Chat cannot be accepted. Session might have expired.");
+                }
+
+                if ($session->status === 'waiting') {
+                    $oldestWaitingSessionId = \App\Models\ChatSession::where('provider_id', $providerId)
+                        ->where('status', 'waiting')
+                        ->orderBy('created_at', 'asc')
+                        ->orderBy('id', 'asc')
+                        ->value('id');
+
+                    if ((int) $oldestWaitingSessionId !== (int) $session->id) {
+                        throw new Exception("Please accept the oldest waiting chat request first.");
+                    }
                 }
 
                 // Check dynamic busy check under lock to prevent double booking
@@ -158,14 +173,12 @@ class ChatService
                     'type' => 'system',
                 ]);
 
-                // Broadcast user details system message to the astrologer
-                broadcast(new \App\Events\MessageSent($systemMessage, $session->provider_id));
-
                 // Check for astrologer's active default message
                 $defaultMessage = \App\Models\AstrologerDefaultMessage::where('astrologer_id', $providerId)
                     ->where('is_default', true)
                     ->first();
 
+                $textMsg = null;
                 if ($defaultMessage) {
                     $personalizedMsg = $this->personalizeDefaultMessage($defaultMessage->content, $consumer, $provider, $session);
                     
@@ -178,15 +191,20 @@ class ChatService
                         'type' => 'text',
                     ]);
 
-                    // Broadcast personalized greeting message to the consumer (user)
-                    broadcast(new \App\Events\MessageSent($textMsg, $session->consumer_id));
                 }
                 
                 // Start billing ticker (delayed by 1 minute)
                 ChatBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
                 
                 $session->refresh();
-                return $session;
+                $session->setRelation('consumer', $consumer);
+                $session->setRelation('provider', $provider->loadMissing('astrologer'));
+
+                return [
+                    'session' => $session,
+                    'system_message' => $systemMessage,
+                    'default_message' => $textMsg,
+                ];
 
             } catch (Exception $e) {
                 Log::error("Chat Acceptance Failed: " . $e->getMessage());
@@ -403,22 +421,26 @@ class ChatService
     {
         return DB::transaction(function () use ($sessionId, $userId) {
             try {
-                $session = $this->chatRepo->findById($sessionId);
+                $session = \App\Models\ChatSession::where('id', $sessionId)->lockForUpdate()->first();
                 if (!$session) {
                     throw new Exception("Chat session not found.");
                 }
 
                 // Security: Only the consumer can cancel their own initiated chat
                 if ($session->consumer_id != $userId) {
-                    throw new Exception("You are not authorized to cancel this chat.");
+                    throw new Exception("You are not authorized to cancel this chat.", 403);
                 }
 
-                if ($session->status !== 'initiated') {
-                    throw new Exception("Only initiated chats can be cancelled.");
+                if (in_array($session->status, ['cancelled', 'rejected', 'completed'])) {
+                    throw new Exception("This chat is already {$session->status}.");
+                }
+
+                if (!in_array($session->status, ['initiated', 'waiting'])) {
+                    throw new Exception("Only initiated or waiting chats can be cancelled.");
                 }
 
                 $this->chatRepo->update($sessionId, [
-                    'status' => 'rejected', // Mark as rejected/cancelled
+                    'status' => 'cancelled',
                     'ended_at' => now(),
                 ]);
 
@@ -453,7 +475,7 @@ class ChatService
                 }
 
                 $this->chatRepo->update($sessionId, [
-                    'status' => 'rejected', // Mark as rejected/cancelled due to timeout
+                    'status' => 'cancelled',
                     'ended_at' => now(),
                 ]);
 
@@ -471,4 +493,3 @@ class ChatService
         });
     }
 }
-

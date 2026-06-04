@@ -126,7 +126,7 @@ All endpoints are prefixed with `/api/v1` and protected by the `auth:sanctum` mi
 ---
 
 ### 1. Initiate Chat Session (User Ringing)
-Users call this endpoint to start a chat request with an astrologer. The system checks if the astrologer is online, if the user has wallet balance for at least 5 minutes of chat, and dispatches a 60-second ringing timeout job.
+Users call this endpoint to start a chat request with an astrologer. The system checks if the astrologer is online, if the user has wallet balance for at least 5 minutes of chat, and dispatches a 120-second ringing timeout job for direct `initiated` chat requests.
 
 *   **Method**: `POST`
 *   **URL**: `/api/v1/chat/initiate`
@@ -169,8 +169,8 @@ Users call this endpoint to start a chat request with an astrologer. The system 
 The Astrologer calls this endpoint to pick up and accept the ringing chat. This transitions the status to `ongoing`, starts the billing ticker, and flags both participants as `is_busy = 1`.
 
 #### 🤖 Automated Flows Triggered Upon Acceptance
-1. **User Profile Sharing**: The system automatically compiles a snapshot of the consumer's latest birth details (Name, Date of Birth, Time of Birth, Place of Birth, Gender, Relationship Status, Occupation, Question) and saves it as a `system` message in the database. This is immediately broadcasted via `MessageSent` to the astrologer's channel.
-2. **Personalized Greeting**: If the astrologer has an active default message template, the system personalizes it using placeholder substitutions (e.g., `{{user_name}}`, `{{astrologer_name}}`, `{{date_of_birth}}`, `{{time_of_birth}}`, `{{place_of_birth}}`, `{{session_id}}`), saves it as a `text` message, and broadcasts it via `MessageSent` to the user's channel.
+1. **User Profile Sharing**: The system automatically compiles a snapshot of the consumer's latest birth details (Name, Date of Birth, Time of Birth, Place of Birth, Gender, Relationship Status, Occupation, Question) and saves it as a `system` message in the database. After `ChatAccepted`, it is broadcast via `MessageSent` to the astrologer's channel.
+2. **Personalized Greeting**: If the astrologer has an active default message template, the system personalizes it using placeholder substitutions (e.g., `{{user_name}}`, `{{astrologer_name}}`, `{{date_of_birth}}`, `{{time_of_birth}}`, `{{place_of_birth}}`, `{{session_id}}`), saves it as a `text` message, and broadcasts it via `MessageSent` to the user's channel immediately after `ChatAccepted`. If no active default template exists, no default text message is created.
 
 *   **Method**: `POST`
 *   **URL**: `/api/v1/chat/{sessionId}/accept`
@@ -214,7 +214,7 @@ The Astrologer calls this endpoint to pick up and accept the ringing chat. This 
 ---
 
 ### 3. Reject Chat Request (Astrologer Declines)
-The Astrologer calls this to reject an initiated chat request, ending the session.
+The Astrologer calls this to reject an initiated or waiting chat request, ending the session with `status = 'rejected'`. After a successful reject, the backend fires the `ChatDismissed` real-time WebSocket event to the consumer/user channel so the user's ringing page, notification state, and floating chat bubble can be closed automatically.
 
 *   **Method**: `POST`
 *   **URL**: `/api/v1/chat/{sessionId}/reject`
@@ -235,7 +235,7 @@ The Astrologer calls this to reject an initiated chat request, ending the sessio
 ---
 
 ### 4. Cancel/Dismiss Chat Request (Consumer side)
-The User (Consumer) calls this endpoint to cancel or dismiss an active ringing request (`status = 'initiated'`) before the astrologer accepts it. The API shifts the status to `'rejected'`, resets the players' availability, and fires the `ChatDismissed` real-time WebSocket event to dismiss the incoming call ringing view on the astrologer's screen. 
+The User (Consumer) calls this endpoint to cancel or dismiss their own active pending chat request (`status = 'initiated'` or `status = 'waiting'`) before the astrologer accepts it. The API validates that the chat belongs to the logged-in user, shifts the status to `'cancelled'`, resets the players' availability, and fires the `ChatDismissed` real-time WebSocket event to the astrologer channel so the incoming request dialog is removed automatically.
 
 *   *Note: If the consumer went offline or closed their app abruptly, the presence system automatically fires this cancellation logic on connection lost to save the astrologer's time.*
 
@@ -249,20 +249,22 @@ The User (Consumer) calls this endpoint to cancel or dismiss an active ringing r
 *   **Response Payload (`200 OK`)**:
     ```json
     {
-        "success": true,
-        "message": "Chat cancelled successfully",
-        "data": {
-            "session": {
-                "id": 50,
-                "consumer_id": 20,
-                "provider_id": 1,
-                "status": "rejected",
-                "rate_per_minute": 15,
-                "ended_at": "2026-05-30T12:00:25.000000Z",
-                "created_at": "2026-05-30T12:00:00.000000Z",
-                "updated_at": "2026-05-30T12:00:25.000000Z"
-            }
-        }
+        "status": "success",
+        "message": "Chat cancelled successfully."
+    }
+    ```
+*   **Response Payload (`403 Forbidden`) — Not Owner**:
+    ```json
+    {
+        "status": "error",
+        "message": "You are not authorized to cancel this chat."
+    }
+    ```
+*   **Response Payload (`400 Bad Request`) — Already Closed**:
+    ```json
+    {
+        "status": "error",
+        "message": "This chat is already cancelled."
     }
     ```
 
@@ -792,6 +794,7 @@ These events are broadcasted over Reverb. When the backend fires an event, Rever
 ### 🔔 2. `ChatAccepted`
 *   **Broadcasts to**: `private-user.{consumer_id}` (User's Channel)
 *   **Fired When**: Astrologer accepts the chat. Transitions the consumer's calling screen to the active chatting UI.
+*   **Important Ordering**: The backend broadcasts `ChatAccepted` first. If a default message exists, the user receives the default greeting afterward via `MessageSent`, so Flutter should open the chat UI on `ChatAccepted` and then append the incoming default message without requiring refresh.
 *   **JSON Event Payload**:
     ```json
     {
@@ -856,7 +859,8 @@ These events are broadcasted over Reverb. When the backend fires an event, Rever
 
 ### 🔔 4. `ChatDismissed`
 *   **Broadcasts to**: `private-user.{receiverId}` (or both private channels if dismissed by system timeout)
-*   **Fired When**: An initiated chat request is explicitly cancelled by the consumer, automatically timed out by the system, or cancelled due to a participant disconnecting or going offline. This is the exact event to listen to for hiding the astrologer's accept/reject dialog box.
+*   **Fired When**: A chat request is cancelled by the consumer, rejected by the astrologer, automatically timed out by the system, or dismissed due to a participant disconnecting/going offline.
+*   **Frontend Rule**: Listen to this event on `private-user.{logged_in_user_id}` and close all pending chat UI for that `session.id`. If the user cancelled, it reaches the astrologer and should close the incoming request dialog. If the astrologer rejected, it reaches the user and should close the ringing page, notification state, and floating chat bubble.
 *   **JSON Event Payload**:
     ```json
     {
@@ -867,14 +871,39 @@ These events are broadcasted over Reverb. When the backend fires an event, Rever
                 "id": 50,
                 "consumer_id": 20,
                 "provider_id": 1,
-                "status": "rejected",
+                "status": "cancelled",
                 "ended_at": "2026-05-30T12:00:25.000000Z"
             },
-            "dismissedById": 20
+            "dismissedById": 20,
+            "reason": "cancelled"
         }
     }
     ```
-    *Note: `dismissedById` will be `null` if the cancellation/dismissal was automatically triggered by the system timeout.*
+    *Note: `dismissedById` is the user id that triggered the dismissal. It will be `null` if the dismissal was automatically triggered by the system timeout.*
+
+---
+
+### 🔔 4A. `ChatQueueUpdated`
+*   **Broadcasts to**: `private-user.{provider_id}` (Astrologer's Channel)
+*   **Fired When**: Chat queue/order state changes after initiate, accept, reject, cancel, timeout, or end.
+*   **Frontend Rule**: Astrologer app should refresh/reload `/api/v1/astrologer/orders?status=waiting&type=chat` when this event arrives, then render the FIFO queue by `queue_position`.
+*   **JSON Event Payload**:
+    ```json
+    {
+        "event": "ChatQueueUpdated",
+        "channel": "private-user.1",
+        "data": {
+            "provider_id": 1,
+            "action": "initiated",
+            "session": {
+                "id": 51,
+                "consumer_id": 21,
+                "provider_id": 1,
+                "status": "waiting"
+            }
+        }
+    }
+    ```
 
 ---
 
@@ -1005,7 +1034,7 @@ Laravel Reverb automatically drops connections after **30 seconds** of inactivit
 
 ### ✅ What to do (Best Practices)
 1.  **Configure automatic reconnection** inside your client options so that the user's connection resumes automatically when toggling between mobile network towers.
-2.  **Graceful Ringing Timeout**: Handle the 60-second unanswered ringing locally on the client to stop the ringing audio, while relying on the backend job `CleanupMissedSessionJob` as a failsafe.
+2.  **Graceful Ringing Timeout**: Handle the 120-second unanswered ringing locally on the client to stop the ringing audio, while relying on the backend job `CleanupMissedSessionJob` as a failsafe. Backend timeout marks the chat as `cancelled` and emits `ChatDismissed` with `reason = "timeout"`.
 3.  **Wallet Lock Gate**: Prevent starting chats if the consumer's wallet is less than `chat_rate_per_minute * 5` to secure astrologers' billable time.
 
 ---
@@ -1087,7 +1116,8 @@ If a user initiates a chat or call session, and the astrologer is dynamically bu
 2. The user sees a clear status: `"Astrologer is currently busy. Your request is in the waiting list."`
 3. The queue priority/position is calculated dynamically by counting older `waiting` sessions for that astrologer.
 4. When the astrologer accepts a waiting session, it transitions to `'ongoing'`.
-5. Concurrency checks with row-level locks prevent an astrologer from accepting multiple concurrent active calls or chats.
+5. FIFO enforcement prevents the astrologer from accepting a newer waiting chat before the oldest waiting chat.
+6. Concurrency checks with row-level locks prevent an astrologer from accepting multiple concurrent active calls or chats.
 
 ### 📥 3. Unified Astrologer Order History / Waiting List API
 Provides a single endpoint for authenticated astrologers to view history and waiting lists.
@@ -1099,7 +1129,7 @@ Provides a single endpoint for authenticated astrologers to view history and wai
     Accept: application/json
     ```
 - **Query Parameters**:
-  - `status` (Optional): Filter by `waiting`, `pending` (initiated), `completed`, `rejected` (cancelled/rejected).
+  - `status` (Optional): Filter by `waiting`, `pending` (initiated), `completed`, `rejected`, or `cancelled`.
   - `type` (Optional): Filter by `chat` or `call`.
   - `per_page` (Optional): Number of records per page (default: 15).
   - `page` (Optional): Paginated page index (default: 1).
@@ -1914,4 +1944,3 @@ These events are broadcasted over Reverb on the `private-user.{id}` channel when
 | `cancelled` | User cancelled before acceptance | Terminal |
 | `missed` | 60-second timeout, no answer | Terminal |
 | `failed` | Technical failure | Terminal |
-
