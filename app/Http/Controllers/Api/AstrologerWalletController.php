@@ -112,4 +112,23 @@ class AstrologerWalletController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get weekly ranking for astrologers based on current week's earnings.
+     */
+    public function weeklyRankings(Request $request): JsonResponse
+    {
+        try {
+            $rankings = $this->walletService->getWeeklyRankings($request->user());
+            return response()->json([
+                'status' => 'success',
+                'data' => $rankings
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch weekly rankings.'
+            ], 500);
+        }
+    }
 }

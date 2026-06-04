@@ -187,3 +187,40 @@ Submits a request to withdraw funds from the wallet balance to a specified activ
         "message": "Insufficient available balance. Your total balance is ₹1000.00, but you have ₹300 in pending withdrawals."
     }
     ```
+
+---
+
+### 5. Weekly Rankings
+Retrieves the top 10 astrologers based on the current week's completed credit earnings. Along with the list, it includes the logged-in astrologer's own current weekly rank and weekly earnings.
+
+* **Method:** `GET`
+* **URL:** `/wallet/weekly-rankings`
+* **Response (Success - 200 OK):**
+  ```json
+  {
+      "status": "success",
+      "data": {
+          "top_astrologers": [
+              {
+                  "rank": 1,
+                  "astrologer_id": 2,
+                  "user_id": 5,
+                  "name": "Astrologer Rajesh",
+                  "profile_photo": "https://yourdomain.com/storage/astrologer_2.jpg",
+                  "weekly_earnings": 500.0
+              },
+              {
+                  "rank": 2,
+                  "astrologer_id": 1,
+                  "user_id": 3,
+                  "name": "Astrologer Vikram",
+                  "profile_photo": null,
+                  "weekly_earnings": 250.0
+              }
+          ],
+          "my_rank": 2,
+          "my_weekly_earnings": 250.0
+      }
+  }
+  ```
+

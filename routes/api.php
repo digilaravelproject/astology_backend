@@ -99,6 +99,7 @@ Route::prefix('v1')->group(function () {
                 Route::get('/earnings', [AstrologerWalletController::class, 'earnings']);
                 Route::get('/withdrawals', [AstrologerWalletController::class, 'withdrawals']);
                 Route::post('/withdraw', [AstrologerWalletController::class, 'withdraw']);
+                Route::get('/weekly-rankings', [AstrologerWalletController::class, 'weeklyRankings']);
             });
 
             // Gallery routes

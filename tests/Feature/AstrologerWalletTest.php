@@ -254,4 +254,67 @@ class AstrologerWalletTest extends TestCase
         $this->assertCount(1, $response->json('data.data'));
         $this->assertEquals('Withdrawal Request', $response->json('data.data.0.description'));
     }
+
+    /** @test */
+    public function it_retrieves_weekly_rankings()
+    {
+        // 1. Setup another astrologer
+        $anotherUser = User::factory()->create(['name' => 'Astrologer Rajesh', 'user_type' => 'astrologer']);
+        $anotherProfile = Astrologer::create(['user_id' => $anotherUser->id]);
+        $anotherWallet = Wallet::create(['user_id' => $anotherUser->id, 'balance' => 2000.00]);
+
+        // Credit another astrologer with completed earning this week
+        DB::table('wallet_transactions')->insert([
+            'wallet_id' => $anotherWallet->id,
+            'transaction_type' => 'credit',
+            'amount' => 500.00,
+            'status' => 'completed',
+            'description' => 'Consultation credit',
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now(),
+        ]);
+
+        // Credit current astrologer with completed earning this week
+        DB::table('wallet_transactions')->insert([
+            'wallet_id' => $this->wallet->id,
+            'transaction_type' => 'credit',
+            'amount' => 250.00,
+            'status' => 'completed',
+            'description' => 'Consultation credit',
+            'created_at' => Carbon::now(),
+            'updated_at' => Carbon::now(),
+        ]);
+
+        // Credit current astrologer with completed earning from LAST week (should be ignored)
+        DB::table('wallet_transactions')->insert([
+            'wallet_id' => $this->wallet->id,
+            'transaction_type' => 'credit',
+            'amount' => 1000.00,
+            'status' => 'completed',
+            'description' => 'Consultation credit old',
+            'created_at' => Carbon::now()->subWeek(),
+            'updated_at' => Carbon::now()->subWeek(),
+        ]);
+
+        $response = $this->actingAs($this->astrologerUser)->getJson('/api/v1/astrologer/wallet/weekly-rankings');
+        $response->assertStatus(200);
+
+        $response->assertJsonStructure([
+            'status',
+            'data' => [
+                'top_astrologers',
+                'my_rank',
+                'my_weekly_earnings',
+            ]
+        ]);
+
+        $data = $response->json('data');
+        $this->assertEquals(2, $data['my_rank']); // Rajesh is #1 with 500, Vikram is #2 with 250
+        $this->assertEquals(250.00, $data['my_weekly_earnings']);
+        $this->assertCount(2, $data['top_astrologers']);
+        $this->assertEquals('Astrologer Rajesh', $data['top_astrologers'][0]['name']);
+        $this->assertEquals(500.00, $data['top_astrologers'][0]['weekly_earnings']);
+        $this->assertEquals('Astrologer Vikram', $data['top_astrologers'][1]['name']);
+        $this->assertEquals(250.00, $data['top_astrologers'][1]['weekly_earnings']);
+    }
 }

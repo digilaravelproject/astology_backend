@@ -175,4 +175,63 @@ class AstrologerWalletService
             'available_balance' => $availableBalance - $amount,
         ];
     }
+
+    /**
+     * Get weekly ranking for astrologers based on completed credit earnings for the current week.
+     */
+    public function getWeeklyRankings(User $user): array
+    {
+        $startOfWeek = Carbon::now()->startOfWeek();
+
+        // Get list of all astrologers and calculate their earnings for the current week
+        $rankings = DB::table('astrologers')
+            ->join('users', 'users.id', '=', 'astrologers.user_id')
+            ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
+            ->leftJoin('wallet_transactions', function($join) use ($startOfWeek) {
+                $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
+                     ->where('wallet_transactions.transaction_type', '=', 'credit')
+                     ->where('wallet_transactions.status', '=', 'completed')
+                     ->where('wallet_transactions.created_at', '>=', $startOfWeek);
+            })
+            ->select(
+                'astrologers.id as astrologer_id',
+                'users.id as user_id',
+                'users.name',
+                'astrologers.profile_photo',
+                DB::raw('COALESCE(SUM(wallet_transactions.amount), 0) as weekly_earnings')
+            )
+            ->groupBy('astrologers.id', 'users.id', 'users.name', 'astrologers.profile_photo')
+            ->orderByDesc('weekly_earnings')
+            ->get();
+
+        // Find the rank and earning of the logged-in user
+        $myRank = null;
+        $myEarnings = 0.00;
+
+        foreach ($rankings as $index => $ranking) {
+            $ranking->weekly_earnings = (float) $ranking->weekly_earnings;
+            if ($ranking->user_id == $user->id) {
+                $myRank = $index + 1;
+                $myEarnings = $ranking->weekly_earnings;
+            }
+        }
+
+        // Return top 10 and my info
+        $top10 = $rankings->take(10)->values()->map(function ($item, $index) {
+            return [
+                'rank' => $index + 1,
+                'astrologer_id' => $item->astrologer_id,
+                'user_id' => $item->user_id,
+                'name' => $item->name,
+                'profile_photo' => $item->profile_photo,
+                'weekly_earnings' => $item->weekly_earnings,
+            ];
+        });
+
+        return [
+            'top_astrologers' => $top10,
+            'my_rank' => $myRank ?? (count($rankings) + 1),
+            'my_weekly_earnings' => $myEarnings,
+        ];
+    }
 }
