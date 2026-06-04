@@ -276,7 +276,7 @@ class AstrologerController extends Controller
             
             // Map common requested terms to db status
             $dbStatusMap = [
-                'waiting' => ['waiting'],
+                'waiting' => ['waiting', 'initiated'],
                 'pending' => ['initiated'],
                 'rejected' => ['rejected'],
                 'cancelled' => ['cancelled'],
