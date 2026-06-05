@@ -14,7 +14,7 @@ trait HasLocalTimezoneSerialization
      */
     protected function serializeDate(DateTimeInterface $date)
     {
-        // Formats as ISO 8601 with the local timezone offset (e.g. +05:30)
-        return $date->format('Y-m-d\TH:i:s.uP');
+        // Formats as Y-m-d H:i:s in local timezone (IST)
+        return $date->format('Y-m-d H:i:s');
     }
 }
