@@ -98,6 +98,7 @@ class DashboardController extends Controller
                 ->orderByDesc('updated_at')
                 ->take(5)
                 ->get()
+                ->toBase()
                 ->map(function ($session) {
                     return [
                         'id' => 'CALL-' . $session->id,
@@ -116,6 +117,7 @@ class DashboardController extends Controller
                 ->orderByDesc('updated_at')
                 ->take(5)
                 ->get()
+                ->toBase()
                 ->map(function ($session) {
                     return [
                         'id' => 'CHAT-' . $session->id,

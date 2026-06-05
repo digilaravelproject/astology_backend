@@ -19,6 +19,7 @@ class OrderController extends Controller
             $calls = CallSession::with(['consumer', 'provider'])
                 ->orderByDesc('created_at')
                 ->get()
+                ->toBase()
                 ->map(function ($session) {
                     return [
                         'id' => 'CALL-' . $session->id,
@@ -42,6 +43,7 @@ class OrderController extends Controller
             $chats = ChatSession::with(['consumer', 'provider'])
                 ->orderByDesc('created_at')
                 ->get()
+                ->toBase()
                 ->map(function ($session) {
                     return [
                         'id' => 'CHAT-' . $session->id,
@@ -175,7 +177,7 @@ class OrderController extends Controller
             ? ChatSession::select('provider_id', 'status', 'total_cost', 'created_at')->get()
             : collect();
 
-        $allSessions = $callSessions->merge($chatSessions);
+        $allSessions = $callSessions->toBase()->merge($chatSessions->toBase());
         $providers = User::where('user_type', 'astrologer')->orderBy('name')->get();
 
         $astrologers = $providers->map(function ($provider) use ($allSessions) {
@@ -224,6 +226,7 @@ class OrderController extends Controller
                 ->where('provider_id', $provider->id)
                 ->orderByDesc('created_at')
                 ->get()
+                ->toBase()
                 ->map(function ($session) {
                     return [
                         'id' => 'CALL-' . $session->id,
@@ -247,6 +250,7 @@ class OrderController extends Controller
                 ->where('provider_id', $provider->id)
                 ->orderByDesc('created_at')
                 ->get()
+                ->toBase()
                 ->map(function ($session) {
                     return [
                         'id' => 'CHAT-' . $session->id,
