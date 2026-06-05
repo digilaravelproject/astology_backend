@@ -370,14 +370,14 @@ class ChatService
         }
 
         return \App\Models\Message::where('chat_session_id', $sessionId)
-            ->latest()
+            ->oldest()
             ->paginate(30);
     }
 
     public function getMessages($sessionId)
     {
         return \App\Models\Message::where('chat_session_id', $sessionId)
-            ->latest()
+            ->oldest()
             ->paginate(30);
     }
 
