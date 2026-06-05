@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasLocalTimezoneSerialization;
 
 class Message extends Model
 {
+    use HasLocalTimezoneSerialization;
+
     protected $fillable = [
         'chat_session_id',
         'sender_id',

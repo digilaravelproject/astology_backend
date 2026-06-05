@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Traits\HasLocalTimezoneSerialization;
 
 class LiveSession extends Model
 {
+    use HasLocalTimezoneSerialization;
     /**
      * The attributes that are mass assignable.
      */
