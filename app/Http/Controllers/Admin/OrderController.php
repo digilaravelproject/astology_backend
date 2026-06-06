@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 
 class OrderController extends Controller
 {
@@ -113,58 +114,83 @@ class OrderController extends Controller
             ? round($validated['amount'] / max(1, ceil($validated['duration_seconds'] / 60)), 2)
             : 0;
 
-        if ($validated['type'] === 'call') {
-            $session = CallSession::create([
-                'consumer_id' => $validated['consumer_id'],
-                'provider_id' => $validated['provider_id'],
-                'status' => $validated['status'],
-                'started_at' => $validated['started_at'] ?? now(),
-                'ended_at' => $validated['status'] === 'completed' ? now() : null,
-                'duration_seconds' => $validated['duration_seconds'],
-                'rate_per_minute' => $validated['rate_per_minute'],
-                'total_cost' => $validated['total_cost'],
-            ]);
-        } else {
-            $session = ChatSession::create([
-                'consumer_id' => $validated['consumer_id'],
-                'provider_id' => $validated['provider_id'],
-                'status' => $validated['status'],
-                'started_at' => $validated['started_at'] ?? now(),
-                'ended_at' => $validated['status'] === 'completed' ? now() : null,
-                'duration_seconds' => $validated['duration_seconds'],
-                'rate_per_minute' => $validated['rate_per_minute'],
-                'total_cost' => $validated['total_cost'],
-            ]);
-        }
+        try {
+            if ($validated['type'] === 'call') {
+                $session = CallSession::create([
+                    'consumer_id' => $validated['consumer_id'],
+                    'provider_id' => $validated['provider_id'],
+                    'status' => $validated['status'],
+                    'started_at' => $validated['started_at'] ?? now(),
+                    'ended_at' => $validated['status'] === 'completed' ? now() : null,
+                    'duration_seconds' => $validated['duration_seconds'],
+                    'rate_per_minute' => $validated['rate_per_minute'],
+                    'total_cost' => $validated['total_cost'],
+                ]);
+            } else {
+                $session = ChatSession::create([
+                    'consumer_id' => $validated['consumer_id'],
+                    'provider_id' => $validated['provider_id'],
+                    'status' => $validated['status'],
+                    'started_at' => $validated['started_at'] ?? now(),
+                    'ended_at' => $validated['status'] === 'completed' ? now() : null,
+                    'duration_seconds' => $validated['duration_seconds'],
+                    'rate_per_minute' => $validated['rate_per_minute'],
+                    'total_cost' => $validated['total_cost'],
+                ]);
+            }
 
-        return redirect()->route('admin.orders.index')->with('success', 'Order created successfully.');
+            return redirect()->route('admin.orders.index')->with('success', 'Order created successfully.');
+        } catch (\Exception $e) {
+            Log::error('Order creation failed: ' . $e->getMessage(), ['validated' => $validated]);
+            return redirect()->back()->withInput()->with('error', 'Failed to create order: ' . $e->getMessage());
+        }
     }
 
     public function show($type, $id)
     {
-        $session = $this->findOrder($type, $id);
-
-        if (!$session) {
+        // Validate the type parameter to prevent injection attacks
+        if (!in_array($type, ['call', 'chat'])) {
             abort(404);
         }
 
-        return view('admin.orders.show', [
-            'order' => $this->buildOrderData($session, $type),
-            'type' => $type,
-        ]);
+        try {
+            $session = $this->findOrder($type, $id);
+
+            if (!$session) {
+                abort(404);
+            }
+
+            return view('admin.orders.show', [
+                'order' => $this->buildOrderData($session, $type),
+                'type' => $type,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Order show failed: ' . $e->getMessage(), ['type' => $type, 'id' => $id]);
+            return redirect()->route('admin.orders.index')->with('error', 'Order not found or invalid.');
+        }
     }
 
     public function destroy($type, $id)
     {
-        $session = $this->findOrder($type, $id);
-
-        if (!$session) {
-            return redirect()->route('admin.orders.index')->with('error', 'Order not found.');
+        // Validate the type parameter to prevent injection attacks
+        if (!in_array($type, ['call', 'chat'])) {
+            return redirect()->route('admin.orders.index')->with('error', 'Invalid order type.');
         }
 
-        $session->delete();
+        try {
+            $session = $this->findOrder($type, $id);
 
-        return redirect()->route('admin.orders.index')->with('success', 'Order deleted successfully.');
+            if (!$session) {
+                return redirect()->route('admin.orders.index')->with('error', 'Order not found.');
+            }
+
+            $session->delete();
+
+            return redirect()->route('admin.orders.index')->with('success', 'Order deleted successfully.');
+        } catch (\Exception $e) {
+            Log::error('Order delete failed: ' . $e->getMessage(), ['type' => $type, 'id' => $id]);
+            return redirect()->route('admin.orders.index')->with('error', 'Failed to delete order.');
+        }
     }
 
     public function byAstrologer(Request $request)
@@ -245,7 +271,7 @@ class OrderController extends Controller
         }
 
         $chats = collect();
-        if (Schema::hasTable('chat_sessions')) {
+        if (Schema之位('chat_sessions')) {
             $chats = ChatSession::with(['consumer', 'provider'])
                 ->where('provider_id', $provider->id)
                 ->orderByDesc('created_at')

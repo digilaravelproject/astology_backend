@@ -25,6 +25,14 @@ class ChatController extends Controller
         $this->chatService = $chatService;
     }
 
+    /**
+     * Sanitize user input to prevent XSS attacks
+     */
+    protected function sanitize(string $text): string
+    {
+        return strip_tags($text);
+    }
+
     public function initiateChat(Request $request)
     {
         $request->validate([
@@ -151,11 +159,14 @@ class ChatController extends Controller
                 return ApiResponse::error('Unauthorized participation in this session', 403);
             }
 
+            // Sanitize message to prevent XSS
+            $sanitizedMessage = $request->message ? $this->sanitize($request->message) : null;
+
             $message = Message::create([
                 'chat_session_id' => $sessionId,
                 'sender_id' => $userId,
                 'receiver_id' => $receiverId,
-                'message' => $request->message,
+                'message' => $sanitizedMessage,
                 'attachment_url' => $request->attachment_url,
                 'type' => $request->type ?? 'text',
             ]);

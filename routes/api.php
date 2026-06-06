@@ -45,15 +45,15 @@ Route::prefix('v1')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('astrologer')->group(function () {
-        Route::post('/signup', [AstrologerAuthController::class, 'signup']);
-        Route::post('/send-otp', [AstrologerAuthController::class, 'sendOtp']);
-        Route::post('/verify-otp', [AstrologerAuthController::class, 'verifyOtp']);
-        Route::post('/resend-otp', [AstrologerAuthController::class, 'resendOtp']);
-        Route::get('/profile/{userId}', [AstrologerAuthController::class, 'getProfile']);
-        Route::get('/training-videos', [TrainingVideoController::class, 'index']);
-        Route::get('/training-videos/{id}', [TrainingVideoController::class, 'show']);
+        Route::post('/signup', [AstrologerAuthController::class, 'signup'])->middleware('throttle:auth');
+        Route::post('/send-otp', [AstrologerAuthController::class, 'sendOtp'])->middleware('throttle:otp');
+        Route::post('/verify-otp', [AstrologerAuthController::class, 'verifyOtp'])->middleware('throttle:otp');
+        Route::post('/resend-otp', [AstrologerAuthController::class, 'resendOtp'])->middleware('throttle:otp');
+        Route::get('/profile/{userId}', [AstrologerAuthController::class, 'getProfile'])->middleware('throttle:general');
+        Route::get('/training-videos', [TrainingVideoController::class, 'index'])->middleware('throttle:general');
+        Route::get('/training-videos/{id}', [TrainingVideoController::class, 'show'])->middleware('throttle:general');
 
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
             Route::get('/orders', [AstrologerController::class, 'getOrders']);
             
             Route::prefix('default-messages')->group(function () {
@@ -130,34 +130,34 @@ Route::prefix('v1')->group(function () {
     | USER (CONSUMER) ROUTES
     |--------------------------------------------------------------------------
     */
-    Route::get('/gifts', [GiftController::class, 'index']);
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/gifts', [GiftController::class, 'index'])->middleware('throttle:general');
+    Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
         Route::post('/gifts/send', [GiftController::class, 'send']);
         Route::get('/astrologers/{id}/gifts', [GiftController::class, 'astrologerGifts']);
     });
 
     Route::prefix('user')->group(function () {
-        Route::post('/send-otp', [UserAuthController::class, 'sendOtp']);
-        Route::post('/verify-otp', [UserAuthController::class, 'verifyOtp']);
-        Route::post('/resend-otp', [UserAuthController::class, 'resendOtp']);
-        Route::get('/profile/{userId}', [UserAuthController::class, 'getProfile']);
-        Route::put('/profile/{userId}', [UserAuthController::class, 'updateProfile']); 
+        Route::post('/send-otp', [UserAuthController::class, 'sendOtp'])->middleware('throttle:otp');
+        Route::post('/verify-otp', [UserAuthController::class, 'verifyOtp'])->middleware('throttle:otp');
+        Route::post('/resend-otp', [UserAuthController::class, 'resendOtp'])->middleware('throttle:otp');
+        Route::get('/profile/{userId}', [UserAuthController::class, 'getProfile'])->middleware('throttle:general');
+        Route::put('/profile/{userId}', [UserAuthController::class, 'updateProfile'])->middleware('throttle:general'); 
 
-        Route::get('/founders-words', [FoundersWordController::class, 'index']);
-        Route::get('/founders-words/{id}', [FoundersWordController::class, 'show']);
-        Route::get('/remedies', [RemedyController::class, 'index']);
-        Route::get('/remedies/{id}', [RemedyController::class, 'show']);
-        Route::get('/blogs', [BlogController::class, 'index']);
-        Route::get('/blogs/search', [BlogController::class, 'search']);
-        Route::get('/blogs/{id}', [BlogController::class, 'show']);
-        Route::get('/notices', [NoticeController::class, 'index']);
-        Route::get('/astrologers', [AstrologerController::class, 'index']);
-        Route::get('/astrologers/{id}', [AstrologerController::class, 'show']);
-        Route::get('/reviews', [ReviewController::class, 'index']);
-        Route::middleware('auth:sanctum')->get('/plans', [PlanController::class, 'index']);
-        Route::get('/plans/{plan}', [PlanController::class, 'show']);
+        Route::get('/founders-words', [FoundersWordController::class, 'index'])->middleware('throttle:general');
+        Route::get('/founders-words/{id}', [FoundersWordController::class, 'show'])->middleware('throttle:general');
+        Route::get('/remedies', [RemedyController::class, 'index'])->middleware('throttle:general');
+        Route::get('/remedies/{id}', [RemedyController::class, 'show'])->middleware('throttle:general');
+        Route::get('/blogs', [BlogController::class, 'index'])->middleware('throttle:general');
+        Route::get('/blogs/search', [BlogController::class, 'search'])->middleware('throttle:general');
+        Route::get('/blogs/{id}', [BlogController::class, 'show'])->middleware('throttle:general');
+        Route::get('/notices', [NoticeController::class, 'index'])->middleware('throttle:general');
+        Route::get('/astrologers', [AstrologerController::class, 'index'])->middleware('throttle:general');
+        Route::get('/astrologers/{id}', [AstrologerController::class, 'show'])->middleware('throttle:general');
+        Route::get('/reviews', [ReviewController::class, 'index'])->middleware('throttle:general');
+        Route::middleware(['auth:sanctum', 'throttle:tiered'])->get('/plans', [PlanController::class, 'index']);
+        Route::get('/plans/{plan}', [PlanController::class, 'show'])->middleware('throttle:general');
 
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
             Route::put('/profileInAppUpdate', [UserAuthController::class, 'updateInAppProfile']);
             Route::post('/profile/photo', [UserAuthController::class, 'updateProfilePhoto']);
             Route::post('/astrologers/{id}/follow', [UserAuthController::class, 'toggleFollowAstrologer']);
@@ -201,9 +201,9 @@ Route::prefix('v1')->group(function () {
             'user' => $request->user() ? $request->user()->id : 'GUEST'
         ]);
         return Broadcast::auth($request);
-    })->middleware('auth:sanctum');
+    })->middleware(['auth:sanctum', 'throttle:auth']);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
         Route::post('/presence/pulse', [PresenceController::class, 'pulse']);
         Route::post('/presence/offline', [PresenceController::class, 'offline']);
 
@@ -246,23 +246,23 @@ Route::prefix('v1')->group(function () {
     | STATIC PAGES
     |--------------------------------------------------------------------------
     */
-    Route::get('/static-pages', [StaticPageController::class, 'index']);
-    Route::get('/static-pages/{type}', [StaticPageController::class, 'show']);
-    Route::get('/faqs', [StaticPageController::class, 'getFaqs']);
-    Route::get('/privacy-policy', [StaticPageController::class, 'getPrivacyPolicy']);
-    Route::get('/terms-and-conditions', [StaticPageController::class, 'getTermsAndConditions']);
-    Route::get('/payment-policy', [StaticPageController::class, 'getPaymentPolicy']);
-    Route::get('/about-us', [StaticPageController::class, 'getAboutUs']);
-    Route::get('/customer-support', [StaticPageController::class, 'getCustomerSupport']);
+    Route::get('/static-pages', [StaticPageController::class, 'index'])->middleware('throttle:general');
+    Route::get('/static-pages/{type}', [StaticPageController::class, 'show'])->middleware('throttle:general');
+    Route::get('/faqs', [StaticPageController::class, 'getFaqs'])->middleware('throttle:general');
+    Route::get('/privacy-policy', [StaticPageController::class, 'getPrivacyPolicy'])->middleware('throttle:general');
+    Route::get('/terms-and-conditions', [StaticPageController::class, 'getTermsAndConditions'])->middleware('throttle:general');
+    Route::get('/payment-policy', [StaticPageController::class, 'getPaymentPolicy'])->middleware('throttle:general');
+    Route::get('/about-us', [StaticPageController::class, 'getAboutUs'])->middleware('throttle:general');
+    Route::get('/customer-support', [StaticPageController::class, 'getCustomerSupport'])->middleware('throttle:general');
 
     /*
     |--------------------------------------------------------------------------
     | FEEDBACK
     |--------------------------------------------------------------------------
     */
-    Route::post('/feedback', [FeedbackController::class, 'store'])->middleware('auth:sanctum');
-    Route::get('/feedbacks', [FeedbackController::class, 'index']);
-    Route::get('/feedbacks/{id}', [FeedbackController::class, 'show']);
+    Route::post('/feedback', [FeedbackController::class, 'store'])->middleware(['auth:sanctum', 'throttle:general']);
+    Route::get('/feedbacks', [FeedbackController::class, 'index'])->middleware('throttle:general');
+    Route::get('/feedbacks/{id}', [FeedbackController::class, 'show'])->middleware('throttle:general');
 
     /*
     |--------------------------------------------------------------------------
@@ -270,11 +270,11 @@ Route::prefix('v1')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('kundli')->group(function () {
-        Route::post('/create', [KundliController::class, 'store']);
-        Route::get('/', [KundliController::class, 'index']);
-        Route::get('/{id}', [KundliController::class, 'show']);
-        Route::put('/{id}', [KundliController::class, 'update']);
-        Route::delete('/{id}', [KundliController::class, 'destroy']);
+        Route::post('/create', [KundliController::class, 'store'])->middleware('throttle:general');
+        Route::get('/', [KundliController::class, 'index'])->middleware('throttle:general');
+        Route::get('/{id}', [KundliController::class, 'show'])->middleware('throttle:general');
+        Route::put('/{id}', [KundliController::class, 'update'])->middleware('throttle:general');
+        Route::delete('/{id}', [KundliController::class, 'destroy'])->middleware('throttle:general');
     });
 
 });

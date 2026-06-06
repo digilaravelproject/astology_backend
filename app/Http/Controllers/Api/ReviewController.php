@@ -13,6 +13,14 @@ use Illuminate\Http\Request;
 class ReviewController extends Controller
 {
     /**
+     * Strip HTML tags from user input to prevent XSS
+     */
+    protected function sanitizeInput(string $text): string
+    {
+        return strip_tags($text);
+    }
+
+    /**
      * Store a new astrologer review by authenticated user.
      */
     public function store(Request $request)
@@ -25,11 +33,14 @@ class ReviewController extends Controller
 
         $user = $request->user();
 
+        // Sanitize review text to prevent XSS
+        $sanitizedReview = $this->sanitizeInput($validated['review']);
+
         $review = AstrologerReview::create([
             'astrologer_id' => $validated['astrologer_id'],
             'user_id' => $user->id,
             'rating' => $validated['rating'],
-            'review' => $validated['review'],
+            'review' => $sanitizedReview,
         ]);
 
         // Notify astrologer about new review
@@ -83,7 +94,8 @@ class ReviewController extends Controller
             ], 403);
         }
 
-        $review->reply = $validated['reply'];
+        // Sanitize reply text to prevent XSS
+        $review->reply = $this->sanitizeInput($validated['reply']);
         $review->reply_at = Carbon::now();
         $review->save();
 
