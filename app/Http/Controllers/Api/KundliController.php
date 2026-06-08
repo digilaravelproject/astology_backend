@@ -11,11 +11,6 @@ use Illuminate\Validation\ValidationException;
 
 class KundliController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
     /**
      * Create a new Kundli
      */

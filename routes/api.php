@@ -269,7 +269,7 @@ Route::prefix('v1')->group(function () {
     | KUNDLI (BIRTH CHART)
     |--------------------------------------------------------------------------
     */
-    Route::prefix('kundli')->group(function () {
+    Route::prefix('kundli')->middleware(['auth:sanctum'])->group(function () {
         Route::post('/create', [KundliController::class, 'store'])->middleware('throttle:general');
         Route::get('/', [KundliController::class, 'index'])->middleware('throttle:general');
         Route::get('/{id}', [KundliController::class, 'show'])->middleware('throttle:general');
