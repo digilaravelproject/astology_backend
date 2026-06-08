@@ -67,9 +67,9 @@ Route::prefix('admin')->group(function () {
             Route::delete('/{id}', [\App\Http\Controllers\Admin\LiveSessionController::class, 'destroy'])->name('admin.astrologers.live-sessions.destroy');
         });
 
-        Route::resource('astrologers', \App\Http\Controllers\Admin\AstrologerController::class)->names('admin.astrologers');
         Route::get('astrologers/pricing', [\App\Http\Controllers\Admin\AstrologerPricingController::class, 'index'])->name('admin.astrologers.pricing');
         Route::post('astrologers/pricing', [\App\Http\Controllers\Admin\AstrologerPricingController::class, 'update'])->name('admin.astrologers.pricing.update');
+        Route::resource('astrologers', \App\Http\Controllers\Admin\AstrologerController::class)->names('admin.astrologers');
 
         // Order Management
         Route::prefix('orders')->group(function() {
