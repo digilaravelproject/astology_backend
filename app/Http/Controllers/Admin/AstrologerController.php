@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Astrologer;
 use App\Models\User;
 use App\Models\AstrologerBillingAddress;
+use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -99,11 +100,11 @@ class AstrologerController extends Controller
             'chat_enabled' => $request->has('chat_enabled'),
             'call_enabled' => $request->has('call_enabled'),
             'video_call_enabled' => $request->has('video_call_enabled'),
-            'chat_rate_per_minute' => $request->input('chat_rate_per_minute'),
-            'call_rate_per_minute' => $request->input('call_rate_per_minute'),
-            'video_call_rate_per_minute' => $request->input('video_call_rate_per_minute'),
+            'chat_rate_per_minute' => $request->input('chat_rate_per_minute') ?? Setting::get('default_chat_rate_per_minute', 15.00),
+            'call_rate_per_minute' => $request->input('call_rate_per_minute') ?? Setting::get('default_call_rate_per_minute', 15.00),
+            'video_call_rate_per_minute' => $request->input('video_call_rate_per_minute') ?? Setting::get('default_video_call_rate_per_minute', 15.00),
             'po_at_5_enabled' => $request->has('po_at_5_enabled'),
-            'po_at_5_rate_per_minute' => $request->input('po_at_5_rate_per_minute'),
+            'po_at_5_rate_per_minute' => $request->input('po_at_5_rate_per_minute') ?? Setting::get('default_po_at_5_rate_per_minute', 5.00),
             'po_at_5_sessions' => $request->input('po_at_5_sessions'),
         ];
 
@@ -194,11 +195,11 @@ class AstrologerController extends Controller
             'chat_enabled' => $request->has('chat_enabled'),
             'call_enabled' => $request->has('call_enabled'),
             'video_call_enabled' => $request->has('video_call_enabled'),
-            'chat_rate_per_minute' => $request->input('chat_rate_per_minute'),
-            'call_rate_per_minute' => $request->input('call_rate_per_minute'),
-            'video_call_rate_per_minute' => $request->input('video_call_rate_per_minute'),
+            'chat_rate_per_minute' => $request->input('chat_rate_per_minute') ?? Setting::get('default_chat_rate_per_minute', 15.00),
+            'call_rate_per_minute' => $request->input('call_rate_per_minute') ?? Setting::get('default_call_rate_per_minute', 15.00),
+            'video_call_rate_per_minute' => $request->input('video_call_rate_per_minute') ?? Setting::get('default_video_call_rate_per_minute', 15.00),
             'po_at_5_enabled' => $request->has('po_at_5_enabled'),
-            'po_at_5_rate_per_minute' => $request->input('po_at_5_rate_per_minute'),
+            'po_at_5_rate_per_minute' => $request->input('po_at_5_rate_per_minute') ?? Setting::get('default_po_at_5_rate_per_minute', 5.00),
             'po_at_5_sessions' => $request->input('po_at_5_sessions'),
         ];
 

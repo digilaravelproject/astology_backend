@@ -15,6 +15,7 @@ use App\Models\Astrologer;
 use App\Models\AstrologerPhoneNumber;
 use App\Models\AstrologerBankAccount;
 use App\Models\AstrologerBillingAddress;
+use App\Models\Setting;
 use App\Services\NotificationHelper;
 use App\Models\AstrologerSkill;
 use App\Models\AstrologerOtherDetail;
@@ -142,7 +143,7 @@ class AstrologerAuthController extends Controller
                 throw new \Exception('Invalid languages provided.');
             }
 
-            // Step 5: Create astrologer profile record
+            // Step 5: Create astrologer profile record with default pricing
             $astrologer = Astrologer::create([
                 'user_id' => $user->id,
                 'years_of_experience' => $validated['years_of_experience'],
@@ -154,7 +155,11 @@ class AstrologerAuthController extends Controller
                 'certificate' => $uploadedFiles['certificate'],
                 'id_proof_number' => $validated['id_proof_number'],
                 'date_of_birth' => $validated['date_of_birth'],
-                'status' => 'pending', // Initial status is pending
+                'status' => 'pending',
+                'chat_rate_per_minute' => Setting::get('default_chat_rate_per_minute', 15.00),
+                'call_rate_per_minute' => Setting::get('default_call_rate_per_minute', 15.00),
+                'video_call_rate_per_minute' => Setting::get('default_video_call_rate_per_minute', 15.00),
+                'po_at_5_rate_per_minute' => Setting::get('default_po_at_5_rate_per_minute', 5.00),
             ]);
 
             // Generate Sanctum personal access token (plain token returned to client)

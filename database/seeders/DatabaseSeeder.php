@@ -27,5 +27,6 @@ class DatabaseSeeder extends Seeder
         $this->call(NoticeSeeder::class);
         $this->call(SubscriptionTestSeeder::class);
         $this->call(WebRTCDemoSeeder::class);
+        $this->call(SettingSeeder::class);
     }
 }

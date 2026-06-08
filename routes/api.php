@@ -196,10 +196,6 @@ Route::prefix('v1')->group(function () {
     */
     // Public/Debug Broadcast Auth (Move inside v1 group)
     Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
-        \Illuminate\Support\Facades\Log::info("DEBUG Broadcast Auth Attempt", [
-            'channel' => $request->channel_name,
-            'user' => $request->user() ? $request->user()->id : 'GUEST'
-        ]);
         return Broadcast::auth($request);
     })->middleware(['auth:sanctum', 'throttle:auth']);
 

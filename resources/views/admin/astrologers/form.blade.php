@@ -1,5 +1,13 @@
 @extends('admin.layouts.app')
 
+@php
+    use App\Models\Setting;
+    $defaultChatRate = Setting::get('default_chat_rate_per_minute', 15.00);
+    $defaultCallRate = Setting::get('default_call_rate_per_minute', 15.00);
+    $defaultVideoRate = Setting::get('default_video_call_rate_per_minute', 15.00);
+    $defaultPoAt5Rate = Setting::get('default_po_at_5_rate_per_minute', 5.00);
+@endphp
+
 @section('content')
 <!-- Page Header -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
@@ -206,7 +214,7 @@
                         <div class="space-y-2">
                             <label for="chat_rate_per_minute" class="block text-xs font-semibold text-gray-dark">Chat Rate (₹/min)</label>
                             <input type="number" id="chat_rate_per_minute" name="chat_rate_per_minute" step="0.01" min="0"
-                                   value="{{ old('chat_rate_per_minute', optional($user)->astrologer?->chat_rate_per_minute ?? '') }}"
+                                    value="{{ old('chat_rate_per_minute', optional($user)->astrologer?->chat_rate_per_minute ?? $defaultChatRate) }}"
                                    class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
                             @error('chat_rate_per_minute') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
@@ -214,7 +222,7 @@
                         <div class="space-y-2">
                             <label for="call_rate_per_minute" class="block text-xs font-semibold text-gray-dark">Call Rate (₹/min)</label>
                             <input type="number" id="call_rate_per_minute" name="call_rate_per_minute" step="0.01" min="0"
-                                   value="{{ old('call_rate_per_minute', optional($user)->astrologer?->call_rate_per_minute ?? '') }}"
+                                    value="{{ old('call_rate_per_minute', optional($user)->astrologer?->call_rate_per_minute ?? $defaultCallRate) }}"
                                    class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
                             @error('call_rate_per_minute') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
@@ -224,7 +232,7 @@
                         <div class="space-y-2">
                             <label for="video_call_rate_per_minute" class="block text-xs font-semibold text-gray-dark">Video Call Rate (₹/min)</label>
                             <input type="number" id="video_call_rate_per_minute" name="video_call_rate_per_minute" step="0.01" min="0"
-                                   value="{{ old('video_call_rate_per_minute', optional($user)->astrologer?->video_call_rate_per_minute ?? '') }}"
+                                    value="{{ old('video_call_rate_per_minute', optional($user)->astrologer?->video_call_rate_per_minute ?? $defaultVideoRate) }}"
                                    class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
                             @error('video_call_rate_per_minute') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
@@ -232,7 +240,7 @@
                         <div class="space-y-2">
                             <label for="po_at_5_rate_per_minute" class="block text-xs font-semibold text-gray-dark">PO at ₹5 Rate (₹/min)</label>
                             <input type="number" id="po_at_5_rate_per_minute" name="po_at_5_rate_per_minute" step="0.01" min="0"
-                                   value="{{ old('po_at_5_rate_per_minute', optional($user)->astrologer?->po_at_5_rate_per_minute ?? '') }}"
+                                    value="{{ old('po_at_5_rate_per_minute', optional($user)->astrologer?->po_at_5_rate_per_minute ?? $defaultPoAt5Rate) }}"
                                    class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
                             @error('po_at_5_rate_per_minute') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
