@@ -83,8 +83,9 @@ class AstrologerController extends Controller
 
             if ($isOnline !== null && in_array((string) $isOnline, ['0', '1'], true)) {
                 if ((int) $isOnline === 1) {
-                    $query->whereHas('user', function ($query) {
-                        $query->where('is_online', true);
+                    $query->where(function ($query) {
+                        $query->where('is_chat_enabled', true)
+                              ->orWhere('is_call_enabled', true);
                     });
                 }
             }
@@ -130,8 +131,10 @@ class AstrologerController extends Controller
                 $avgRating = $astrologer->reviews_avg_rating;
                 $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
                 
-                // Get real online status from astrologers table
-                $astrologer->is_online = (bool) $astrologer->is_online;
+                // Get availability flags from astrologers table
+                $astrologer->is_online = (bool) ($astrologer->is_chat_enabled || $astrologer->is_call_enabled);
+                $astrologer->is_chat_enabled = (bool) $astrologer->is_chat_enabled;
+                $astrologer->is_call_enabled = (bool) $astrologer->is_call_enabled;
 
                 // Dynamic busy check
                 $isBusy = in_array($astrologer->user_id, $busyProviderIds);

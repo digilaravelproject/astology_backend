@@ -40,9 +40,9 @@ class CallService
                 // Eager load provider and astrologer details to prevent N+1
                 $provider = User::with('astrologer')->lockForUpdate()->findOrFail($providerId);
                 
-                $isOnline = $provider->is_online || ($provider->astrologer && $provider->astrologer->is_online);
-                if (!$isOnline) {
-                    throw new Exception("Astrologer is currently offline.");
+                $astrologer = $provider->astrologer;
+                if (!$astrologer || !$astrologer->is_call_enabled) {
+                    throw new Exception("Astrologer is not available for calls.");
                 }
 
                 // Dynamic busy status check

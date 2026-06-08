@@ -1657,7 +1657,11 @@ class AstrologerAuthController extends Controller
             $displayName = 'Video Call';
         } else {
             // Default: Toggle is_online status (when type is not provided)
-            $astrologer->is_online = !$astrologer->is_online;
+            $newOnlineStatus = !$astrologer->is_online;
+            $astrologer->is_online = $newOnlineStatus;
+            // Sync chat/call enabled flags with general online status for backward compatibility
+            $astrologer->is_chat_enabled = $newOnlineStatus;
+            $astrologer->is_call_enabled = $newOnlineStatus;
             $fieldName = 'is_online';
             $displayName = 'Online';
         }

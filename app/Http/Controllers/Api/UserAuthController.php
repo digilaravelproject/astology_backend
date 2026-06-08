@@ -647,8 +647,10 @@ class UserAuthController extends Controller
                     ->avg('rating');
                 $avgRatingValue = $avgRating ? (float) number_format($avgRating, 2) : 0;
                 
-                // Get real online status from astrologers table
-                $isOnline = (bool) $astrologer->is_online;
+                // Get availability flags from astrologers table
+                $isChatEnabled = (bool) $astrologer->is_chat_enabled;
+                $isCallEnabled = (bool) $astrologer->is_call_enabled;
+                $isOnline = $isChatEnabled || $isCallEnabled;
                 
                 return [
                     'astrologer_id' => $astrologer->id,
@@ -664,6 +666,8 @@ class UserAuthController extends Controller
                     'status' => $astrologer->status,
                     'avg_rating' => $avgRatingValue,
                     'is_online' => $isOnline ? 1 : 0,
+                    'is_chat_enabled' => $isChatEnabled ? 1 : 0,
+                    'is_call_enabled' => $isCallEnabled ? 1 : 0,
                     'followed_at' => $record->liked_at,
                     'created_at' => $record->created_at,
                 ];
