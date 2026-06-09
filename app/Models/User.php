@@ -56,7 +56,6 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
-        'profile_photo',
     ];
 
     /**
@@ -83,7 +82,7 @@ class User extends Authenticatable
         ];
     }
 
-    protected $appends = ['profile_photo_url'];
+    protected $appends = [];
 
     public function getProfilePhotoUrlAttribute(): ?string
     {
