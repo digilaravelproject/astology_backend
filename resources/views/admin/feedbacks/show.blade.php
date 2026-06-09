@@ -32,7 +32,7 @@
                     <div class="flex items-start gap-4 mb-8">
                         <div class="w-20 h-20 rounded-full bg-light border border-gray-lighter flex items-center justify-center overflow-hidden flex-shrink-0">
                             @if($feedback->user->profile_photo)
-                                <img src="{{ $feedback->user->profile_photo }}" alt="" class="w-full h-full object-cover">
+                                <img src="{{ $feedback->user->profile_photo_url }}" alt="" class="w-full h-full object-cover">
                             @else
                                 <i class="fas fa-user text-primary text-2xl"></i>
                             @endif

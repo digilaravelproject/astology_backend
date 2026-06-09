@@ -87,7 +87,7 @@ class GiftController extends Controller
         ]);
 
         if ($request->hasFile('icon_file')) {
-            $this->deleteStoragePath($gift->icon_url);
+            $this->deleteStoragePath($gift->getRawOriginal('icon_url'));
             $data['icon_url'] = $this->storeFile($request->file('icon_file'), 'gifts/icons');
         }
 
@@ -102,7 +102,7 @@ class GiftController extends Controller
     public function destroy($id)
     {
         $gift = Gift::findOrFail($id);
-        $this->deleteStoragePath($gift->icon_url);
+        $this->deleteStoragePath($gift->getRawOriginal('icon_url'));
         $gift->delete();
 
         return redirect()->route('admin.gifts.index')->with('success', 'Gift deleted successfully.');

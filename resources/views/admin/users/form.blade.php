@@ -70,7 +70,7 @@
                         <input type="file" name="profile_photo" accept="image/*"
                                class="w-full rounded-2xl border border-gray-lighter bg-light/50 px-4 py-3 text-sm outline-none focus:border-primary focus:bg-white" />
                         @if(isset($user) && $user->profile_photo)
-                            <div class="text-xs text-gray mt-2">Current photo: <a href="{{ $user->profile_photo }}" target="_blank" class="text-primary">View</a></div>
+                            <div class="text-xs text-gray mt-2">Current photo: <a href="{{ $user->profile_photo_url }}" target="_blank" class="text-primary">View</a></div>
                         @endif
                         @error('profile_photo') <div class="text-xs text-danger">{{ $message }}</div> @enderror
                     </div>

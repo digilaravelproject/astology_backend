@@ -78,7 +78,7 @@
                                 <div class="flex items-center gap-3">
                                     <div class="w-12 h-12 rounded-full bg-light border border-gray-lighter flex items-center justify-center overflow-hidden">
                                         @if($feedback->user->profile_photo)
-                                            <img src="{{ $feedback->user->profile_photo }}" alt="" class="w-full h-full object-cover">
+                                            <img src="{{ $feedback->user->profile_photo_url }}" alt="" class="w-full h-full object-cover">
                                         @else
                                             <i class="fas fa-user text-primary text-lg"></i>
                                         @endif

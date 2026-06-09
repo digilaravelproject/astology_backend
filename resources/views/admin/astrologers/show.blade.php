@@ -32,7 +32,7 @@
             <div class="rounded-3xl bg-slate-50 p-6 flex flex-col items-center text-center gap-4">
                 @if(optional($user)->astrologer?->profile_photo)
                     <div class="w-32 h-32 rounded-3xl overflow-hidden shadow-lg">
-                        <img src="{{ optional($user)->astrologer?->profile_photo }}" alt="{{ $user->name }}" class="w-full h-full object-cover" />
+                        <img src="{{ optional($user)->astrologer?->profile_photo_url }}" alt="{{ $user->name }}" class="w-full h-full object-cover" />
                     </div>
                 @else
                     <div class="w-32 h-32 rounded-3xl bg-slate-200 flex items-center justify-center text-6xl font-black text-slate-600 shadow-lg">
@@ -243,7 +243,7 @@
                     <div class="rounded-3xl bg-slate-50 p-5 border border-slate-200">
                         <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Profile Photo</p>
                         @if(optional($user)->astrologer?->profile_photo)
-                            <a href="{{ optional($user)->astrologer?->profile_photo }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-sky-100 text-sky-700 hover:bg-sky-200 transition font-semibold text-sm">
+                            <a href="{{ optional($user)->astrologer?->profile_photo_url }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-sky-100 text-sky-700 hover:bg-sky-200 transition font-semibold text-sm">
                                 <i class="fas fa-image"></i>
                                 View Photo
                             </a>
@@ -254,7 +254,7 @@
                     <div class="rounded-3xl bg-slate-50 p-5 border border-slate-200">
                         <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">ID Proof Document</p>
                         @if(optional($user)->astrologer?->id_proof)
-                            <a href="{{ optional($user)->astrologer?->id_proof }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-cyan-100 text-cyan-700 hover:bg-cyan-200 transition font-semibold text-sm">
+                            <a href="{{ optional($user)->astrologer?->id_proof_url }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-cyan-100 text-cyan-700 hover:bg-cyan-200 transition font-semibold text-sm">
                                 <i class="fas fa-file-pdf"></i>
                                 View Document
                             </a>
@@ -265,7 +265,7 @@
                     <div class="rounded-3xl bg-slate-50 p-5 border border-slate-200">
                         <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 mb-3">Certificate</p>
                         @if(optional($user)->astrologer?->certificate)
-                            <a href="{{ optional($user)->astrologer?->certificate }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition font-semibold text-sm">
+                            <a href="{{ optional($user)->astrologer?->certificate_url }}" target="_blank" class="inline-flex items-center gap-2 px-3 py-2 rounded-full bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition font-semibold text-sm">
                                 <i class="fas fa-certificate"></i>
                                 View Certificate
                             </a>

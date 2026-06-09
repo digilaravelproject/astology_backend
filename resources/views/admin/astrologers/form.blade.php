@@ -177,7 +177,7 @@
                             <input type="file" id="profile_photo" name="profile_photo" accept="image/*"
                                    class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
                             @if(optional($user)->astrologer?->profile_photo)
-                                <p class="text-[11px] text-gray mt-1">Current: <a href="{{ optional($user)->astrologer?->profile_photo }}" target="_blank" class="text-primary font-semibold">View</a></p>
+                                <p class="text-[11px] text-gray mt-1">Current: <a href="{{ optional($user)->astrologer?->profile_photo_url }}" target="_blank" class="text-primary font-semibold">View</a></p>
                             @endif
                             @error('profile_photo') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
@@ -187,7 +187,7 @@
                             <input type="file" id="id_proof" name="id_proof" accept=".pdf,.jpg,.jpeg,.png"
                                    class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
                             @if(optional($user)->astrologer?->id_proof)
-                                <p class="text-[11px] text-gray mt-1">Current: <a href="{{ optional($user)->astrologer?->id_proof }}" target="_blank" class="text-primary font-semibold">View</a></p>
+                                <p class="text-[11px] text-gray mt-1">Current: <a href="{{ optional($user)->astrologer?->id_proof_url }}" target="_blank" class="text-primary font-semibold">View</a></p>
                             @endif
                             @error('id_proof') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
@@ -197,7 +197,7 @@
                             <input type="file" id="certificate" name="certificate" accept=".pdf,.jpg,.jpeg,.png"
                                    class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
                             @if(optional($user)->astrologer?->certificate)
-                                <p class="text-[11px] text-gray mt-1">Current: <a href="{{ optional($user)->astrologer?->certificate }}" target="_blank" class="text-primary font-semibold">View</a></p>
+                                <p class="text-[11px] text-gray mt-1">Current: <a href="{{ optional($user)->astrologer?->certificate_url }}" target="_blank" class="text-primary font-semibold">View</a></p>
                             @endif
                             @error('certificate') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>

@@ -128,12 +128,12 @@ class TrainingVideoController extends Controller
         $data['sort_order'] = $request->input('sort_order', 0);
 
         if ($request->hasFile('video_file')) {
-            $this->deleteStoragePath($video->video_url);
+            $this->deleteStoragePath($video->getRawOriginal('video_url'));
             $data['video_url'] = $this->storeFile($request->file('video_file'), 'training_videos/videos');
         }
 
         if ($request->hasFile('thumbnail_file')) {
-            $this->deleteStoragePath($video->thumbnail_url);
+            $this->deleteStoragePath($video->getRawOriginal('thumbnail_url'));
             $data['thumbnail_url'] = $this->storeFile($request->file('thumbnail_file'), 'training_videos/thumbnails');
         }
 

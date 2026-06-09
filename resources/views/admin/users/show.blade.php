@@ -32,7 +32,7 @@
             <div class="space-y-6 bg-light/30 rounded-3xl p-6">
                 @if($user->profile_photo)
                     <div class="w-28 h-28 rounded-[30px] overflow-hidden border-2 border-primary shadow-md mx-auto">
-                        <img src="{{ $user->profile_photo }}" alt="{{ $user->name }}" class="w-full h-full object-cover" />
+                        <img src="{{ $user->profile_photo_url }}" alt="{{ $user->name }}" class="w-full h-full object-cover" />
                     </div>
                 @else
                     <div class="flex items-center justify-center w-28 h-28 rounded-[30px] bg-primary/10 text-primary text-6xl font-black mx-auto">
@@ -111,7 +111,7 @@
                         <div>
                             <div class="text-[10px] font-black text-gray uppercase">Profile Photo</div>
                             @if($user->profile_photo)
-                                <a href="{{ $user->profile_photo }}" target="_blank" class="text-primary font-semibold hover:underline inline-block">View Photo</a>
+                                <a href="{{ $user->profile_photo_url }}" target="_blank" class="text-primary font-semibold hover:underline inline-block">View Photo</a>
                             @else
                                 <span class="text-gray">No photo uploaded</span>
                             @endif
