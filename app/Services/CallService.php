@@ -104,7 +104,7 @@ class CallService
                 Log::error("Call Initiation Failed: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
     
     /**
@@ -155,7 +155,7 @@ class CallService
                 Log::error("Call Acceptance Failed: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 
     /**
@@ -194,7 +194,7 @@ class CallService
                 Log::error("Rejecting Call Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 
     /**
@@ -254,7 +254,7 @@ class CallService
                 Log::error("Ending Call Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 
     public function calculateCost($durationSeconds, $rate)
@@ -297,7 +297,7 @@ class CallService
                 Log::error("Marking call as missed failed: session {$sessionId} — " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 
     /**
@@ -340,7 +340,7 @@ class CallService
                 Log::error("Cancelling call failed: session {$sessionId} — " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 }
 

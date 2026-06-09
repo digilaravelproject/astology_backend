@@ -106,7 +106,7 @@ class ChatService
                 Log::error("Chat Initiation Failed: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
     
     /**
@@ -210,7 +210,7 @@ class ChatService
                 Log::error("Chat Acceptance Failed: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 
     private function formatUserDetailsMessage($consumer, $session)
@@ -296,7 +296,7 @@ class ChatService
                 Log::error("Rejecting Chat Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 
     /**
@@ -354,7 +354,7 @@ class ChatService
                 Log::error("Ending Chat Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 
     /**
@@ -455,7 +455,7 @@ class ChatService
                 Log::error("Cancelling Chat Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 
     /**
@@ -490,6 +490,6 @@ class ChatService
                 Log::error("System Timing Out Chat Failed: session " . $sessionId . " error: " . $e->getMessage());
                 throw $e;
             }
-        });
+        }, 3);
     }
 }
