@@ -141,7 +141,7 @@
                     @if($account->passbook_document)
                     <div>
                         <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Uploaded Document</div>
-                        <a href="{{ asset('storage/' . $account->passbook_document) }}" target="_blank" class="inline-block px-6 py-3 bg-primary/10 text-primary font-black text-[10px] uppercase rounded-2xl hover:bg-primary/20 transition-all border border-primary/20">
+                        <a href="{{ Storage::url($account->passbook_document) }}" target="_blank" class="inline-block px-6 py-3 bg-primary/10 text-primary font-black text-[10px] uppercase rounded-2xl hover:bg-primary/20 transition-all border border-primary/20">
                             <i class="fas fa-download mr-2"></i> Download Document
                         </a>
                     </div>

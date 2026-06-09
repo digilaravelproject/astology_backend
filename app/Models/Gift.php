@@ -23,6 +23,13 @@ class Gift extends Model
         'is_active' => 'boolean',
     ];
 
+    protected $appends = ['icon_url'];
+
+    public function getIconUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->icon_url);
+    }
+
     public function transactions()
     {
         return $this->hasMany(GiftTransaction::class);

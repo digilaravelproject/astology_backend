@@ -11,7 +11,7 @@ class RtcHelper
         $data = [
             'id' => $user->id,
             'name' => $user->name,
-            'profile_photo' => $user->profile_photo,
+            'profile_photo' => $user->profile_photo_url,
             'is_online' => $user->is_online,
             'is_busy' => $user->is_busy,
             'user_type' => $user->user_type,

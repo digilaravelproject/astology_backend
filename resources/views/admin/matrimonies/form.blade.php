@@ -138,7 +138,7 @@
                         <div class="flex items-center gap-4">
                             <div class="w-24 h-24 rounded-2xl bg-light border border-gray-lighter overflow-hidden">
                                 @if($profile->profile_photo)
-                                    <img src="{{ asset('storage/' . $profile->profile_photo) }}" alt="Photo" class="w-full h-full object-cover">
+                                    <img src="{{ Storage::url($profile->profile_photo) }}" alt="Photo" class="w-full h-full object-cover">
                                 @else
                                     <div class="w-full h-full flex items-center justify-center text-gray text-xs">No photo</div>
                                 @endif

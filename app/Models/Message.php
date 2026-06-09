@@ -25,6 +25,13 @@ class Message extends Model
         'is_delivered' => 'boolean',
     ];
 
+    protected $appends = ['attachment_url'];
+
+    public function getAttachmentUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->attachment_url);
+    }
+
     public function chatSession()
     {
         return $this->belongsTo(ChatSession::class);

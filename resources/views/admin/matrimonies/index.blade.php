@@ -93,7 +93,7 @@
                                 <div class="flex items-center gap-4">
                                     <div class="w-14 h-14 rounded-2xl bg-light border border-gray-lighter flex items-center justify-center overflow-hidden">
                                         @if($profile->profile_photo)
-                                            <img src="{{ asset('storage/' . $profile->profile_photo) }}" alt="Profile" class="w-full h-full object-cover">
+                                            <img src="{{ Storage::url($profile->profile_photo) }}" alt="Profile" class="w-full h-full object-cover">
                                         @else
                                             <span class="text-xs font-black text-gray">P-{{ $profile->id }}</span>
                                         @endif

@@ -22,6 +22,13 @@ class AstrologerBankAccount extends Model
         'is_active' => 'boolean',
     ];
 
+    protected $appends = ['passbook_document_url'];
+
+    public function getPassbookDocumentUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->passbook_document);
+    }
+
     public function astrologer()
     {
         return $this->belongsTo(Astrologer::class);

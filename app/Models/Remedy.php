@@ -30,19 +30,10 @@ class Remedy extends Model
         'is_active' => 'boolean',
     ];
 
-    /**
-     * Get the image URL.
-     */
+    protected $appends = ['image_url'];
+
     public function getImageUrlAttribute(): ?string
     {
-        if (!$this->image) {
-            return null;
-        }
-
-        if (filter_var($this->image, FILTER_VALIDATE_URL)) {
-            return $this->image;
-        }
-
-        return url('storage/' . $this->image);
+        return \App\Helpers\MediaHelper::getUrl($this->image);
     }
 }

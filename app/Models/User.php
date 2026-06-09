@@ -82,6 +82,13 @@ class User extends Authenticatable
         ];
     }
 
+    protected $appends = ['profile_photo_url'];
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->profile_photo);
+    }
+
     /**
      * Get the astrologer profile associated with the user.
      */

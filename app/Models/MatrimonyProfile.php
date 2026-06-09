@@ -37,6 +37,13 @@ class MatrimonyProfile extends Model
         'is_active' => 'boolean',
     ];
 
+    protected $appends = ['profile_photo_url'];
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->profile_photo);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

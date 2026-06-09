@@ -65,6 +65,23 @@ class Astrologer extends Model
         'po_at_5_sessions' => 'integer',
     ];
 
+    protected $appends = ['profile_photo_url', 'id_proof_url', 'certificate_url'];
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->profile_photo);
+    }
+
+    public function getIdProofUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->id_proof);
+    }
+
+    public function getCertificateUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->certificate);
+    }
+
     /**
      * Get the user associated with the astrologer.
      */

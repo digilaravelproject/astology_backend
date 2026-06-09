@@ -248,7 +248,7 @@ class AstrologerController extends Controller
 
                 // Store the new file
                 $storagePath = $file->storeAs($path, $filename, 'public');
-                $data[$field] = '/storage/' . $storagePath;
+                $data[$field] = $storagePath;
             }
         }
 

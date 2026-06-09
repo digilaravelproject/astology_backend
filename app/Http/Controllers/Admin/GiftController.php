@@ -112,7 +112,7 @@ class GiftController extends Controller
     {
         $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
         $path = $file->storeAs($directory, $filename, 'public');
-        return '/storage/' . $path;
+        return $path;
     }
 
     private function deleteStoragePath($path)

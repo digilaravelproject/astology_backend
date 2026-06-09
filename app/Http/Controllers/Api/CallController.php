@@ -43,7 +43,7 @@ class CallController extends Controller
             broadcast(new CallInitiated($session, [
                 'id'            => $request->user()->id,
                 'name'          => $request->user()->name,
-                'profile_photo' => $request->user()->profile_photo,
+                'profile_photo' => $request->user()->profile_photo_url,
                 'offer'         => $request->offer,
             ]));
 

@@ -199,7 +199,7 @@ class UserController extends Controller
             $file = $request->file('profile_photo');
             $filename = time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
             $path = $file->storeAs('profile_photos', $filename, 'public');
-            $data['profile_photo'] = '/storage/' . $path;
+            $data['profile_photo'] = $path;
         }
 
         return $data;

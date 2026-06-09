@@ -51,4 +51,11 @@ class Blog extends Model
         'is_active' => 'boolean',
         'blog_tags' => 'array',
     ];
+
+    protected $appends = ['blog_image_url'];
+
+    public function getBlogImageUrlAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getUrl($this->blog_image);
+    }
 }

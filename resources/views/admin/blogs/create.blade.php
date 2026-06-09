@@ -151,7 +151,7 @@
                         <input type="file" name="blog_image" accept="image/*" class="w-full rounded-2xl border border-gray-lighter p-2 bg-white text-xs" />
                         @if(isset($blog->blog_image) && $blog->blog_image)
                             <div class="mt-3">
-                                <img src="{{ asset('storage/' . $blog->blog_image) }}" alt="Blog image" class="w-full rounded-2xl object-cover" />
+                                <img src="{{ Storage::url($blog->blog_image) }}" alt="Blog image" class="w-full rounded-2xl object-cover" />
                             </div>
                         @endif
                         @error('blog_image') <span class="text-xs text-danger">{{ $message }}</span> @enderror
