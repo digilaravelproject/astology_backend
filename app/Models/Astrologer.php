@@ -67,6 +67,8 @@ class Astrologer extends Model
         'po_at_5_sessions' => 'integer',
     ];
 
+    protected $hidden = ['profile_photo', 'id_proof', 'certificate'];
+
     protected $appends = ['profile_photo_url', 'id_proof_url', 'certificate_url'];
 
     public function getProfilePhotoUrlAttribute(): ?string

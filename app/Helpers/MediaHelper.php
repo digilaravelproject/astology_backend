@@ -20,7 +20,16 @@ class MediaHelper
 
         $path = preg_replace('#^storage/#', '', $path);
 
-        return Storage::disk('public')->url($path);
+        $path = preg_replace('#^public/#', '', $path);
+
+        $url = Storage::disk('public')->url($path);
+
+        if ($url && !str_starts_with($url, 'http://') && !str_starts_with($url, 'https://') && !str_starts_with($url, '//')) {
+            $appUrl = rtrim(config('app.url', 'http://localhost'), '/');
+            $url = $appUrl . '/' . ltrim($url, '/');
+        }
+
+        return $url;
     }
 
     public static function getFullUrl(?string $path): ?string
