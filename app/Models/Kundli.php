@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Kundli extends Model
 {
     protected $fillable = [
+        'user_id',
         'name',
         'gender',
         'birth_date',
@@ -23,4 +24,9 @@ class Kundli extends Model
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }
