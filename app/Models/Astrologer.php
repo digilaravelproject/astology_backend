@@ -8,6 +8,8 @@ use App\Models\AstrologerSkill;
 use App\Models\AstrologerOtherDetail;
 use App\Models\AstrologerCommunity;
 use App\Models\AstrologerBankAccount;
+use App\Models\CallSession;
+use App\Models\ChatSession;
 
 class Astrologer extends Model
 {
@@ -148,5 +150,23 @@ class Astrologer extends Model
     public function liveSessions()
     {
         return $this->hasMany(LiveSession::class);
+    }
+
+    public function priceIncreaseRequests()
+    {
+        return $this->hasMany(PriceIncreaseRequest::class);
+    }
+
+    public function getTotalBusyMinutesAttribute(): float
+    {
+        $callSeconds = (float) CallSession::where('provider_id', $this->user_id)
+            ->whereIn('status', ['completed', 'approved'])
+            ->sum('duration_seconds');
+
+        $chatSeconds = (float) ChatSession::where('provider_id', $this->user_id)
+            ->whereIn('status', ['completed', 'approved'])
+            ->sum('duration_seconds');
+
+        return ($callSeconds + $chatSeconds) / 60;
     }
 }

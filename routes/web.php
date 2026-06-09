@@ -139,6 +139,25 @@ Route::prefix('admin')->group(function () {
         Route::resource('notices', \App\Http\Controllers\Admin\NoticeController::class)->names('admin.notices');
         Route::post('notices/{id}/toggle-status', [\App\Http\Controllers\Admin\NoticeController::class, 'toggleStatus'])->name('admin.notices.toggle-status');
 
+        // Price Increase Levels Management
+        Route::prefix('price-increase-levels')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\PriceIncreaseLevelController::class, 'index'])->name('admin.price-increase-levels.index');
+            Route::get('/create', [\App\Http\Controllers\Admin\PriceIncreaseLevelController::class, 'create'])->name('admin.price-increase-levels.create');
+            Route::post('/', [\App\Http\Controllers\Admin\PriceIncreaseLevelController::class, 'store'])->name('admin.price-increase-levels.store');
+            Route::get('/{id}/edit', [\App\Http\Controllers\Admin\PriceIncreaseLevelController::class, 'edit'])->name('admin.price-increase-levels.edit');
+            Route::put('/{id}', [\App\Http\Controllers\Admin\PriceIncreaseLevelController::class, 'update'])->name('admin.price-increase-levels.update');
+            Route::post('/{id}/toggle-status', [\App\Http\Controllers\Admin\PriceIncreaseLevelController::class, 'toggleStatus'])->name('admin.price-increase-levels.toggle-status');
+            Route::delete('/{id}', [\App\Http\Controllers\Admin\PriceIncreaseLevelController::class, 'destroy'])->name('admin.price-increase-levels.destroy');
+        });
+
+        // Price Increase Requests Management
+        Route::prefix('price-increase-requests')->group(function () {
+            Route::get('/', [\App\Http\Controllers\Admin\PriceIncreaseRequestController::class, 'index'])->name('admin.price-increase-requests.index');
+            Route::get('/{id}', [\App\Http\Controllers\Admin\PriceIncreaseRequestController::class, 'show'])->name('admin.price-increase-requests.show');
+            Route::post('/{id}/approve', [\App\Http\Controllers\Admin\PriceIncreaseRequestController::class, 'approve'])->name('admin.price-increase-requests.approve');
+            Route::post('/{id}/reject', [\App\Http\Controllers\Admin\PriceIncreaseRequestController::class, 'reject'])->name('admin.price-increase-requests.reject');
+        });
+
         // App Notifications Management
         Route::prefix('app-notifications')->group(function() {
             Route::get('/', [\App\Http\Controllers\Admin\AppNotificationController::class, 'index'])->name('admin.app-notifications.index');

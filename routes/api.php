@@ -120,6 +120,13 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/{id}', [LiveSessionController::class, 'destroy']);
             });
 
+            // Price Increase routes
+            Route::prefix('price-increase')->group(function () {
+                Route::get('/status', [\App\Http\Controllers\Api\AstrologerPriceIncreaseController::class, 'status']);
+                Route::post('/request', [\App\Http\Controllers\Api\AstrologerPriceIncreaseController::class, 'requestIncrease']);
+                Route::get('/history', [\App\Http\Controllers\Api\AstrologerPriceIncreaseController::class, 'history']);
+            });
+
             Route::post('/logout', [AstrologerAuthController::class, 'logout']);
             Route::delete('/delete-account', [AstrologerAuthController::class, 'deleteAccount']);
         });
