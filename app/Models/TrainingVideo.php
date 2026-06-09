@@ -28,11 +28,11 @@ class TrainingVideo extends Model
 
     public function getVideoUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->video_url);
+        return \App\Helpers\MediaHelper::getUrl($this->attributes['video_url'] ?? null);
     }
 
     public function getThumbnailUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->thumbnail_url);
+        return \App\Helpers\MediaHelper::getUrl($this->attributes['thumbnail_url'] ?? null);
     }
 }
