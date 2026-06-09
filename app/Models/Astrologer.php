@@ -69,6 +69,24 @@ class Astrologer extends Model
 
     protected $hidden = [];
 
+    public function getProfilePhotoAttribute($value): ?string
+    {
+        if (empty($value)) return null;
+        return ltrim(preg_replace('#^/?storage/#', '', $value), '/');
+    }
+
+    public function getIdProofAttribute($value): ?string
+    {
+        if (empty($value)) return null;
+        return ltrim(preg_replace('#^/?storage/#', '', $value), '/');
+    }
+
+    public function getCertificateAttribute($value): ?string
+    {
+        if (empty($value)) return null;
+        return ltrim(preg_replace('#^/?storage/#', '', $value), '/');
+    }
+
     public function getProfilePhotoUrlAttribute(): ?string
     {
         return \App\Helpers\MediaHelper::getUrl($this->profile_photo);
