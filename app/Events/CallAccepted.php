@@ -15,10 +15,12 @@ class CallAccepted implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $session;
+    public $answer;
 
-    public function __construct($session)
+    public function __construct($session, $answer = null)
     {
         $this->session = $session;
+        $this->answer = $answer ?? ($session->answer ?? null);
     }
 
     public function broadcastOn(): array
@@ -31,5 +33,20 @@ class CallAccepted implements ShouldBroadcast
     public function broadcastAs()
     {
         return 'CallAccepted';
+    }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'session' => [
+                'id'              => $this->session->id,
+                'consumer_id'     => $this->session->consumer_id,
+                'provider_id'     => $this->session->provider_id,
+                'status'          => $this->session->status,
+                'rate_per_minute' => $this->session->rate_per_minute,
+                'started_at'      => optional($this->session->started_at)?->toISOString(),
+            ],
+            'answer' => $this->answer,
+        ];
     }
 }
