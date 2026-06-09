@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -10,9 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         if (!Schema::hasColumn('kundlis', 'user_id')) {
-            Schema::table('kundlis', function (Blueprint $table) {
-                $table->unsignedBigInteger('user_id')->nullable();
-            });
+            DB::statement('ALTER TABLE kundlis ADD COLUMN user_id BIGINT UNSIGNED NULL');
         }
 
         $firstUserId = DB::table('users')->value('id');
@@ -20,29 +17,25 @@ return new class extends Migration
             DB::table('kundlis')->whereNull('user_id')->update(['user_id' => $firstUserId]);
         }
 
-        $sm = Schema::getConnection()->getDoctrineSchemaManager();
-        $foreignKeys = $sm->listTableForeignKeys('kundlis');
-        $hasFk = false;
-        foreach ($foreignKeys as $fk) {
-            if (in_array('user_id', $fk->getLocalColumns())) {
-                $hasFk = true;
-                break;
-            }
-        }
+        $fkExists = DB::selectOne("
+            SELECT 1 FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'kundlis'
+              AND COLUMN_NAME = 'user_id'
+              AND REFERENCED_TABLE_NAME IS NOT NULL
+        ");
 
-        if (!$hasFk) {
-            Schema::table('kundlis', function (Blueprint $table) {
-                $table->unsignedBigInteger('user_id')->nullable(false)->change();
-                $table->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
-            });
+        if (!$fkExists) {
+            DB::statement('ALTER TABLE kundlis MODIFY COLUMN user_id BIGINT UNSIGNED NOT NULL');
+            DB::statement('ALTER TABLE kundlis ADD CONSTRAINT kundlis_user_id_foreign FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE');
         }
     }
 
     public function down(): void
     {
-        Schema::table('kundlis', function (Blueprint $table) {
-            $table->dropForeign(['user_id']);
-            $table->dropColumn('user_id');
-        });
+        if (Schema::hasColumn('kundlis', 'user_id')) {
+            DB::statement('ALTER TABLE kundlis DROP FOREIGN KEY kundlis_user_id_foreign');
+            DB::statement('ALTER TABLE kundlis DROP COLUMN user_id');
+        }
     }
 };
