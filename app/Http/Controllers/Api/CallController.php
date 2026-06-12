@@ -194,7 +194,7 @@ class CallController extends Controller
             $userId = $request->user()->id;
 
             $session = CallSession::with([
-                'consumer:id,name,profile_photo',
+                'consumer:id,name,profile_photo,gender,date_of_birth,time_of_birth,place_of_birth',
                 'provider:id,name,profile_photo',
                 'provider.astrologer:user_id,call_rate_per_minute',
             ])
@@ -252,7 +252,7 @@ class CallController extends Controller
             $perPage = min((int) $request->query('per_page', 15), 50);
 
             $sessions = CallSession::with([
-                'consumer:id,name,profile_photo',
+                'consumer:id,name,profile_photo,gender,date_of_birth,time_of_birth,place_of_birth',
             ])
             ->where('provider_id', $userId)
             ->orderBy('created_at', 'desc')
