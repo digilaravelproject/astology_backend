@@ -29,7 +29,7 @@ class Message extends Model
 
     public function getAttachmentUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->attachment_url);
+        return \App\Helpers\MediaHelper::getUrl($this->attributes['attachment_url'] ?? null);
     }
 
     public function chatSession()
