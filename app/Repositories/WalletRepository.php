@@ -33,27 +33,44 @@ class WalletRepository
             if ($reference_type && $reference_id) {
                 try {
                     if (class_exists($reference_type)) {
-                        $refModel = $reference_type::with(['consumer', 'provider'])->find($reference_id);
-                        if ($refModel) {
-                            $sessionType = '';
-                            if (str_contains($reference_type, 'ChatSession')) {
-                                $sessionType = 'Chat';
-                            } elseif (str_contains($reference_type, 'CallSession')) {
-                                $sessionType = 'Call';
-                            } else {
-                                $sessionType = 'Consultation';
+                        if (str_contains($reference_type, 'SuperChat')) {
+                            $refModel = $reference_type::with(['user', 'astrologer.user'])->find($reference_id);
+                            if ($refModel) {
+                                $userName = $refModel->user->name ?? 'User';
+                                $astrologerName = $refModel->astrologer?->user?->name ?? 'Astrologer';
+                                $resolvedDescription = "Super Chat from {$userName} to Astrologer {$astrologerName}";
+                                $meta = [
+                                    'type' => 'super_chat',
+                                    'user_id' => $refModel->user_id,
+                                    'user_name' => $userName,
+                                    'astrologer_id' => $refModel->astrologer_id,
+                                    'astrologer_name' => $astrologerName,
+                                    'live_session_id' => $refModel->live_session_id,
+                                ];
                             }
+                        } else {
+                            $refModel = $reference_type::with(['consumer', 'provider'])->find($reference_id);
+                            if ($refModel) {
+                                $sessionType = '';
+                                if (str_contains($reference_type, 'ChatSession')) {
+                                    $sessionType = 'Chat';
+                                } elseif (str_contains($reference_type, 'CallSession')) {
+                                    $sessionType = 'Call';
+                                } else {
+                                    $sessionType = 'Consultation';
+                                }
 
-                            $refName = $sessionType . ' session reference #' . $reference_id;
-                            $providerName = $refModel->provider->name ?? 'Astrologer';
-                            $resolvedDescription = "{$sessionType} session with Astrologer {$providerName}";
-                            $meta = [
-                                'type' => strtolower($sessionType),
-                                'astrologer_id' => $refModel->provider_id,
-                                'astrologer_name' => $providerName,
-                                'session_id' => $reference_id,
-                                'session_reference' => $refName,
-                            ];
+                                $refName = $sessionType . ' session reference #' . $reference_id;
+                                $providerName = $refModel->provider->name ?? 'Astrologer';
+                                $resolvedDescription = "{$sessionType} session with Astrologer {$providerName}";
+                                $meta = [
+                                    'type' => strtolower($sessionType),
+                                    'astrologer_id' => $refModel->provider_id,
+                                    'astrologer_name' => $providerName,
+                                    'session_id' => $reference_id,
+                                    'session_reference' => $refName,
+                                ];
+                            }
                         }
                     }
                 } catch (\Exception $e) {
@@ -96,27 +113,44 @@ class WalletRepository
             if ($reference_type && $reference_id) {
                 try {
                     if (class_exists($reference_type)) {
-                        $refModel = $reference_type::with(['consumer', 'provider'])->find($reference_id);
-                        if ($refModel) {
-                            $sessionType = '';
-                            if (str_contains($reference_type, 'ChatSession')) {
-                                $sessionType = 'Chat';
-                            } elseif (str_contains($reference_type, 'CallSession')) {
-                                $sessionType = 'Call';
-                            } else {
-                                $sessionType = 'Consultation';
+                        if (str_contains($reference_type, 'SuperChat')) {
+                            $refModel = $reference_type::with(['user', 'astrologer.user'])->find($reference_id);
+                            if ($refModel) {
+                                $userName = $refModel->user->name ?? 'User';
+                                $astrologerName = $refModel->astrologer?->user?->name ?? 'Astrologer';
+                                $resolvedDescription = "Super Chat from {$userName} to Astrologer {$astrologerName}";
+                                $meta = [
+                                    'type' => 'super_chat',
+                                    'user_id' => $refModel->user_id,
+                                    'user_name' => $userName,
+                                    'astrologer_id' => $refModel->astrologer_id,
+                                    'astrologer_name' => $astrologerName,
+                                    'live_session_id' => $refModel->live_session_id,
+                                ];
                             }
+                        } else {
+                            $refModel = $reference_type::with(['consumer', 'provider'])->find($reference_id);
+                            if ($refModel) {
+                                $sessionType = '';
+                                if (str_contains($reference_type, 'ChatSession')) {
+                                    $sessionType = 'Chat';
+                                } elseif (str_contains($reference_type, 'CallSession')) {
+                                    $sessionType = 'Call';
+                                } else {
+                                    $sessionType = 'Consultation';
+                                }
 
-                            $refName = $sessionType . ' session reference #' . $reference_id;
-                            $consumerName = $refModel->consumer->name ?? 'User';
-                            $resolvedDescription = "{$sessionType} consultation with User {$consumerName}";
-                            $meta = [
-                                'type' => strtolower($sessionType),
-                                'user_id' => $refModel->consumer_id,
-                                'user_name' => $consumerName,
-                                'session_id' => $reference_id,
-                                'session_reference' => $refName,
-                            ];
+                                $refName = $sessionType . ' session reference #' . $reference_id;
+                                $consumerName = $refModel->consumer->name ?? 'User';
+                                $resolvedDescription = "{$sessionType} consultation with User {$consumerName}";
+                                $meta = [
+                                    'type' => strtolower($sessionType),
+                                    'user_id' => $refModel->consumer_id,
+                                    'user_name' => $consumerName,
+                                    'session_id' => $reference_id,
+                                    'session_reference' => $refName,
+                                ];
+                            }
                         }
                     }
                 } catch (\Exception $e) {

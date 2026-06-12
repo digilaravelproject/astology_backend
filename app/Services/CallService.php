@@ -41,9 +41,11 @@ class CallService
                 $provider = User::with('astrologer')->lockForUpdate()->findOrFail($providerId);
                 
                 $astrologer = $provider->astrologer;
+
                 if (!$astrologer || !$astrologer->is_call_enabled) {
                     throw new Exception("Astrologer is not available for calls.");
                 }
+                $rate = $astrologer->call_rate_per_minute ?? 15.00;
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -53,6 +55,9 @@ class CallService
                     ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->exists();
                 $isBusy = $isChatBusy || $isCallBusy;
+                if ($isBusy) {
+                    throw new Exception("Astrologer is currently busy on another session. Please try again later.");
+                }
 
                 // Dynamic check for consumer
                 $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
@@ -76,27 +81,22 @@ class CallService
                     throw new Exception("You already have a pending or waiting request.");
                 }
 
-                $rate = $provider->astrologer->call_rate_per_minute ?? 15.00;
-                
                 // Check minimum balance (5 minutes minimum to start)
                 $balance = $this->walletService->getBalance($consumerId);
                 if ($balance < $rate * 5) {
                     throw new Exception("Insufficient balance. You need minimum " . ($rate * 5) . " in your wallet to start this call.");
                 }
 
-                $status = $isBusy ? 'waiting' : 'initiated';
-
                 $session = $this->callRepo->create([
                     'consumer_id' => $consumerId,
                     'provider_id' => $providerId,
-                    'status' => $status,
+                    'call_type'   => 'audio',
+                    'status' => 'initiated',
                     'rate_per_minute' => $rate,
                 ]);
 
-                if ($status === 'initiated') {
-                    // Dispatch timeout cleanup (60 seconds ringing timeout)
-                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
-                }
+                // Dispatch timeout cleanup (60 seconds ringing timeout)
+                \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
 
                 return $session;
 
@@ -320,12 +320,12 @@ class CallService
                     throw new Exception('You are not authorized to cancel this call.');
                 }
 
-                if (!in_array($session->status, ['initiated', 'ringing', 'waiting'])) {
-                    throw new Exception('Only pending or waiting calls can be cancelled.');
+                if (!in_array($session->status, ['initiated', 'ringing'])) {
+                    throw new Exception('Only ringing calls can be cancelled.');
                 }
 
                 $this->callRepo->update($sessionId, [
-                    'status'   => 'cancelled',
+                    'status'   => 'missed',
                     'ended_at' => now(),
                 ]);
 

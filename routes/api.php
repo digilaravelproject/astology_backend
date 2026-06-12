@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\{
     RemedyController,
     ReviewController,
     StaticPageController,
+    SuperChatController,
     TrainingVideoController,
     GiftController,
     UserAuthController,
@@ -118,6 +119,8 @@ Route::prefix('v1')->group(function () {
                 Route::get('/{id}', [LiveSessionController::class, 'show']);
                 Route::put('/{id}', [LiveSessionController::class, 'update']);
                 Route::delete('/{id}', [LiveSessionController::class, 'destroy']);
+                Route::post('/{id}/start', [LiveSessionController::class, 'start']);
+                Route::post('/{id}/stop', [LiveSessionController::class, 'stop']);
             });
 
             // Price Increase routes
@@ -181,6 +184,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/wallet/transactions/{id}', [WalletController::class, 'transactionDetail']);
             Route::post('/reviews', [ReviewController::class, 'store']);
             Route::post('/reviews/{reviewId}/reply', [ReviewController::class, 'reply']);
+            Route::get('/live/now', [SuperChatController::class, 'nowStreaming']);
+            Route::get('/live/{id}', [SuperChatController::class, 'show']);
+            Route::post('/live/{id}/join', [SuperChatController::class, 'join']);
+            Route::post('/live/{id}/leave', [SuperChatController::class, 'leave']);
+            Route::post('/live/{id}/comment', [SuperChatController::class, 'comment']);
+            Route::post('/live/{id}/super-chat', [SuperChatController::class, 'sendSuperChat']);
+            Route::get('/live/{id}/comments', [SuperChatController::class, 'comments']);
+
             Route::get('/notifications/count', [NotificationController::class, 'count']);
             Route::get('/notifications', [NotificationController::class, 'list']);
             Route::get('/notifications/{id}', [NotificationController::class, 'show']);
@@ -215,6 +226,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/sessions/user',       [CallController::class, 'getUserSessions']);
             Route::get('/sessions/astrologer', [CallController::class, 'getAstrologerSessions']);
             Route::get('/current-session',     [CallController::class, 'getCurrentSession']);
+            Route::get('/turn-credentials',    [TurnCredentialsController::class, 'index']);
+            Route::get('/pending',             [CallController::class, 'pending']);
 
             // Lifecycle mutations (POST endpoints)
             Route::post('/initiate',                    [CallController::class, 'initiateCall'])->middleware('throttle:10,1');
@@ -223,6 +236,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/{sessionId}/cancel',          [CallController::class, 'cancelCall']);
             Route::post('/{sessionId}/end',             [CallController::class, 'endCall']);
             Route::post('/{sessionId}/ice-candidate',  [CallController::class, 'sendIceCandidate']);
+            Route::post('/{sessionId}/sdp',            [CallController::class, 'updateSdp']);
         });
 
         Route::prefix('chat')->group(function () {

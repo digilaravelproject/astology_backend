@@ -35,6 +35,7 @@ class CallInitiated implements ShouldBroadcastNow
     {
         return [
             new PrivateChannel('user.' . $this->session->provider_id),
+            new PrivateChannel('call.' . $this->session->id),
         ];
     }
 

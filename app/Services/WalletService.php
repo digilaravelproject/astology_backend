@@ -38,4 +38,14 @@ class WalletService
     {
         return $this->walletRepo->credit($providerId, $amount, 'chat_credit', 'App\Models\ChatSession', $chatSessionId);
     }
+
+    public function deductForSuperChat($userId, $amount, $superChatId): \App\Models\WalletTransaction
+    {
+        return $this->walletRepo->debit($userId, $amount, 'super_chat_deduction', 'App\Models\SuperChat', $superChatId);
+    }
+
+    public function creditAstrologerForSuperChat($astrologerUserId, $amount, $superChatId): \App\Models\WalletTransaction
+    {
+        return $this->walletRepo->credit($astrologerUserId, $amount, 'super_chat_credit', 'App\Models\SuperChat', $superChatId);
+    }
 }

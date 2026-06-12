@@ -7,6 +7,7 @@ use App\Helpers\ApiResponse;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 class LiveSessionController extends Controller
 {
@@ -262,6 +263,90 @@ class LiveSessionController extends Controller
     }
 
     /**
+     * Start a live session (go live)
+     * POST /api/v1/astrologer/live/{id}/start
+     */
+    public function start($id)
+    {
+        try {
+            $astrologer = auth()->user()->astrologer;
+
+            if (!$astrologer) {
+                return ApiResponse::error('User is not an astrologer', 403);
+            }
+
+            $liveSession = LiveSession::where('astrologer_id', $astrologer->id)
+                ->where('id', $id)
+                ->first();
+
+            if (!$liveSession) {
+                return ApiResponse::error('Live session not found', 404);
+            }
+
+            if ($liveSession->status !== 'upcoming') {
+                return ApiResponse::error('Only upcoming sessions can be started', 422);
+            }
+
+            $liveSession->update([
+                'status'     => 'ongoing',
+                'started_at' => now(),
+                'stream_key' => Str::random(32),
+            ]);
+
+            return ApiResponse::success(
+                'Live session started successfully',
+                $this->formatLiveSession($liveSession->fresh())
+            );
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to start live session: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Stop a live session (end stream)
+     * POST /api/v1/astrologer/live/{id}/stop
+     */
+    public function stop($id)
+    {
+        try {
+            $astrologer = auth()->user()->astrologer;
+
+            if (!$astrologer) {
+                return ApiResponse::error('User is not an astrologer', 403);
+            }
+
+            $liveSession = LiveSession::where('astrologer_id', $astrologer->id)
+                ->where('id', $id)
+                ->first();
+
+            if (!$liveSession) {
+                return ApiResponse::error('Live session not found', 404);
+            }
+
+            if ($liveSession->status !== 'ongoing') {
+                return ApiResponse::error('Only ongoing sessions can be stopped', 422);
+            }
+
+            $durationMinutes = $liveSession->started_at
+                ? (int) $liveSession->started_at->diffInMinutes(now())
+                : 0;
+
+            $liveSession->update([
+                'status'           => 'completed',
+                'ended_at'         => now(),
+                'duration_minutes' => $durationMinutes,
+            ]);
+
+            return ApiResponse::success(
+                'Live session ended successfully',
+                $this->formatLiveSession($liveSession->fresh())
+            );
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to stop live session: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Format live session response
      */
     private function formatLiveSession($session)
@@ -277,9 +362,14 @@ class LiveSessionController extends Controller
             'session_type' => $session->session_type,
             'status' => $session->status,
             'live_url' => $session->live_url,
+            'stream_key' => $session->stream_key,
+            'stream_url' => $session->stream_url,
+            'started_at' => $session->started_at?->format('Y-m-d H:i:s'),
+            'ended_at' => $session->ended_at?->format('Y-m-d H:i:s'),
             'duration_minutes' => $session->duration_minutes,
             'max_participants' => $session->max_participants,
             'current_participants' => $session->current_participants,
+            'viewer_count' => $session->viewer_count,
             'created_at' => $session->created_at->format('Y-m-d H:i:s'),
             'updated_at' => $session->updated_at->format('Y-m-d H:i:s'),
         ];

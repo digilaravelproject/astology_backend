@@ -260,11 +260,11 @@ class CallFlowCompleteTest extends TestCase
         $response->assertStatus(200);
         $this->assertDatabaseHas('call_sessions', [
             'id'     => $session->id,
-            'status' => 'cancelled',
+            'status' => 'missed',
         ]);
 
         Event::assertDispatched(CallDismissed::class, function ($e) use ($session) {
-            return $e->session->id === $session->id && $e->reason === 'cancelled';
+            return $e->session->id === $session->id && $e->reason === 'missed';
         });
     }
 

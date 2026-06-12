@@ -29,6 +29,7 @@ class IceCandidateSent implements ShouldBroadcastNow
     {
         return [
             new PrivateChannel('user.' . $this->receiverId),
+            new PrivateChannel('call.' . $this->session->id),
         ];
     }
     

@@ -31,6 +31,7 @@ class CallEnded implements ShouldBroadcastNow
 
         return [
             new PrivateChannel('user.' . $receiverId),
+            new PrivateChannel('call.' . $this->session->id),
         ];
     }
     

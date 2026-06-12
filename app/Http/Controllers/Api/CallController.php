@@ -11,6 +11,7 @@ use App\Events\CallAccepted;
 use App\Events\CallEnded;
 use App\Events\CallDismissed;
 use App\Events\IceCandidateSent;
+use App\Events\WebRtcSdpUpdated;
 use App\Models\CallSession;
 use App\Models\IceCandidate;
 use App\Jobs\CallBillingTickJob;
@@ -112,7 +113,7 @@ class CallController extends Controller
             $session    = $this->callService->cancelCall($sessionId, $consumerId);
 
             // CallDismissed broadcasts to BOTH channels so the astrologer's ring screen closes
-            broadcast(new CallDismissed($session, $consumerId, 'cancelled'));
+            broadcast(new CallDismissed($session, $consumerId, 'missed'));
 
             return ApiResponse::success(null, 'Call cancelled successfully');
 
@@ -178,6 +179,82 @@ class CallController extends Controller
             broadcast(new IceCandidateSent($session, $request->candidate, $receiverId));
 
             return ApiResponse::success(null, 'Candidate sent');
+
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // UPDATE SDP (mid-call SDP re-exchange for reconnect)
+    // ─────────────────────────────────────────────────────────
+
+    public function updateSdp(Request $request, $sessionId)
+    {
+        $request->validate([
+            'sdp'  => 'required|string',
+            'type' => 'required|in:offer,answer',
+        ]);
+
+        try {
+            $userId  = $request->user()->id;
+            $session = $this->callService->getSession($sessionId);
+
+            if (!$session || !in_array($session->status, ['accepted', 'ongoing'])) {
+                return ApiResponse::error('Session is not active', 400);
+            }
+
+            if ($session->consumer_id != $userId && $session->provider_id != $userId) {
+                return ApiResponse::error('Unauthorized', 403);
+            }
+
+            // Persist SDP for reconnect scenarios
+            $column = ($userId == $session->consumer_id) ? 'consumer_sdp' : 'provider_sdp';
+            $session->update([$column => $request->sdp]);
+
+            // Relay to the other peer
+            broadcast(new WebRtcSdpUpdated($session, $request->sdp, $userId, $request->type));
+
+            return ApiResponse::success(null, 'SDP updated successfully');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // PENDING CALLS (for astrologer to see unanswered rings on reconnect)
+    // ─────────────────────────────────────────────────────────
+
+    public function pending(Request $request)
+    {
+        try {
+            $userId = $request->user()->id;
+
+            $sessions = CallSession::with([
+                'consumer:id,name,profile_photo',
+            ])
+            ->where('provider_id', $userId)
+            ->whereIn('status', ['initiated', 'ringing'])
+            ->latest()
+            ->get()
+            ->map(function ($session) {
+                return [
+                    'id'          => $session->id,
+                    'status'      => $session->status,
+                    'caller'      => $session->consumer ? [
+                        'id'            => $session->consumer->id,
+                        'name'          => $session->consumer->name,
+                        'profile_photo' => $session->consumer->profile_photo_url,
+                    ] : null,
+                    'created_at'  => $session->created_at->toISOString(),
+                    'expires_at'  => $session->created_at->addSeconds(60)->toISOString(),
+                ];
+            });
+
+            return ApiResponse::success([
+                'pending_calls' => $sessions->values(),
+                'total'         => $sessions->count(),
+            ], 'Pending calls retrieved successfully');
 
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);

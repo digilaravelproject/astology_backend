@@ -4,14 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use App\Traits\HasLocalTimezoneSerialization;
 
 class LiveSession extends Model
 {
     use HasLocalTimezoneSerialization;
-    /**
-     * The attributes that are mass assignable.
-     */
+
     protected $fillable = [
         'astrologer_id',
         'title',
@@ -20,29 +19,41 @@ class LiveSession extends Model
         'session_type',
         'status',
         'live_url',
+        'stream_key',
+        'stream_url',
+        'started_at',
+        'ended_at',
         'duration_minutes',
         'max_participants',
         'current_participants',
+        'viewer_count',
     ];
 
-    /**
-     * The attributes that should be cast.
-     */
     protected $casts = [
         'scheduled_at' => 'datetime',
+        'started_at' => 'datetime',
+        'ended_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'max_participants' => 'integer',
         'current_participants' => 'integer',
+        'viewer_count' => 'integer',
         'duration_minutes' => 'integer',
     ];
 
-    /**
-     * Get the astrologer that owns this live session.
-     */
     public function astrologer(): BelongsTo
     {
         return $this->belongsTo(Astrologer::class);
+    }
+
+    public function comments(): HasMany
+    {
+        return $this->hasMany(LiveComment::class);
+    }
+
+    public function superChats(): HasMany
+    {
+        return $this->hasMany(SuperChat::class);
     }
 
     /**

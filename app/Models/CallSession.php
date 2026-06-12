@@ -12,6 +12,7 @@ class CallSession extends Model
     protected $fillable = [
         'consumer_id',
         'provider_id',
+        'call_type',
         'status',
         'started_at',
         'ended_at',
@@ -19,6 +20,8 @@ class CallSession extends Model
         'rate_per_minute',
         'total_cost',
         'last_billed_at',
+        'consumer_sdp',
+        'provider_sdp',
     ];
 
     protected $casts = [

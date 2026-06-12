@@ -40,6 +40,7 @@ class CallDismissed implements ShouldBroadcastNow
         return [
             new PrivateChannel('user.' . $this->session->consumer_id),
             new PrivateChannel('user.' . $this->session->provider_id),
+            new PrivateChannel('call.' . $this->session->id),
         ];
     }
 

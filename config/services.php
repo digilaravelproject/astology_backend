@@ -35,4 +35,26 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | TURN Server (for WebRTC NAT traversal)
+    |--------------------------------------------------------------------------
+    | Configure in .env to enable TURN relay for users behind restrictive NATs,
+    | firewalls, or on 3G/4G mobile networks.
+    |
+    | Example (using Coturn or a cloud TURN provider):
+    |   TURN_SERVER_URL=turn:your-turn.example.com:3478
+    |   TURN_SERVER_USERNAME=your-username
+    |   TURN_SERVER_CREDENTIAL=your-credential
+    |
+    | For production, always use a TURN server with credentials.
+    | Google's free STUN only works for simple NAT scenarios.
+    |--------------------------------------------------------------------------
+    */
+    'turn' => [
+        'server_url' => env('TURN_SERVER_URL'),
+        'username'   => env('TURN_SERVER_USERNAME'),
+        'credential' => env('TURN_SERVER_CREDENTIAL'),
+    ],
+
 ];
