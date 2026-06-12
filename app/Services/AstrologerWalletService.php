@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Models\AstrologerBankAccount;
+use App\Helpers\MediaHelper;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Exception;
@@ -47,8 +48,30 @@ class AstrologerWalletService
             ->where('created_at', '>=', Carbon::now()->subMonths(3))
             ->sum('amount');
 
-        // Calculate rank based on all-time completed credit earnings
-        $earningsList = DB::table('astrologers')
+        // Weekly rank (consistent with getWeeklyRankings)
+        $weeklyRankingsList = DB::table('astrologers')
+            ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
+            ->leftJoin('wallet_transactions', function($join) {
+                $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
+                     ->where('wallet_transactions.transaction_type', '=', 'credit')
+                     ->where('wallet_transactions.status', '=', 'completed')
+                     ->where('wallet_transactions.created_at', '>=', Carbon::now()->startOfWeek());
+            })
+            ->select('astrologers.user_id', DB::raw('COALESCE(SUM(wallet_transactions.amount), 0) as weekly_earnings'))
+            ->groupBy('astrologers.user_id')
+            ->orderByDesc('weekly_earnings')
+            ->get();
+
+        $weeklyRank = 1;
+        foreach ($weeklyRankingsList as $index => $entry) {
+            if ($entry->user_id == $user->id) {
+                $weeklyRank = $index + 1;
+                break;
+            }
+        }
+
+        // All-time rank
+        $allTimeList = DB::table('astrologers')
             ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
             ->leftJoin('wallet_transactions', function($join) {
                 $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
@@ -60,12 +83,18 @@ class AstrologerWalletService
             ->orderByDesc('total_earnings')
             ->get();
 
-        $rank = 1;
-        foreach ($earningsList as $index => $earning) {
-            if ($earning->user_id == $user->id) {
-                $rank = $index + 1;
+        $allTimeRank = 1;
+        foreach ($allTimeList as $index => $entry) {
+            if ($entry->user_id == $user->id) {
+                $allTimeRank = $index + 1;
                 break;
             }
+        }
+
+        $astrologer = $user->astrologer;
+        $photo = $astrologer?->profile_photo;
+        if ($photo) {
+            $photo = '/storage/' . ltrim(preg_replace('#^/?storage/#', '', $photo), '/');
         }
 
         return [
@@ -74,7 +103,10 @@ class AstrologerWalletService
             'weekly_earning' => (float)$weeklyEarning,
             'monthly_earning' => (float)$monthlyEarning,
             'three_month_earning' => (float)$threeMonthEarning,
-            'rank' => $rank,
+            'rank' => $weeklyRank,
+            'all_time_rank' => $allTimeRank,
+            'name' => $user->name,
+            'profile_photo' => $photo,
         ];
     }
 
@@ -218,12 +250,16 @@ class AstrologerWalletService
 
         // Return top 10 and my info
         $top10 = $rankings->take(10)->values()->map(function ($item, $index) {
+            $photo = $item->profile_photo;
+            if ($photo) {
+                $photo = '/storage/' . ltrim(preg_replace('#^/?storage/#', '', $photo), '/');
+            }
             return [
                 'rank' => $index + 1,
                 'astrologer_id' => $item->astrologer_id,
                 'user_id' => $item->user_id,
                 'name' => $item->name,
-                'profile_photo' => $item->profile_photo,
+                'profile_photo' => $photo,
                 'weekly_earnings' => $item->weekly_earnings,
             ];
         });

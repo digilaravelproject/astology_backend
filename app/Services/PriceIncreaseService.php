@@ -31,10 +31,11 @@ class PriceIncreaseService
             $currentChatRate = (float) $astrologer->chat_rate_per_minute;
             $currentCallRate = (float) $astrologer->call_rate_per_minute;
 
-            $pendingRequest = PriceIncreaseRequest::pending()
+            $pendingRequests = PriceIncreaseRequest::pending()
                 ->byAstrologer($astrologer->id)
+                ->with('level')
                 ->latest()
-                ->first();
+                ->get();
 
             return [
                 'total_busy_minutes' => round($totalBusyMinutes, 2),
@@ -56,16 +57,19 @@ class PriceIncreaseService
                     'chat_rate_per_minute' => $currentChatRate,
                     'call_rate_per_minute' => $currentCallRate,
                 ],
-                'pending_request' => $pendingRequest ? [
-                    'id' => $pendingRequest->id,
-                    'price_type' => $pendingRequest->price_type,
-                    'old_price' => (float) $pendingRequest->old_price,
-                    'new_price' => (float) $pendingRequest->new_price,
-                    'increase_amount' => (float) $pendingRequest->increase_amount,
-                    'level_name' => $pendingRequest->level?->name,
-                    'created_at' => $pendingRequest->created_at->toDateTimeString(),
-                ] : null,
-                'can_request' => $currentLevel !== null && $pendingRequest === null,
+                'pending_requests' => $pendingRequests->map(fn ($req) => [
+                    'id' => $req->id,
+                    'price_type' => $req->price_type,
+                    'old_price' => (float) $req->old_price,
+                    'new_price' => (float) $req->new_price,
+                    'increase_amount' => (float) $req->increase_amount,
+                    'level_name' => $req->level?->name,
+                    'created_at' => $req->created_at->toDateTimeString(),
+                ])->values()->toArray(),
+                'can_request' => [
+                    'chat' => $currentLevel !== null && $pendingRequests->where('price_type', 'chat')->isEmpty(),
+                    'call' => $currentLevel !== null && $pendingRequests->where('price_type', 'call')->isEmpty(),
+                ],
             ];
         } catch (\Exception $e) {
             Log::error('PriceIncreaseService::getStatus error: ' . $e->getMessage(), [
@@ -93,12 +97,13 @@ class PriceIncreaseService
                 throw new \RuntimeException('You are not eligible for any price increase level yet.');
             }
 
-            $pendingExists = PriceIncreaseRequest::pending()
+            $pendingExistsForType = PriceIncreaseRequest::pending()
                 ->byAstrologer($astrologer->id)
+                ->where('price_type', $priceType)
                 ->exists();
 
-            if ($pendingExists) {
-                throw new \RuntimeException('You already have a pending price increase request.');
+            if ($pendingExistsForType) {
+                throw new \RuntimeException("You already have a pending price increase request for {$priceType}.");
             }
 
             if (!in_array($priceType, ['call', 'chat'])) {
