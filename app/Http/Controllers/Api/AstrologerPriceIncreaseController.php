@@ -60,11 +60,13 @@ class AstrologerPriceIncreaseController extends Controller
 
             $validated = $request->validate([
                 'price_type' => 'required|string|in:call,chat',
+                'increase_amount' => 'required|numeric|min:0.01',
             ]);
 
             $priceRequest = $this->priceIncreaseService->requestIncrease(
                 $user->astrologer,
-                $validated['price_type']
+                $validated['price_type'],
+                (float) $validated['increase_amount']
             );
 
             return response()->json([
@@ -85,6 +87,11 @@ class AstrologerPriceIncreaseController extends Controller
                 'status' => 'error',
                 'message' => 'Validation failed.',
                 'errors' => $e->errors(),
+            ], 422);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
             ], 422);
         } catch (\RuntimeException $e) {
             return response()->json([

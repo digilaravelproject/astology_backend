@@ -18,15 +18,38 @@ class PriceIncreaseService
         try {
             $totalBusyMinutes = $astrologer->total_busy_minutes;
 
-            $currentLevel = PriceIncreaseLevel::active()
-                ->where('required_busy_minutes', '<=', $totalBusyMinutes)
-                ->orderBy('level_number', 'desc')
-                ->first();
-
-            $nextLevel = PriceIncreaseLevel::active()
-                ->where('required_busy_minutes', '>', $totalBusyMinutes)
+            $activeLevels = PriceIncreaseLevel::active()
                 ->orderBy('level_number', 'asc')
-                ->first();
+                ->get();
+
+            $currentLevel = null;
+            $nextLevel = null;
+
+            if ($activeLevels->isNotEmpty()) {
+                if ($totalBusyMinutes >= $activeLevels[0]->required_busy_minutes) {
+                    $currentIndex = 0;
+                    while ($currentIndex < $activeLevels->count() - 1) {
+                        $evalLevel = $activeLevels[$currentIndex];
+                        $possibleNextLevel = $activeLevels[$currentIndex + 1];
+
+                        $hasMinutes = $totalBusyMinutes >= $possibleNextLevel->required_busy_minutes;
+                        $hasPerformedIncrease = PriceIncreaseRequest::where('astrologer_id', $astrologer->id)
+                            ->where('level_id', $evalLevel->id)
+                            ->whereIn('status', ['pending', 'approved'])
+                            ->exists();
+
+                        if ($hasMinutes && $hasPerformedIncrease) {
+                            $currentIndex++;
+                        } else {
+                            break;
+                        }
+                    }
+                    $currentLevel = $activeLevels[$currentIndex];
+                    $nextLevel = $activeLevels->get($currentIndex + 1);
+                } else {
+                    $nextLevel = $activeLevels[0];
+                }
+            }
 
             $currentChatRate = (float) $astrologer->chat_rate_per_minute;
             $currentCallRate = (float) $astrologer->call_rate_per_minute;
@@ -36,6 +59,23 @@ class PriceIncreaseService
                 ->with('level')
                 ->latest()
                 ->get();
+
+            $hasPendingOrApprovedChat = false;
+            $hasPendingOrApprovedCall = false;
+
+            if ($currentLevel) {
+                $hasPendingOrApprovedChat = PriceIncreaseRequest::where('astrologer_id', $astrologer->id)
+                    ->where('level_id', $currentLevel->id)
+                    ->where('price_type', 'chat')
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->exists();
+
+                $hasPendingOrApprovedCall = PriceIncreaseRequest::where('astrologer_id', $astrologer->id)
+                    ->where('level_id', $currentLevel->id)
+                    ->where('price_type', 'call')
+                    ->whereIn('status', ['pending', 'approved'])
+                    ->exists();
+            }
 
             return [
                 'total_busy_minutes' => round($totalBusyMinutes, 2),
@@ -67,8 +107,8 @@ class PriceIncreaseService
                     'created_at' => $req->created_at->toDateTimeString(),
                 ])->values()->toArray(),
                 'can_request' => [
-                    'chat' => $currentLevel !== null && $pendingRequests->where('price_type', 'chat')->isEmpty(),
-                    'call' => $currentLevel !== null && $pendingRequests->where('price_type', 'call')->isEmpty(),
+                    'chat' => $currentLevel !== null && !$hasPendingOrApprovedChat,
+                    'call' => $currentLevel !== null && !$hasPendingOrApprovedCall,
                 ],
             ];
         } catch (\Exception $e) {
@@ -83,41 +123,67 @@ class PriceIncreaseService
     /**
      * Submit a price increase request.
      */
-    public function requestIncrease(Astrologer $astrologer, string $priceType): PriceIncreaseRequest
+    public function requestIncrease(Astrologer $astrologer, string $priceType, float $increaseAmount): PriceIncreaseRequest
     {
         try {
             $totalBusyMinutes = $astrologer->total_busy_minutes;
 
-            $currentLevel = PriceIncreaseLevel::active()
-                ->where('required_busy_minutes', '<=', $totalBusyMinutes)
-                ->orderBy('level_number', 'desc')
-                ->first();
+            $activeLevels = PriceIncreaseLevel::active()
+                ->orderBy('level_number', 'asc')
+                ->get();
+
+            $currentLevel = null;
+
+            if ($activeLevels->isNotEmpty() && $totalBusyMinutes >= $activeLevels[0]->required_busy_minutes) {
+                $currentIndex = 0;
+                while ($currentIndex < $activeLevels->count() - 1) {
+                    $evalLevel = $activeLevels[$currentIndex];
+                    $possibleNextLevel = $activeLevels[$currentIndex + 1];
+
+                    $hasMinutes = $totalBusyMinutes >= $possibleNextLevel->required_busy_minutes;
+                    $hasPerformedIncrease = PriceIncreaseRequest::where('astrologer_id', $astrologer->id)
+                        ->where('level_id', $evalLevel->id)
+                        ->whereIn('status', ['pending', 'approved'])
+                        ->exists();
+
+                    if ($hasMinutes && $hasPerformedIncrease) {
+                        $currentIndex++;
+                    } else {
+                        break;
+                    }
+                }
+                $currentLevel = $activeLevels[$currentIndex];
+            }
 
             if (!$currentLevel) {
                 throw new \RuntimeException('You are not eligible for any price increase level yet.');
-            }
-
-            $pendingExistsForType = PriceIncreaseRequest::pending()
-                ->byAstrologer($astrologer->id)
-                ->where('price_type', $priceType)
-                ->exists();
-
-            if ($pendingExistsForType) {
-                throw new \RuntimeException("You already have a pending price increase request for {$priceType}.");
             }
 
             if (!in_array($priceType, ['call', 'chat'])) {
                 throw new \InvalidArgumentException('Invalid price type. Must be call or chat.');
             }
 
+            $usedExists = PriceIncreaseRequest::where('astrologer_id', $astrologer->id)
+                ->where('level_id', $currentLevel->id)
+                ->where('price_type', $priceType)
+                ->whereIn('status', ['pending', 'approved'])
+                ->exists();
+
+            if ($usedExists) {
+                throw new \RuntimeException("You have already used the price increase option for {$priceType} on this level.");
+            }
+
+            if ($increaseAmount <= 0) {
+                throw new \InvalidArgumentException('Increase amount must be greater than zero.');
+            }
+
+            if ($increaseAmount > $currentLevel->max_increase_amount) {
+                throw new \InvalidArgumentException("You can increase the price by a maximum of {$currentLevel->max_increase_amount} for this level.");
+            }
+
             $oldPrice = $priceType === 'chat'
                 ? (float) $astrologer->chat_rate_per_minute
                 : (float) $astrologer->call_rate_per_minute;
-
-            $increaseAmount = min(
-                $currentLevel->max_increase_amount,
-                $oldPrice * 0.20
-            );
 
             $newPrice = $oldPrice + $increaseAmount;
 
