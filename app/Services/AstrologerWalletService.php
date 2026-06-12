@@ -92,10 +92,7 @@ class AstrologerWalletService
         }
 
         $astrologer = $user->astrologer;
-        $photo = $astrologer?->profile_photo;
-        if ($photo) {
-            $photo = '/storage/' . ltrim(preg_replace('#^/?storage/#', '', $photo), '/');
-        }
+        $photo = \App\Helpers\MediaHelper::getUrl($astrologer?->profile_photo);
 
         return [
             'total_balance' => (float)$wallet->balance,
@@ -250,10 +247,7 @@ class AstrologerWalletService
 
         // Return top 10 and my info
         $top10 = $rankings->take(10)->values()->map(function ($item, $index) {
-            $photo = $item->profile_photo;
-            if ($photo) {
-                $photo = '/storage/' . ltrim(preg_replace('#^/?storage/#', '', $photo), '/');
-            }
+            $photo = \App\Helpers\MediaHelper::getUrl($item->profile_photo);
             return [
                 'rank' => $index + 1,
                 'astrologer_id' => $item->astrologer_id,
