@@ -36,8 +36,16 @@ class ChatBillingTickJob implements ShouldQueue
                     throw new Exception("Session is not ongoing or not found.");
                 }
 
-                // Lock consumer wallet
-                $consumerWallet = \App\Models\Wallet::where('user_id', $session->consumer_id)->lockForUpdate()->first();
+                // Lock both wallets in consistent order (MIN user_id first) to prevent AB-BA deadlock
+                $consumerId = $session->consumer_id;
+                $providerId = $session->provider_id;
+                if ($consumerId < $providerId) {
+                    $consumerWallet = \App\Models\Wallet::where('user_id', $consumerId)->lockForUpdate()->first();
+                    $providerWallet = \App\Models\Wallet::where('user_id', $providerId)->lockForUpdate()->first();
+                } else {
+                    $providerWallet = \App\Models\Wallet::where('user_id', $providerId)->lockForUpdate()->first();
+                    $consumerWallet = \App\Models\Wallet::where('user_id', $consumerId)->lockForUpdate()->first();
+                }
                 if (!$consumerWallet || $consumerWallet->balance < $session->rate_per_minute) {
                     throw new Exception("Insufficient balance for chat session tick.");
                 }

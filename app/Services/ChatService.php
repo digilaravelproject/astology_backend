@@ -316,9 +316,16 @@ class ChatService
                     throw new Exception("You are not authorized to end this chat.");
                 }
 
-                // Lock wallets inside the transaction
-                $consumerWallet = \App\Models\Wallet::where('user_id', $session->consumer_id)->lockForUpdate()->first();
-                $providerWallet = \App\Models\Wallet::where('user_id', $session->provider_id)->lockForUpdate()->first();
+                // Lock wallets in consistent order (MIN user_id first) to prevent AB-BA deadlock
+                $consumerId = $session->consumer_id;
+                $providerId = $session->provider_id;
+                if ($consumerId < $providerId) {
+                    $consumerWallet = \App\Models\Wallet::where('user_id', $consumerId)->lockForUpdate()->first();
+                    $providerWallet = \App\Models\Wallet::where('user_id', $providerId)->lockForUpdate()->first();
+                } else {
+                    $providerWallet = \App\Models\Wallet::where('user_id', $providerId)->lockForUpdate()->first();
+                    $consumerWallet = \App\Models\Wallet::where('user_id', $consumerId)->lockForUpdate()->first();
+                }
 
                 $endTime = now();
                 $durationSeconds = $session->started_at ? (int) $session->started_at->diffInSeconds($endTime) : 0;

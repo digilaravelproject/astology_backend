@@ -114,14 +114,15 @@ class CallService
     {
         return DB::transaction(function () use ($sessionId, $providerId) {
             try {
-                // Lock provider row to prevent concurrent accepts
-                $provider = User::where('id', $providerId)->lockForUpdate()->first();
+                // Lock the session row FIRST (prevents deadlock with missedCall/endCall/rejectCall)
+                $session = \App\Models\CallSession::where('id', $sessionId)->lockForUpdate()->first();
 
-                $session = $this->callRepo->findById($sessionId);
-                
-                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing', 'waiting'])) {
+                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing'])) {
                     throw new Exception("The call session is no longer valid or has been cancelled.");
                 }
+
+                // Now lock provider row to prevent concurrent accepts
+                $provider = User::where('id', $providerId)->lockForUpdate()->first();
 
                 // Check dynamic busy check under lock to prevent double booking
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -215,9 +216,16 @@ class CallService
                     throw new Exception("You are not authorized to end this call.");
                 }
 
-                // Lock wallets inside the transaction
-                $consumerWallet = \App\Models\Wallet::where('user_id', $session->consumer_id)->lockForUpdate()->first();
-                $providerWallet = \App\Models\Wallet::where('user_id', $session->provider_id)->lockForUpdate()->first();
+                // Lock wallets in consistent order (MIN user_id first) to prevent AB-BA deadlock
+                $consumerId = $session->consumer_id;
+                $providerId = $session->provider_id;
+                if ($consumerId < $providerId) {
+                    $consumerWallet = \App\Models\Wallet::where('user_id', $consumerId)->lockForUpdate()->first();
+                    $providerWallet = \App\Models\Wallet::where('user_id', $providerId)->lockForUpdate()->first();
+                } else {
+                    $providerWallet = \App\Models\Wallet::where('user_id', $providerId)->lockForUpdate()->first();
+                    $consumerWallet = \App\Models\Wallet::where('user_id', $consumerId)->lockForUpdate()->first();
+                }
 
                 $endTime = now();
                 $durationSeconds = $session->started_at ? $session->started_at->diffInSeconds($endTime) : 0;
