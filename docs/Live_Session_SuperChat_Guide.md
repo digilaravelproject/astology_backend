@@ -1,680 +1,482 @@
-# Live Session & Super Chat API Guide
+# Live Session & Super Chat API & WebSocket Guide
 
-## Overview
-
-This document covers the **Live Streaming** (Instagram Live style) feature and **Super Chat** paid-tip system. Astrologers can go live instantly or schedule sessions for the future, multiple users can join as viewers, send real-time comments, and send paid Super Chats that deduct from their wallet and credit the astrologer.
+This guide details the complete step-by-step lifecycle of Live Streaming and Super Chats in the Astrologer Backend. It includes exact HTTP routes, payload parameters (required vs. optional), server responses, and Laravel Reverb WebSocket event details for both **Scheduled** and **Instant** live streams.
 
 ---
 
-## Architecture
+## 1. Authentication & Base Setup
 
-### Real-Time Stack
-- **Laravel Reverb** (WebSockets) — all real-time communication
-- **Presence Channels** (`live-session.{id}`) — viewer count, comments, super chats
-- **Public Channels** (`live-sessions`) — updates when any astrologer goes live
-- **Private Channels** (`call.{sessionId}`, `user.{id}`) — 1-on-1 call signaling
+All API requests require the following headers:
+- `Authorization: Bearer <sanctum_token>`
+- `Accept: application/json`
+- `Content-Type: application/json`
 
-### Database Tables
-| Table | Purpose |
-|-------|---------|
-| `live_sessions` | Live stream sessions (astrologer, status, stream_key, viewer_count) |
-| `live_comments` | Viewer comments on live sessions |
-| `super_chats` | Paid tips with wallet transaction tracking |
-
-### Wallet Integration
-- User wallet is debited on Super Chat send
-- Astrologer wallet (via `astrologer.user_id`) is credited simultaneously
-- All wallet operations use **ACID-compliant transactions** with `lockForUpdate()` to prevent race conditions
-- To prevent deadlocks, database locks on user and astrologer wallets are always acquired in deterministic order (ascending user ID)
-- Both debit and credit reference the `super_chats` record for full traceability
+WebSockets are handled using **Laravel Reverb**. All WebSocket connection authentication (for presence and private channels) uses:
+- `POST /api/v1/broadcasting/auth`
 
 ---
 
-## API Endpoints
+## 2. Step-by-Step Flow: Scheduled Live Session
 
-### Authentication
-All endpoints require `Authorization: Bearer <token>` header. Tokens are obtained via Sanctum login.
-
----
-
-### Astrologer Endpoints
-
-#### 1. List My Live Sessions
-```http
-GET /api/v1/astrologer/live?filter=upcoming|completed|all&per_page=15
+```mermaid
+sequence-diagram
+    autonumber
+    Astrologer -> API: POST /api/v1/astrologer/live (Create Scheduled)
+    Astrologer -> API: POST /api/v1/astrologer/live/{id}/start (Go Live)
+    Note over Reverb: Broadcasts 'LiveSessionStarted' on 'live-sessions'
+    User -> API: GET /api/v1/user/live/now (Fetch ongoing streams)
+    User -> API: POST /api/v1/user/live/{id}/join
+    Note over Reverb: Broadcasts 'ViewerCountUpdated' on 'live-session.{id}'
+    User -> API: POST /api/v1/user/live/{id}/comment
+    Note over Reverb: Broadcasts 'NewLiveComment' on 'live-session.{id}'
+    User -> API: POST /api/v1/user/live/{id}/super-chat
+    Note over Reverb: Broadcasts 'SuperChatReceived' on 'live-session.{id}'
+    Astrologer -> API: POST /api/v1/astrologer/live/{id}/stop (End stream)
 ```
 
-##### Query Parameters
-- `filter` (optional, string): Filter by session status. Options: `upcoming`, `completed`, `all`. Defaults to `all`.
-- `per_page` (optional, integer): Number of records per page. Defaults to `15`.
+### Step 1: Create Scheduled Session (Astrologer)
+The astrologer schedules a session for the future.
 
-##### Response (Success - `filter=all`):
-```json
-{
-  "success": true,
-  "data": {
-    "upcoming": {
-      "data": [
-        {
-          "id": 2,
-          "astrologer_id": 5,
-          "title": "Weekly Tarot Prediction",
-          "description": "Tarot guidance for the next week",
-          "scheduled_at": "2026-06-20 18:00:00",
-          "scheduled_date": "2026-06-20",
-          "scheduled_time": "18:00:00",
-          "session_type": "public",
-          "status": "upcoming",
-          "live_url": null,
-          "stream_key": null,
-          "stream_url": null,
-          "started_at": null,
-          "ended_at": null,
-          "duration_minutes": 60,
-          "max_participants": 100,
-          "current_participants": 0,
-          "viewer_count": 0,
-          "created_at": "2026-06-16 12:00:00",
-          "updated_at": "2026-06-16 12:00:00"
-        }
-      ],
-      "total": 1
+- **HTTP Request**: `POST /api/v1/astrologer/live`
+- **Request Body**:
+  ```json
+  {
+    "title": "Weekly Astrology Prediction",          // Required, string, max:255
+    "description": "Weekly horoscope analysis",      // Optional, string, max:1000
+    "scheduled_at": "2026-06-20 18:00:00",           // Required, date_format:Y-m-d H:i:s, after:now
+    "session_type": "public",                        // Required, in:public,private
+    "duration_minutes": 60,                         // Optional, integer, min:15, max:480, default:60
+    "max_participants": 500                          // Optional, integer, min:1, max:5000, default:100
+  }
+  ```
+- **Response (`201 Created`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 15,
+      "astrologer_id": 5,
+      "title": "Weekly Astrology Prediction",
+      "description": "Weekly horoscope analysis",
+      "scheduled_at": "2026-06-20 18:00:00",
+      "scheduled_date": "2026-06-20",
+      "scheduled_time": "18:00:00",
+      "session_type": "public",
+      "status": "upcoming",
+      "live_url": null,
+      "stream_key": null,
+      "stream_url": null,
+      "started_at": null,
+      "ended_at": null,
+      "duration_minutes": 60,
+      "max_participants": 500,
+      "current_participants": 0,
+      "viewer_count": 0,
+      "created_at": "2026-06-16 14:00:00",
+      "updated_at": "2026-06-16 14:00:00"
     },
-    "completed": {
-      "data": [
-        {
-          "id": 1,
-          "astrologer_id": 5,
-          "title": "Evening Meditation",
-          "description": "Relaxing evening meditation",
-          "scheduled_at": "2026-06-15 19:00:00",
-          "scheduled_date": "2026-06-15",
-          "scheduled_time": "19:00:00",
-          "session_type": "public",
-          "status": "completed",
-          "live_url": "https://stream.astrogravity.com/live/evening-meditation",
-          "stream_key": "some_random_stream_key_32_chars",
-          "stream_url": "rtmp://stream.astrogravity.com/live",
-          "started_at": "2026-06-15 19:05:00",
-          "ended_at": "2026-06-15 20:05:00",
-          "duration_minutes": 60,
-          "max_participants": 200,
-          "current_participants": 45,
-          "viewer_count": 0,
-          "created_at": "2026-06-15 15:00:00",
-          "updated_at": "2026-06-15 20:05:00"
-        }
-      ],
-      "pagination": {
-        "current_page": 1,
-        "total_pages": 1,
-        "per_page": 15,
-        "total": 1
-      }
-    }
-  },
-  "message": "Live sessions retrieved successfully"
-}
-```
+    "message": "Live session created successfully"
+  }
+  ```
 
 ---
 
-#### 2. Get Currently Active Ongoing Session
-*Allows the astrologer to check if they have a running live stream (e.g. if the app closed accidentally or they need to resume).*
-```http
-GET /api/v1/astrologer/live/current
-```
+### Step 2: Start Scheduled Session (Astrologer)
+When the scheduled time arrives, the astrologer starts the stream.
 
-##### Response (Success - Session Found):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 13,
-    "astrologer_id": 5,
-    "title": "Instant QA & Reading",
-    "description": "Going live right now to answer your questions!",
-    "scheduled_at": "2026-06-16 14:06:00",
-    "scheduled_date": "2026-06-16",
-    "scheduled_time": "14:06:00",
-    "session_type": "public",
-    "status": "ongoing",
-    "live_url": null,
-    "stream_key": "abcde12345randomstreamkeyhere",
-    "stream_url": null,
-    "started_at": "2026-06-16 14:06:00",
-    "ended_at": null,
-    "duration_minutes": 45,
-    "max_participants": 200,
-    "current_participants": 12,
-    "viewer_count": 12,
-    "created_at": "2026-06-16 14:06:00",
-    "updated_at": "2026-06-16 14:08:00"
-  },
-  "message": "Current active live session retrieved successfully"
-}
-```
-
-##### Response (Success - No Session Active):
-```json
-{
-  "success": true,
-  "data": null,
-  "message": "No active live session found"
-}
-```
-
----
-
-#### 3. Create Live Session (Scheduled or Instant)
-```http
-POST /api/v1/astrologer/live
-Content-Type: application/json
-```
-
-##### Payload Body Parameters
-- `title` (required, string): Maximum 255 characters.
-- `description` (optional, string): Maximum 1000 characters.
-- `is_instant` (optional, boolean): If `true`, the live session starts immediately. Status becomes `ongoing`, `started_at` is set, and a random `stream_key` is generated.
-- `scheduled_at` (required unless `is_instant` is true, string): Format `Y-m-d H:i:s`. Must be a future date/time.
-- `session_type` (required, string): Options: `public`, `private`.
-- `duration_minutes` (optional, integer): Range `15` to `480`. Defaults to `60`.
-- `max_participants` (optional, integer): Range `1` to `5000`. Defaults to `100`.
-
-##### Example Request (Instant Live):
-```json
-{
-  "title": "Instant QA & Reading",
-  "description": "Going live right now to answer your questions!",
-  "is_instant": true,
-  "session_type": "public",
-  "duration_minutes": 45,
-  "max_participants": 200
-}
-```
-
-##### Response (Success - Instant - `201 Created`):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 13,
-    "astrologer_id": 5,
-    "title": "Instant QA & Reading",
-    "description": "Going live right now to answer your questions!",
-    "scheduled_at": "2026-06-16 14:06:00",
-    "scheduled_date": "2026-06-16",
-    "scheduled_time": "14:06:00",
-    "session_type": "public",
-    "status": "ongoing",
-    "live_url": null,
-    "stream_key": "abcde12345randomstreamkeyhere",
-    "stream_url": null,
-    "started_at": "2026-06-16 14:06:00",
-    "ended_at": null,
-    "duration_minutes": 45,
-    "max_participants": 200,
-    "current_participants": 0,
-    "viewer_count": 0,
-    "created_at": "2026-06-16 14:06:00",
-    "updated_at": "2026-06-16 14:06:00"
-  },
-  "message": "Live session created successfully"
-}
-```
-
----
-
-#### 4. Start Live Session (For Scheduled Upcoming Sessions)
-```http
-POST /api/v1/astrologer/live/{id}/start
-```
-
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 12,
-    "astrologer_id": 5,
-    "title": "Evening Tarot Reading",
-    "description": "Join me for free tarot!",
-    "scheduled_at": "2026-06-25 18:00:00",
-    "scheduled_date": "2026-06-25",
-    "scheduled_time": "18:00:00",
-    "session_type": "public",
-    "status": "ongoing",
-    "live_url": null,
-    "stream_key": "streamkeyxyz123abc456random",
-    "stream_url": null,
-    "started_at": "2026-06-16 14:10:00",
-    "ended_at": null,
-    "duration_minutes": 60,
-    "max_participants": 500,
-    "current_participants": 0,
-    "viewer_count": 0,
-    "created_at": "2026-06-16 14:05:00",
-    "updated_at": "2026-06-16 14:10:00"
-  },
-  "message": "Live session started successfully"
-}
-```
-
----
-
-#### 5. Stop Live Session
-```http
-POST /api/v1/astrologer/live/{id}/stop
-```
-
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 12,
-    "astrologer_id": 5,
-    "title": "Evening Tarot Reading",
-    "description": "Join me for free tarot!",
-    "scheduled_at": "2026-06-25 18:00:00",
-    "scheduled_date": "2026-06-25",
-    "scheduled_time": "18:00:00",
-    "session_type": "public",
-    "status": "completed",
-    "live_url": null,
-    "stream_key": "streamkeyxyz123abc456random",
-    "stream_url": null,
-    "started_at": "2026-06-16 14:10:00",
-    "ended_at": "2026-06-16 14:55:00",
-    "duration_minutes": 45,
-    "max_participants": 500,
-    "current_participants": 0,
-    "viewer_count": 0,
-    "created_at": "2026-06-16 14:05:00",
-    "updated_at": "2026-06-16 14:55:00"
-  },
-  "message": "Live session ended successfully"
-}
-```
-
----
-
-#### 6. Update Live Session
-```http
-PUT /api/v1/astrologer/live/{id}
-Content-Type: application/json
-```
-
-##### Payload Body Parameters
-- `title` (optional, string): Max 255.
-- `description` (optional, string): Max 1000.
-- `scheduled_at` (optional, string): Format `Y-m-d H:i:s`. Must be a future date/time.
-- `session_type` (optional, string): `public`, `private`.
-- `status` (optional, string): `upcoming`, `ongoing`, `completed`, `cancelled`.
-- `duration_minutes` (optional, integer): Range `15` to `480`.
-- `max_participants` (optional, integer): Range `1` to `5000`.
-
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 12,
-    "astrologer_id": 5,
-    "title": "Updated Tarot Time",
-    "description": "Join me for free tarot!",
-    "scheduled_at": "2026-06-25 18:00:00",
-    "scheduled_date": "2026-06-25",
-    "scheduled_time": "18:00:00",
-    "session_type": "public",
-    "status": "upcoming",
-    "live_url": null,
-    "stream_key": null,
-    "stream_url": null,
-    "started_at": null,
-    "ended_at": null,
-    "duration_minutes": 90,
-    "max_participants": 500,
-    "current_participants": 0,
-    "viewer_count": 0,
-    "created_at": "2026-06-16 14:05:00",
-    "updated_at": "2026-06-16 14:15:00"
-  },
-  "message": "Live session updated successfully"
-}
-```
-
----
-
-#### 7. Delete Live Session
-```http
-DELETE /api/v1/astrologer/live/{id}
-```
-
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": null,
-  "message": "Live session 'Updated Tarot Time' deleted successfully"
-}
-```
-
----
-
-### User (Viewer) Endpoints
-
-#### 1. Get Currently Streaming Sessions
-```http
-GET /api/v1/user/live/now
-```
-
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": [
+- **HTTP Request**: `POST /api/v1/astrologer/live/{id}/start` (where `{id}` is `15`)
+- **Request Body**: None
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 15,
+      "astrologer_id": 5,
+      "title": "Weekly Astrology Prediction",
+      "description": "Weekly horoscope analysis",
+      "scheduled_at": "2026-06-20 18:00:00",
+      "scheduled_date": "2026-06-20",
+      "scheduled_time": "18:00:00",
+      "session_type": "public",
+      "status": "ongoing",
+      "live_url": null,
+      "stream_key": "streamkey_random_value_32_chars",
+      "stream_url": null,
+      "started_at": "2026-06-20 18:00:05",
+      "ended_at": null,
+      "duration_minutes": 60,
+      "max_participants": 500,
+      "current_participants": 0,
+      "viewer_count": 0,
+      "created_at": "2026-06-16 14:00:00",
+      "updated_at": "2026-06-20 18:00:05"
+    },
+    "message": "Live session started successfully"
+  }
+  ```
+- **Real-Time WebSocket Event**:
+  - **Channel**: `live-sessions` (Public Channel)
+  - **Event Name**: `LiveSessionStarted`
+  - **Payload**:
+    ```json
     {
-      "id": 13,
-      "title": "Instant QA & Reading",
+      "id": 15,
+      "title": "Weekly Astrology Prediction",
       "astrologer": {
         "id": 5,
         "name": "Priya Sharma",
         "profile_photo": "https://astrogravity.com/storage/photos/abc.jpg"
       },
-      "viewer_count": 42,
-      "started_at": "2026-06-16T14:06:00.000000Z"
+      "viewer_count": 0,
+      "started_at": "2026-06-20T18:00:05.000000Z"
     }
-  ],
-  "message": "Live sessions retrieved successfully"
-}
-```
+    ```
+- **System Notification**: Triggered immediately to all app users via `NotificationHelper`:
+  - **Title**: `Astrologer Live Now!`
+  - **Body**: `Priya Sharma is now streaming live. Join the session to ask your questions!`
+  - **Meta**: `{"type": "live_session", "live_session_id": 15}`
 
 ---
 
-#### 2. Get Live Session Detail
-```http
-GET /api/v1/user/live/{id}
-```
+## 3. Step-by-Step Flow: Instant Live Session
 
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 13,
-    "title": "Instant QA & Reading",
-    "description": "Going live right now to answer your questions!",
-    "session_type": "public",
-    "status": "ongoing",
-    "stream_url": "https://stream.astrogravity.com/live/13.m3u8",
-    "viewer_count": 42,
-    "started_at": "2026-06-16T14:06:00.000000Z",
-    "astrologer": {
-      "id": 5,
-      "name": "Priya Sharma",
-      "profile_photo": "https://astrogravity.com/storage/photos/abc.jpg",
-      "gender": "female",
-      "date_of_birth": "1990-08-15"
+### Step 1: Go Live Instantly (Astrologer)
+The astrologer skips scheduling and goes live right away.
+
+- **HTTP Request**: `POST /api/v1/astrologer/live`
+- **Request Body**:
+  ```json
+  {
+    "title": "Instant Tarot Reading & QA",             // Required, string, max:255
+    "description": "Ask me anything live!",            // Optional, string, max:1000
+    "is_instant": true,                                // Required, boolean (true)
+    "session_type": "public",                          // Required, in:public,private
+    "duration_minutes": 45,                           // Optional, integer, min:15, max:480, default:60
+    "max_participants": 300                            // Optional, integer, min:1, max:5000, default:100
+  }
+  ```
+- **Response (`201 Created`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 16,
+      "astrologer_id": 5,
+      "title": "Instant Tarot Reading & QA",
+      "description": "Ask me anything live!",
+      "scheduled_at": "2026-06-16 14:30:00",
+      "scheduled_date": "2026-06-16",
+      "scheduled_time": "14:30:00",
+      "session_type": "public",
+      "status": "ongoing",
+      "live_url": null,
+      "stream_key": "streamkey_instant_32_chars_random",
+      "stream_url": null,
+      "started_at": "2026-06-16 14:30:00",
+      "ended_at": null,
+      "duration_minutes": 45,
+      "max_participants": 300,
+      "current_participants": 0,
+      "viewer_count": 0,
+      "created_at": "2026-06-16 14:30:00",
+      "updated_at": "2026-06-16 14:30:00"
+    },
+    "message": "Live session created successfully"
+  }
+  ```
+- **Real-Time WebSocket Event**:
+  - **Channel**: `live-sessions` (Public Channel)
+  - **Event Name**: `LiveSessionStarted`
+  - **Payload**:
+    ```json
+    {
+      "id": 16,
+      "title": "Instant Tarot Reading & QA",
+      "astrologer": {
+        "id": 5,
+        "name": "Priya Sharma",
+        "profile_photo": "https://astrogravity.com/storage/photos/abc.jpg"
+      },
+      "viewer_count": 0,
+      "started_at": "2026-06-16T14:30:00.000000Z"
     }
-  },
-  "message": "Live session retrieved successfully"
-}
-```
+    ```
+- **System Notification**: Triggered immediately to all app users via `NotificationHelper`:
+  - **Title**: `Astrologer Live Now!`
+  - **Body**: `Priya Sharma is now streaming live. Join the session to ask your questions!`
+  - **Meta**: `{"type": "live_session", "live_session_id": 16}`
 
 ---
 
-#### 3. Join Live Session
-```http
-POST /api/v1/user/live/{id}/join
-```
-*Increments the viewer count for the session and broadcasts a `ViewerCountUpdated` event.*
+## 4. User (Viewer) Interaction Steps
 
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": null,
-  "message": "Joined live session successfully"
-}
-```
+Once the stream is `ongoing` (from Scheduled or Instant steps), users interact as follows:
 
----
+### Step 1: List Active Live Streams
+Users fetch a list of all active streams to click and join.
 
-#### 4. Leave Live Session
-```http
-POST /api/v1/user/live/{id}/leave
-```
-*Decrements the viewer count for the session and broadcasts a `ViewerCountUpdated` event.*
-
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": null,
-  "message": "Left live session successfully"
-}
-```
-
----
-
-#### 5. Send Comment
-```http
-POST /api/v1/user/live/{id}/comment
-Content-Type: application/json
-```
-
-##### Payload Body Parameters
-- `message` (required, string): Maximum 500 characters.
-
-##### Example Request:
-```json
-{
-  "message": "Amazing session! 🌟"
-}
-```
-
-##### Response (Success - `201 Created`):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 99,
-    "message": "Amazing session! 🌟",
-    "created_at": "2026-06-16T14:20:00.000000Z"
-  },
-  "message": "Comment sent successfully"
-}
-```
-
----
-
-#### 6. Send Super Chat
-```http
-POST /api/v1/user/live/{id}/super-chat
-Content-Type: application/json
-```
-
-##### Payload Body Parameters
-- `gift_id` (required, integer): The ID of the active gift to send as a Super Chat.
-- `message` (optional, string): Maximum 500 characters.
-
-##### Example Request:
-```json
-{
-  "gift_id": 3,
-  "message": "Great reading! 🎉"
-}
-```
-
-##### Response (Success - `201 Created`):
-```json
-{
-  "success": true,
-  "data": {
-    "id": 10,
-    "amount": 50.00,
-    "message": "[Gift: Red Rose] Great reading! 🎉",
-    "created_at": "2026-06-16T14:22:00.000000Z"
-  },
-  "message": "Super Chat sent successfully"
-}
-```
-
----
-
-#### 7. Get Session Comments
-```http
-GET /api/v1/user/live/{id}/comments?per_page=50
-```
-
-##### Query Parameters
-- `per_page` (optional, integer): Range `1` to `100`. Defaults to `50`.
-
-##### Response (Success):
-```json
-{
-  "success": true,
-  "data": {
+- **HTTP Request**: `GET /api/v1/user/live/now`
+- **Request Body**: None
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
     "data": [
       {
-        "id": 99,
-        "user_id": 42,
-        "user_name": "Rahul K",
-        "user_avatar": "https://astrogravity.com/storage/photos/user42.jpg",
-        "message": "Amazing session! 🌟",
-        "created_at": "2026-06-16T14:20:00.000000Z"
+        "id": 16,
+        "title": "Instant Tarot Reading & QA",
+        "astrologer": {
+          "id": 5,
+          "name": "Priya Sharma",
+          "profile_photo": "https://astrogravity.com/storage/photos/abc.jpg"
+        },
+        "viewer_count": 0,
+        "started_at": "2026-06-16T14:30:00.000000Z"
       }
     ],
-    "pagination": {
-      "current_page": 1,
-      "total_pages": 1,
-      "per_page": 50,
-      "total": 1
+    "message": "Live sessions retrieved successfully"
+  }
+  ```
+
+---
+
+### Step 2: Join the Live Session
+User clicks on a live session card to watch and subscribe to real-time chats.
+
+- **HTTP Request**: `POST /api/v1/user/live/{id}/join` (where `{id}` is `16`)
+- **Request Body**: None
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": null,
+    "message": "Joined live session successfully"
+  }
+  ```
+- **Real-Time WebSocket Event**:
+  - **Channel**: `presence-live-session.16` (Presence Channel)
+  - **Event Name**: `ViewerCountUpdated`
+  - **Payload**:
+    ```json
+    {
+      "live_session_id": 16,
+      "viewer_count": 1
     }
-  },
-  "message": "Comments retrieved successfully"
-}
-```
+    ```
 
 ---
 
-## Reverb Channels & Real-Time Events
+### Step 3: Send Real-time Comment
+User writes a text message in the chat box.
 
-### Channels List
-
-| Channel Name | Type | Purpose |
-|--------------|------|---------|
-| `live-sessions` | Public | Emits updates when any astrologer goes live. |
-| `live-session.{id}` | Presence | Used for chat comments, viewer counts, and Super Chats in a specific session. |
-
----
-
-### Events Description
-
-#### 1. `LiveSessionStarted` (Public Channel: `live-sessions`)
-*Emitted as soon as an astrologer starts streaming (instant or scheduled). Allows the client app to insert the new ongoing session into the stream list instantly without refreshing.*
-
-##### Event Data Payload:
-```json
-{
-  "id": 13,
-  "title": "Instant QA & Reading",
-  "astrologer": {
-    "id": 5,
-    "name": "Priya Sharma",
-    "profile_photo": "https://astrogravity.com/storage/photos/abc.jpg"
-  },
-  "viewer_count": 0,
-  "started_at": "2026-06-16T14:06:00.000000Z"
-}
-```
-
----
-
-#### 2. `ViewerCountUpdated` (Presence Channel: `live-session.{id}`)
-*Emitted in real-time whenever a user joins or leaves the live stream. Keeps the live viewer count badge synchronized.*
-
-##### Event Data Payload:
-```json
-{
-  "live_session_id": 13,
-  "viewer_count": 43
-}
-```
+- **HTTP Request**: `POST /api/v1/user/live/{id}/comment`
+- **Request Body**:
+  ```json
+  {
+    "message": "Hello Priya, please answer my question! 🔮"   // Required, string, max:500
+  }
+  ```
+- **Response (`210 Created`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 110,
+      "message": "Hello Priya, please answer my question! 🔮",
+      "created_at": "2026-06-16T14:32:00.000000Z"
+    },
+    "message": "Comment sent successfully"
+  }
+  ```
+- **Real-Time WebSocket Event**:
+  - **Channel**: `presence-live-session.16` (Presence Channel)
+  - **Event Name**: `NewLiveComment`
+  - **Payload**:
+    ```json
+    {
+      "user_id": 42,
+      "user_name": "Rahul Kumar",
+      "user_avatar": "https://astrogravity.com/storage/photos/user42.jpg",
+      "message": "Hello Priya, please answer my question! 🔮",
+      "created_at": "2026-06-16T14:32:00.000000Z"
+    }
+    ```
 
 ---
 
-#### 3. `NewLiveComment` (Presence Channel: `live-session.{id}`)
-*Emitted when a new message is successfully sent to the session chat.*
+### Step 4: Send Super Chat (Gift Tip)
+User wants to catch the astrologer's attention by tipping a pre-defined Gift from their wallet balance.
 
-##### Event Data Payload:
-```json
-{
-  "user_id": 42,
-  "user_name": "Rahul K",
-  "user_avatar": "https://astrogravity.com/storage/photos/user42.jpg",
-  "message": "Amazing session! 🌟",
-  "created_at": "2026-06-16T14:20:00.000000Z"
-}
-```
-
----
-
-#### 4. `SuperChatReceived` (Presence Channel: `live-session.{id}`)
-*Emitted when a Super Chat (paid tip) is successfully sent. Astrologer receives credits, user is debited, and all viewers see the notification overlay.*
-
-##### Event Data Payload:
-```json
-{
-  "user_id": 42,
-  "user_name": "Rahul K",
-  "user_avatar": "https://astrogravity.com/storage/photos/user42.jpg",
-  "amount": 50.00,
-  "message": "[Gift: Red Rose] Great reading! 🎉",
-  "gift": {
-    "id": 3,
-    "title": "Red Rose",
-    "icon_url": "https://astrogravity.com/storage/gifts/icons/red_rose.png"
-  },
-  "created_at": "2026-06-16T14:22:00.000000Z"
-}
-```
-
----
-
-## Super Chat Transaction Flow
-
-```
-User POST /live/{id}/super-chat { gift_id: 3, message: "Great!" }
-  │
-  ├─► Validate session is 'ongoing'
-  ├─► Validate active gift and fetch price
-  │
-  ├─► DB::beginTransaction()
-  │    ├─► Get lock order of wallet IDs: min(user_id, astrologer_user_id) then max(user_id, astrologer_user_id)
-  │    ├─► lockForUpdate() first wallet
-  │    ├─► lockForUpdate() second wallet
-  │    ├─► Check user.balance >= 50
-  │    ├─► INSERT super_chats (status: pending)
-  │    ├─► walletRepository.debit(user, 50)
-  │    │    └─► WalletTransaction (debit, super_chat_deduction)
-  │    ├─► walletRepository.credit(astrologer_user, 50)
-  │    │    └─► WalletTransaction (credit, super_chat_credit)
-  │    ├─► UPDATE super_chats SET status=completed, wallet_transaction_id=...
-  │    └─► DB::commit()
-  │
-  ├─► Broadcast SuperChatReceived event to live-session.{id}
-  │
-  └─► Return 201 { id, amount, message, created_at }
-```
+- **HTTP Request**: `POST /api/v1/user/live/{id}/super-chat`
+- **Request Body**:
+  ```json
+  {
+    "gift_id": 3,                                              // Required, integer, exists:gifts,id
+    "message": "Here is a Red Rose for you!"                   // Optional, string, max:500
+  }
+  ```
+- **Response (`201 Created`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 22,
+      "amount": 50.00,
+      "message": "[Gift: Red Rose] Here is a Red Rose for you!",
+      "created_at": "2026-06-16T14:34:00.000000Z"
+    },
+    "message": "Super Chat sent successfully"
+  }
+  ```
+- **Real-Time WebSocket Event**:
+  - **Channel**: `presence-live-session.16` (Presence Channel)
+  - **Event Name**: `SuperChatReceived`
+  - **Payload**:
+    ```json
+    {
+      "user_id": 42,
+      "user_name": "Rahul Kumar",
+      "user_avatar": "https://astrogravity.com/storage/photos/user42.jpg",
+      "amount": 50.00,
+      "message": "[Gift: Red Rose] Here is a Red Rose for you!",
+      "gift": {
+        "id": 3,
+        "title": "Red Rose",
+        "icon_url": "https://astrogravity.com/storage/gifts/icons/red_rose.png"
+      },
+      "created_at": "2026-06-16T14:34:00.000000Z"
+    }
+    ```
 
 ---
 
-## Changelog
+### Step 5: Leave the Live Session
+User closes the stream window.
 
-| Date | Change |
-|------|--------|
-| 2026-06-12 | Initial live session + super chat implementation |
-| 2026-06-16 | Added support for instant live session creation and deterministic deadlock-free locking |
-| 2026-06-16 | Added live session started/join real-time events, current ongoing session recovery, and user notification trigger |
+- **HTTP Request**: `POST /api/v1/user/live/{id}/leave`
+- **Request Body**: None
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": null,
+    "message": "Left live session successfully"
+  }
+  ```
+- **Real-Time WebSocket Event**:
+  - **Channel**: `presence-live-session.16` (Presence Channel)
+  - **Event Name**: `ViewerCountUpdated`
+  - **Payload**:
+    ```json
+    {
+      "live_session_id": 16,
+      "viewer_count": 0
+    }
+    ```
+
+---
+
+## 5. Astrologer Stream Interruption & End Flows
+
+### Astrologer Resume Stream (If app crashes or back-button clicked)
+If the astrologer's app closes accidentally but they are still streaming:
+
+- **HTTP Request**: `GET /api/v1/astrologer/live/current`
+- **Request Body**: None
+- **Response (`200 OK - Active Stream found`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 16,
+      "astrologer_id": 5,
+      "title": "Instant Tarot Reading & QA",
+      "description": "Ask me anything live!",
+      "scheduled_at": "2026-06-16 14:30:00",
+      "scheduled_date": "2026-06-16",
+      "scheduled_time": "14:30:00",
+      "session_type": "public",
+      "status": "ongoing",
+      "live_url": null,
+      "stream_key": "streamkey_instant_32_chars_random",
+      "stream_url": null,
+      "started_at": "2026-06-16 14:30:00",
+      "ended_at": null,
+      "duration_minutes": 45,
+      "max_participants": 300,
+      "current_participants": 0,
+      "viewer_count": 0,
+      "created_at": "2026-06-16 14:30:00",
+      "updated_at": "2026-06-16 14:30:00"
+    },
+    "message": "Current active live session retrieved successfully"
+  }
+  ```
+- **Action**: The frontend recovers the `stream_key` from the response and reconnects/pushes RTMP without creating a new session.
+
+---
+
+### Step 6: End Live Session (Astrologer)
+The astrologer finishes the live session.
+
+- **HTTP Request**: `POST /api/v1/astrologer/live/{id}/stop` (where `{id}` is `16`)
+- **Request Body**: None
+- **Response (`200 OK`)**:
+  ```json
+  {
+    "success": true,
+    "data": {
+      "id": 16,
+      "astrologer_id": 5,
+      "title": "Instant Tarot Reading & QA",
+      "description": "Ask me anything live!",
+      "scheduled_at": "2026-06-16 14:30:00",
+      "scheduled_date": "2026-06-16",
+      "scheduled_time": "14:30:00",
+      "session_type": "public",
+      "status": "completed",
+      "live_url": null,
+      "stream_key": "streamkey_instant_32_chars_random",
+      "stream_url": null,
+      "started_at": "2026-06-16 14:30:00",
+      "ended_at": "2026-06-16 15:15:00",
+      "duration_minutes": 45,
+      "max_participants": 300,
+      "current_participants": 0,
+      "viewer_count": 0,
+      "created_at": "2026-06-16 14:30:00",
+      "updated_at": "2026-06-16 15:15:00"
+    },
+    "message": "Live session ended successfully"
+  }
+  ```
+
+---
+
+## 6. Real-Time WebSocket Event Definitions (Laravel Reverb)
+
+Here is a quick reference for the frontend to bind events:
+
+```javascript
+// 1. Listen to global live streams additions
+Echo.channel('live-sessions')
+    .listen('.LiveSessionStarted', (e) => {
+        console.log('New Stream Started:', e);
+        // Add e to list of active streams reactively
+    });
+
+// 2. Listen to updates inside a specific stream (e.g. stream ID = 16)
+Echo.join('live-session.16')
+    .listen('.ViewerCountUpdated', (e) => {
+        console.log('Updated Viewers:', e.viewer_count);
+    })
+    .listen('.NewLiveComment', (e) => {
+        console.log('New Comment:', e.message);
+        // Append comment to chat list
+    })
+    .listen('.SuperChatReceived', (e) => {
+        console.log('Tipped Gift:', e.gift.title, 'Amount:', e.amount);
+        // Trigger overlay anim with e.gift.icon_url
+    });
+```
