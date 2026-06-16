@@ -31,7 +31,8 @@ class LiveKitService
             $token = $this->generateApiToken();
             $response = Http::withToken($token, 'Bearer')
                 ->timeout(5)
-                ->post("{$this->serverUrl}/livekit/room/create", [
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->post("{$this->serverUrl}/twirp/livekit.RoomService/CreateRoom", [
                     'name' => $roomName,
                     'empty_timeout' => 300,
                     'max_participants' => 0,
@@ -66,7 +67,8 @@ class LiveKitService
             $token = $this->generateApiToken();
             $response = Http::withToken($token, 'Bearer')
                 ->timeout(5)
-                ->post("{$this->serverUrl}/livekit/room/delete", [
+                ->withHeaders(['Content-Type' => 'application/json'])
+                ->post("{$this->serverUrl}/twirp/livekit.RoomService/DeleteRoom", [
                     'room' => $roomName,
                 ]);
 
