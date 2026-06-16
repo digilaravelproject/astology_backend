@@ -89,7 +89,7 @@ class Astrologer extends Model
 
     public function getProfilePhotoUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->profile_photo);
+        return \App\Helpers\MediaHelper::getFullUrl($this->profile_photo);
     }
 
     public function getIdProofUrlAttribute(): ?string

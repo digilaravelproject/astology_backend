@@ -27,20 +27,21 @@ class SuperChatController extends Controller
     public function nowStreaming(Request $request)
     {
         try {
-            $sessions = LiveSession::with('astrologer.user:id,name,profile_photo')
+            $sessions = LiveSession::with('astrologer.user:id,name,profile_photo,gender,date_of_birth')
                 ->where('status', 'ongoing')
                 ->where('session_type', 'public')
                 ->latest('started_at')
                 ->get()
                 ->map(function ($session) {
-                    $astrologerUser = $session->astrologer?->user;
+                    $astrologer = $session->astrologer;
+                    $astrologerUser = $astrologer?->user;
                     return [
                         'id' => $session->id,
                         'title' => $session->title,
-                        'astrologer' => $astrologerUser ? [
-                            'id' => $astrologerUser->id,
-                            'name' => $astrologerUser->name,
-                            'profile_photo' => $astrologerUser->profile_photo_url,
+                        'astrologer' => $astrologer ? [
+                            'id' => $astrologer->user_id,
+                            'name' => $astrologerUser?->name,
+                            'profile_photo' => $astrologerUser?->profile_photo_url ?? $astrologer->profile_photo_url,
                         ] : null,
                         'viewer_count' => $session->viewer_count,
                         'started_at' => $session->started_at?->toISOString(),
@@ -61,7 +62,8 @@ class SuperChatController extends Controller
                 'astrologer.skill',
             ])->findOrFail($id);
 
-            $astrologerUser = $session->astrologer?->user;
+            $astrologer = $session->astrologer;
+            $astrologerUser = $astrologer?->user;
 
             return ApiResponse::success([
                 'id' => $session->id,
@@ -72,12 +74,12 @@ class SuperChatController extends Controller
                 'stream_url' => $session->stream_url,
                 'viewer_count' => $session->viewer_count,
                 'started_at' => $session->started_at?->toISOString(),
-                'astrologer' => $astrologerUser ? [
-                    'id' => $astrologerUser->id,
-                    'name' => $astrologerUser->name,
-                    'profile_photo' => $astrologerUser->profile_photo_url,
-                    'gender' => $astrologerUser->gender,
-                    'date_of_birth' => $astrologerUser->date_of_birth,
+                'astrologer' => $astrologer ? [
+                    'id' => $astrologer->user_id,
+                    'name' => $astrologerUser?->name,
+                    'profile_photo' => $astrologerUser?->profile_photo_url ?? $astrologer->profile_photo_url,
+                    'gender' => $astrologerUser?->gender,
+                    'date_of_birth' => $astrologerUser?->date_of_birth?->format('Y-m-d') ?? $astrologer->date_of_birth?->format('Y-m-d'),
                 ] : null,
             ], 'Live session retrieved successfully');
         } catch (Exception $e) {
