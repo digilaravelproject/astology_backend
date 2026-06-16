@@ -5,14 +5,17 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Helpers\ApiResponse;
 use App\Models\LiveSession;
+use App\Models\LiveSessionParticipant;
 use App\Models\LiveComment;
 use App\Models\SuperChat;
+use App\Services\LiveKitService;
 use App\Services\WalletService;
 use App\Events\NewLiveComment;
 use App\Events\SuperChatReceived;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class SuperChatController extends Controller
@@ -27,10 +30,10 @@ class SuperChatController extends Controller
     public function nowStreaming(Request $request)
     {
         try {
-            $sessions = LiveSession::with('astrologer.user:id,name,profile_photo,gender,date_of_birth')
+            $sessions = LiveSession::with('astrologer.user:id,name')
                 ->where('status', 'ongoing')
                 ->where('session_type', 'public')
-                ->latest('started_at')
+                ->latest('id')
                 ->get()
                 ->map(function ($session) {
                     $astrologer = $session->astrologer;
@@ -41,10 +44,10 @@ class SuperChatController extends Controller
                         'astrologer' => $astrologer ? [
                             'id' => $astrologer->user_id,
                             'name' => $astrologerUser?->name,
-                            'profile_photo' => $astrologerUser?->profile_photo_url ?? $astrologer->profile_photo_url,
+                            'profile_photo' => $astrologerUser?->profile_photo ?? $astrologer?->profile_photo,
                         ] : null,
+                        'is_broadcasting' => $session->is_broadcasting,
                         'viewer_count' => $session->viewer_count,
-                        'started_at' => $session->started_at?->toISOString(),
                     ];
                 });
 
@@ -58,7 +61,7 @@ class SuperChatController extends Controller
     {
         try {
             $session = LiveSession::with([
-                'astrologer.user:id,name,profile_photo,gender,date_of_birth',
+                'astrologer.user:id,name,gender',
                 'astrologer.skill',
             ])->findOrFail($id);
 
@@ -71,19 +74,69 @@ class SuperChatController extends Controller
                 'description' => $session->description,
                 'session_type' => $session->session_type,
                 'status' => $session->status,
-                'stream_url' => $session->stream_url,
+                'is_broadcasting' => $session->is_broadcasting,
                 'viewer_count' => $session->viewer_count,
-                'started_at' => $session->started_at?->toISOString(),
                 'astrologer' => $astrologer ? [
                     'id' => $astrologer->user_id,
                     'name' => $astrologerUser?->name,
-                    'profile_photo' => $astrologerUser?->profile_photo_url ?? $astrologer->profile_photo_url,
+                    'profile_photo' => $astrologerUser?->profile_photo ?? $astrologer?->profile_photo,
                     'gender' => $astrologerUser?->gender,
-                    'date_of_birth' => $astrologerUser?->date_of_birth?->format('Y-m-d') ?? $astrologer->date_of_birth?->format('Y-m-d'),
+                    'date_of_birth' => $astrologer->date_of_birth?->format('Y-m-d'),
                 ] : null,
             ], 'Live session retrieved successfully');
         } catch (Exception $e) {
             return ApiResponse::error('Live session not found', 404);
+        }
+    }
+
+    /**
+     * Get LiveKit subscriber token for watching video
+     * POST /api/v1/user/live/{id}/watch
+     */
+    public function watch(LiveKitService $liveKit, $id)
+    {
+        try {
+            $session = LiveSession::findOrFail($id);
+
+            if ($session->status !== 'ongoing') {
+                return ApiResponse::error('Live session is not currently active', 400);
+            }
+
+            if (!$session->is_broadcasting || !$session->room_uuid) {
+                return ApiResponse::error('Broadcast has not started yet', 400);
+            }
+
+            $user = auth()->user();
+
+            $identity = 'user_' . $user->id;
+
+            LiveSessionParticipant::updateOrCreate(
+                [
+                    'live_session_id' => $session->id,
+                    'user_id' => $user->id,
+                    'role' => 'viewer',
+                ],
+                [
+                    'livekit_identity' => $identity,
+                    'joined_at' => now(),
+                    'left_at' => null,
+                ]
+            );
+
+            $token = $liveKit->generateToken(
+                $session->room_uuid,
+                $identity,
+                canPublish: false,
+                canSubscribe: true
+            );
+
+            return ApiResponse::success([
+                'livekit_ws_url' => $liveKit->getWsUrl(),
+                'room_uuid' => $session->room_uuid,
+                'token' => $token,
+            ], 'Watch token generated successfully');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
@@ -116,6 +169,11 @@ class SuperChatController extends Controller
                 $session->decrement('viewer_count');
                 $session->refresh();
             }
+
+            LiveSessionParticipant::where('live_session_id', $session->id)
+                ->where('user_id', auth()->id())
+                ->whereNull('left_at')
+                ->update(['left_at' => now()]);
 
             broadcast(new \App\Events\ViewerCountUpdated($session->id, $session->viewer_count));
 
@@ -153,7 +211,7 @@ class SuperChatController extends Controller
             broadcast(new NewLiveComment($session->id, [
                 'user_id'    => $user->id,
                 'user_name'  => $user->name,
-                'user_avatar' => $user->profile_photo_url,
+                'user_avatar' => $user->profile_photo,
                 'message'    => $comment->message,
                 'created_at' => $comment->created_at->toISOString(),
             ]));
@@ -240,7 +298,7 @@ class SuperChatController extends Controller
             broadcast(new SuperChatReceived($session->id, [
                 'user_id'    => $user->id,
                 'user_name'  => $user->name,
-                'user_avatar' => $user->profile_photo_url,
+                'user_avatar' => $user->profile_photo,
                 'amount'     => $amount,
                 'message'    => $superChat->message ?? '',
                 'gift'       => [
@@ -278,7 +336,7 @@ class SuperChatController extends Controller
                     'id' => $comment->id,
                     'user_id' => $comment->user_id,
                     'user_name' => $comment->user->name ?? 'Unknown',
-                    'user_avatar' => $comment->user->profile_photo_url,
+                    'user_avatar' => $comment->user->profile_photo,
                     'message' => $comment->message,
                     'created_at' => $comment->created_at->toISOString(),
                 ];

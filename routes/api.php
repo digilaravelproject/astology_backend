@@ -122,6 +122,8 @@ Route::prefix('v1')->group(function () {
                 Route::delete('/{id}', [LiveSessionController::class, 'destroy']);
                 Route::post('/{id}/start', [LiveSessionController::class, 'start']);
                 Route::post('/{id}/stop', [LiveSessionController::class, 'stop']);
+                Route::post('/{id}/broadcast', [LiveSessionController::class, 'broadcast']);
+                Route::post('/{id}/stop-broadcast', [LiveSessionController::class, 'stopBroadcast']);
             });
 
             // Price Increase routes
@@ -188,6 +190,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/live/now', [SuperChatController::class, 'nowStreaming']);
             Route::get('/live/{id}', [SuperChatController::class, 'show']);
             Route::post('/live/{id}/join', [SuperChatController::class, 'join']);
+            Route::post('/live/{id}/watch', [SuperChatController::class, 'watch']);
             Route::post('/live/{id}/leave', [SuperChatController::class, 'leave']);
             Route::post('/live/{id}/comment', [SuperChatController::class, 'comment']);
             Route::post('/live/{id}/super-chat', [SuperChatController::class, 'sendSuperChat']);

@@ -60,6 +60,6 @@ Broadcast::channel('live-session.{id}', function ($user, $id) {
     return [
         'id'            => $user->id,
         'name'          => $user->name,
-        'profile_photo' => $user->profile_photo_url,
+        'profile_photo' => $user->profile_photo,
     ];
 });

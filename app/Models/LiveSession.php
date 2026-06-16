@@ -16,13 +16,10 @@ class LiveSession extends Model
         'title',
         'description',
         'scheduled_at',
+        'room_uuid',
         'session_type',
         'status',
-        'live_url',
-        'stream_key',
-        'stream_url',
-        'started_at',
-        'ended_at',
+        'is_broadcasting',
         'duration_minutes',
         'max_participants',
         'current_participants',
@@ -31,15 +28,19 @@ class LiveSession extends Model
 
     protected $casts = [
         'scheduled_at' => 'datetime',
-        'started_at' => 'datetime',
-        'ended_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'max_participants' => 'integer',
         'current_participants' => 'integer',
         'viewer_count' => 'integer',
         'duration_minutes' => 'integer',
+        'is_broadcasting' => 'boolean',
     ];
+
+    public function participants(): HasMany
+    {
+        return $this->hasMany(LiveSessionParticipant::class);
+    }
 
     public function astrologer(): BelongsTo
     {
@@ -83,31 +84,4 @@ class LiveSession extends Model
         return $query->where('status', $status);
     }
 
-    public function getLiveUrlAttribute($value): ?string
-    {
-        if ($value) {
-            return $value;
-        }
-        if ($this->stream_key) {
-            $defaultHost = request()->getHost() ?: 'suryapathkundli.com';
-            $defaultRtmp = 'rtmp://' . $defaultHost . '/live';
-            return env('LIVE_RTMP_URL', $defaultRtmp);
-        }
-        return null;
-    }
-
-    public function getStreamUrlAttribute($value): ?string
-    {
-        if ($value) {
-            return $value;
-        }
-        if ($this->stream_key) {
-            $defaultHost = request()->getHost() ?: 'suryapathkundli.com';
-            $defaultScheme = request()->getScheme() ?: 'https';
-            $defaultPlayback = $defaultScheme . '://' . $defaultHost . '/live';
-            $playbackBase = env('LIVE_PLAYBACK_URL', $defaultPlayback);
-            return rtrim($playbackBase, '/') . '/' . $this->stream_key . '.m3u8';
-        }
-        return null;
-    }
 }

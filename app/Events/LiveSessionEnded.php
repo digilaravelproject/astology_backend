@@ -8,7 +8,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class LiveSessionStarted implements ShouldBroadcastNow
+class LiveSessionEnded implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -23,27 +23,22 @@ class LiveSessionStarted implements ShouldBroadcastNow
     {
         return [
             new Channel('live-sessions'),
+            new \Illuminate\Broadcasting\PresenceChannel('live-session.' . $this->liveSession->id),
         ];
     }
 
     public function broadcastAs(): string
     {
-        return 'LiveSessionStarted';
+        return 'LiveSessionEnded';
     }
 
     public function broadcastWith(): array
     {
-        $astrologerUser = $this->liveSession->astrologer?->user;
         return [
             'id' => $this->liveSession->id,
+            'astrologer_id' => $this->liveSession->astrologer_id,
             'title' => $this->liveSession->title,
-            'astrologer' => $astrologerUser ? [
-                'id' => $astrologerUser->id,
-                'name' => $astrologerUser->name,
-                'profile_photo' => $astrologerUser->profile_photo,
-            ] : null,
-            'viewer_count' => $this->liveSession->viewer_count,
-            'is_broadcasting' => $this->liveSession->is_broadcasting,
+            'status' => 'ended',
         ];
     }
 }

@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\LiveSession;
+use App\Models\LiveSessionParticipant;
 use App\Helpers\ApiResponse;
+use App\Services\LiveKitService;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class LiveSessionController extends Controller
 {
@@ -53,11 +55,6 @@ class LiveSessionController extends Controller
                 'duration_minutes' => $request->duration_minutes ?? 60,
                 'max_participants' => $request->max_participants ?? 100,
             ];
-
-            if ($isInstant) {
-                $liveSessionData['started_at'] = now();
-                $liveSessionData['stream_key'] = Str::random(32);
-            }
 
             $liveSession = LiveSession::create($liveSessionData);
 
@@ -305,8 +302,6 @@ class LiveSessionController extends Controller
 
             $liveSession->update([
                 'status'     => 'ongoing',
-                'started_at' => now(),
-                'stream_key' => Str::random(32),
             ]);
 
             $freshSession = $liveSession->fresh(['astrologer.user']);
@@ -347,18 +342,31 @@ class LiveSessionController extends Controller
                 return ApiResponse::error('Only ongoing sessions can be stopped', 422);
             }
 
-            $durationMinutes = $liveSession->started_at
-                ? (int) $liveSession->started_at->diffInMinutes(now())
-                : 0;
-
             $liveSession->update([
-                'status'           => 'completed',
-                'ended_at'         => now(),
-                'duration_minutes' => $durationMinutes,
+                'status' => 'completed',
             ]);
 
+            $freshSession = $liveSession->fresh();
+
+            if ($freshSession->room_uuid) {
+                try {
+                    app(LiveKitService::class)->deleteRoom($freshSession->room_uuid);
+                } catch (\Exception $e) {
+                    Log::error('Failed to delete LiveKit room during stop', [
+                        'room' => $freshSession->room_uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            try {
+                broadcast(new \App\Events\LiveSessionEnded($freshSession));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast LiveSessionEnded', ['error' => $e->getMessage()]);
+            }
+
             return ApiResponse::success(
-                $this->formatLiveSession($liveSession->fresh()),
+                $this->formatLiveSession($freshSession),
                 'Live session ended successfully'
             );
         } catch (\Exception $e) {
@@ -393,6 +401,134 @@ class LiveSessionController extends Controller
             );
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve current live session: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Start LiveKit broadcast for an ongoing session
+     * POST /api/v1/astrologer/live/{id}/broadcast
+     */
+    public function broadcast(LiveKitService $liveKit, $id)
+    {
+        try {
+            $astrologer = auth()->user()->astrologer;
+
+            if (!$astrologer) {
+                return ApiResponse::error('User is not an astrologer', 403);
+            }
+
+            $liveSession = LiveSession::where('astrologer_id', $astrologer->id)
+                ->where('id', $id)
+                ->first();
+
+            if (!$liveSession) {
+                return ApiResponse::error('Live session not found', 404);
+            }
+
+            if ($liveSession->status !== 'ongoing') {
+                return ApiResponse::error('Only ongoing sessions can start broadcasting', 422);
+            }
+
+            if ($liveSession->room_uuid && $liveSession->is_broadcasting) {
+                $token = $liveKit->generateToken(
+                    $liveSession->room_uuid,
+                    'astro_' . $astrologer->user_id,
+                    canPublish: true
+                );
+
+                return ApiResponse::success([
+                    'livekit_ws_url' => $liveKit->getWsUrl(),
+                    'room_uuid' => $liveSession->room_uuid,
+                    'token' => $token,
+                ], 'Broadcast already active');
+            }
+
+            $roomName = 'live_' . $liveSession->id;
+
+            try {
+                $liveKit->createRoom($roomName);
+            } catch (\RuntimeException $e) {
+                return ApiResponse::error($e->getMessage(), 503);
+            }
+
+            $liveSession->update([
+                'room_uuid' => $roomName,
+                'is_broadcasting' => true,
+            ]);
+
+            LiveSessionParticipant::create([
+                'live_session_id' => $liveSession->id,
+                'user_id' => auth()->id(),
+                'role' => 'astrologer',
+                'livekit_identity' => 'astro_' . auth()->id(),
+                'joined_at' => now(),
+            ]);
+
+            $token = $liveKit->generateToken(
+                $roomName,
+                'astro_' . auth()->id(),
+                canPublish: true
+            );
+
+            try {
+                broadcast(new \App\Events\AstrologerBroadcastStarted($liveSession->fresh()));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast AstrologerBroadcastStarted', ['error' => $e->getMessage()]);
+            }
+
+            return ApiResponse::success([
+                'livekit_ws_url' => $liveKit->getWsUrl(),
+                'room_uuid' => $roomName,
+                'token' => $token,
+            ], 'Broadcast started successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to start broadcast: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Stop LiveKit broadcast without ending the session
+     * POST /api/v1/astrologer/live/{id}/stop-broadcast
+     */
+    public function stopBroadcast(LiveKitService $liveKit, $id)
+    {
+        try {
+            $astrologer = auth()->user()->astrologer;
+
+            if (!$astrologer) {
+                return ApiResponse::error('User is not an astrologer', 403);
+            }
+
+            $liveSession = LiveSession::where('astrologer_id', $astrologer->id)
+                ->where('id', $id)
+                ->first();
+
+            if (!$liveSession) {
+                return ApiResponse::error('Live session not found', 404);
+            }
+
+            if (!$liveSession->is_broadcasting || !$liveSession->room_uuid) {
+                return ApiResponse::error('No active broadcast to stop', 422);
+            }
+
+            try {
+                $liveKit->deleteRoom($liveSession->room_uuid);
+            } catch (\Exception $e) {
+                Log::error('Failed to delete LiveKit room', ['room' => $liveSession->room_uuid, 'error' => $e->getMessage()]);
+            }
+
+            LiveSessionParticipant::where('live_session_id', $liveSession->id)
+                ->whereNull('left_at')
+                ->update(['left_at' => now()]);
+
+            $liveSession->update([
+                'is_broadcasting' => false,
+                'room_uuid' => null,
+            ]);
+
+            return ApiResponse::success(null, 'Broadcast stopped successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to stop broadcast: ' . $e->getMessage(), 500);
         }
     }
 
@@ -437,11 +573,7 @@ class LiveSessionController extends Controller
             'scheduled_time' => $session->scheduled_at->format('H:i:s'),
             'session_type' => $session->session_type,
             'status' => $session->status,
-            'live_url' => $session->live_url,
-            'stream_key' => $session->stream_key,
-            'stream_url' => $session->stream_url,
-            'started_at' => $session->started_at?->format('Y-m-d H:i:s'),
-            'ended_at' => $session->ended_at?->format('Y-m-d H:i:s'),
+            'is_broadcasting' => $session->is_broadcasting,
             'duration_minutes' => $session->duration_minutes,
             'max_participants' => $session->max_participants,
             'current_participants' => $session->current_participants,

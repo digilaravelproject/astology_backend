@@ -60,11 +60,6 @@ Common fields returned in all live session responses (`formatLiveSession()`):
 | `scheduled_time` | string (H:i:s) | Scheduled time only |
 | `session_type` | string | `public` or `private` |
 | `status` | string | `upcoming` / `ongoing` / `completed` / `cancelled` |
-| `live_url` | string / null | RTMP ingest URL |
-| `stream_key` | string / null | Stream key (32 chars random) |
-| `stream_url` | string / null | Playback URL |
-| `started_at` | string / null (Y-m-d H:i:s) | Actual start time |
-| `ended_at` | string / null (Y-m-d H:i:s) | Actual end time |
 | `duration_minutes` | integer | Duration in minutes |
 | `max_participants` | integer | Max viewers (default: 100) |
 | `current_participants` | integer | Current viewer count |
@@ -118,11 +113,6 @@ Base: `/api/v1/astrologer/live` — all routes require `auth:sanctum` + `throttl
     "scheduled_time": "18:00:00",
     "session_type": "public",
     "status": "upcoming",
-    "live_url": null,
-    "stream_key": null,
-    "stream_url": null,
-    "started_at": null,
-    "ended_at": null,
     "duration_minutes": 60,
     "max_participants": 500,
     "current_participants": 0,
@@ -160,7 +150,7 @@ Base: `/api/v1/astrologer/live` — all routes require `auth:sanctum` + `throttl
 | `duration_minutes` | No | integer, min:15, max:480, default:60 |
 | `max_participants` | No | integer, min:1, max:5000, default:100 |
 
-> When `is_instant=true`, `scheduled_at` is ignored (not required). Session is created with `status=ongoing`, `started_at=now`, `stream_key=random(32)`, and `LiveSessionStarted` is broadcast immediately.
+> When `is_instant=true`, `scheduled_at` is ignored (not required). Session is created with `status=ongoing` and `LiveSessionStarted` is broadcast immediately.
 
 **Response (201 Created):**
 ```json
@@ -177,11 +167,6 @@ Base: `/api/v1/astrologer/live` — all routes require `auth:sanctum` + `throttl
     "scheduled_time": "14:30:00",
     "session_type": "public",
     "status": "ongoing",
-    "live_url": null,
-    "stream_key": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
-    "stream_url": null,
-    "started_at": "2026-06-16 14:30:00",
-    "ended_at": null,
     "duration_minutes": 45,
     "max_participants": 300,
     "current_participants": 0,
@@ -338,8 +323,6 @@ No request body.
   "data": {
     "id": 15,
     "status": "ongoing",
-    "started_at": "2026-06-20 18:00:05",
-    "stream_key": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6",
     ...
   }
 }
@@ -357,7 +340,7 @@ No request body.
 
 **POST** `/api/v1/astrologer/live/{id}/stop`
 
-No request body. Duration is calculated automatically: `started_at->diffInMinutes(now)`.
+No request body.
 
 **Response (200 OK):**
 ```json
@@ -367,8 +350,6 @@ No request body. Duration is calculated automatically: `started_at->diffInMinute
   "data": {
     "id": 15,
     "status": "completed",
-    "ended_at": "2026-06-20 19:15:00",
-    "duration_minutes": 75,
     ...
   }
 }
@@ -378,11 +359,11 @@ No request body. Duration is calculated automatically: `started_at->diffInMinute
 
 ---
 
-### 4.9 Get Current Active Session (Recovery)
+### 4.9 Get Current Active Session
 
 **GET** `/api/v1/astrologer/live/current`
 
-Used for crash recovery: if the astrologer's app closes, they fetch the current session to recover `stream_key` and reconnect RTMP.
+Used to check if the astrologer has an ongoing live session.
 
 **Response (200 OK) — Active stream found:**
 ```json
@@ -412,7 +393,7 @@ Base: `/api/v1/user/live` — all routes require `auth:sanctum` + `throttle:tier
 
 **GET** `/api/v1/user/live/now`
 
-No request body. Returns only public, ongoing sessions, ordered by latest `started_at`.
+No request body. Returns only public, ongoing sessions.
 
 **Response (200 OK):**
 ```json
@@ -426,10 +407,9 @@ No request body. Returns only public, ongoing sessions, ordered by latest `start
       "astrologer": {
         "id": 5,
         "name": "Priya Sharma",
-        "profile_photo": "https://astrogravity.com/storage/photos/abc.jpg"
+        "profile_photo": "photos/abc.jpg"
       },
-      "viewer_count": 0,
-      "started_at": "2026-06-16T14:30:00.000000Z"
+      "viewer_count": 0
     }
   ]
 }
@@ -454,13 +434,11 @@ Returns session with astrologer profile details (name, photo, gender, date_of_bi
     "description": "Ask me anything live!",
     "session_type": "public",
     "status": "ongoing",
-    "stream_url": null,
     "viewer_count": 0,
-    "started_at": "2026-06-16T14:30:00.000000Z",
     "astrologer": {
       "id": 5,
       "name": "Priya Sharma",
-      "profile_photo": "https://astrogravity.com/storage/photos/abc.jpg",
+      "profile_photo": "photos/abc.jpg",
       "gender": "female",
       "date_of_birth": "1990-05-15"
     }
@@ -713,10 +691,9 @@ All events use `ShouldBroadcastNow` for immediate delivery. Channel names here a
   "astrologer": {
     "id": 5,
     "name": "Priya Sharma",
-    "profile_photo": "https://astrogravity.com/storage/photos/abc.jpg"
+    "profile_photo": "photos/abc.jpg"
   },
-  "viewer_count": 0,
-  "started_at": "2026-06-16T14:30:00.000000Z"
+  "viewer_count": 0
 }
 ```
 
