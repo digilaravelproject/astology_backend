@@ -89,7 +89,9 @@ class LiveSession extends Model
             return $value;
         }
         if ($this->stream_key) {
-            return "rtmp://suryapathkundli.com/live";
+            $defaultHost = request()->getHost() ?: 'suryapathkundli.com';
+            $defaultRtmp = 'rtmp://' . $defaultHost . '/live';
+            return env('LIVE_RTMP_URL', $defaultRtmp);
         }
         return null;
     }
@@ -100,7 +102,11 @@ class LiveSession extends Model
             return $value;
         }
         if ($this->stream_key) {
-            return "https://suryapathkundli.com/live/" . $this->stream_key . ".m3u8";
+            $defaultHost = request()->getHost() ?: 'suryapathkundli.com';
+            $defaultScheme = request()->getScheme() ?: 'https';
+            $defaultPlayback = $defaultScheme . '://' . $defaultHost . '/live';
+            $playbackBase = env('LIVE_PLAYBACK_URL', $defaultPlayback);
+            return rtrim($playbackBase, '/') . '/' . $this->stream_key . '.m3u8';
         }
         return null;
     }
