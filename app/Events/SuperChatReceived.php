@@ -41,6 +41,7 @@ class SuperChatReceived implements ShouldBroadcastNow
             'user_avatar'  => $this->superChat['user_avatar'] ?? null,
             'amount'       => (float) $this->superChat['amount'],
             'message'      => $this->superChat['message'] ?? '',
+            'gift'         => $this->superChat['gift'] ?? null,
             'created_at'   => $this->superChat['created_at'],
         ];
     }

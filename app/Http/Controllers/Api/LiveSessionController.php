@@ -68,8 +68,8 @@ class LiveSessionController extends Controller
             }
 
             return ApiResponse::success(
-                'Live session created successfully',
                 $this->formatLiveSession($liveSession),
+                'Live session created successfully',
                 201
             );
         } catch (\Exception $e) {
@@ -101,7 +101,6 @@ class LiveSessionController extends Controller
                 $sessions = $query->paginate($perPage);
                 
                 return ApiResponse::success(
-                    'Live sessions retrieved successfully',
                     [
                         'data' => $sessions->map(fn($session) => $this->formatLiveSession($session))->values(),
                         'pagination' => [
@@ -110,14 +109,14 @@ class LiveSessionController extends Controller
                             'per_page' => $sessions->perPage(),
                             'total' => $sessions->total(),
                         ]
-                    ]
+                    ],
+                    'Live sessions retrieved successfully'
                 );
             } elseif ($filter === 'completed') {
                 $query = $query->completed();
                 $sessions = $query->paginate($perPage);
                 
                 return ApiResponse::success(
-                    'Live sessions retrieved successfully',
                     [
                         'data' => $sessions->map(fn($session) => $this->formatLiveSession($session))->values(),
                         'pagination' => [
@@ -126,7 +125,8 @@ class LiveSessionController extends Controller
                             'per_page' => $sessions->perPage(),
                             'total' => $sessions->total(),
                         ]
-                    ]
+                    ],
+                    'Live sessions retrieved successfully'
                 );
             } else {
                 // Return all, separated by status
@@ -139,7 +139,7 @@ class LiveSessionController extends Controller
                     ->completed()
                     ->paginate($perPage);
 
-                return ApiResponse::success('Live sessions retrieved successfully', [
+                return ApiResponse::success([
                     'upcoming' => [
                         'data' => $upcoming->values(),
                         'total' => $upcoming->count(),
@@ -153,7 +153,7 @@ class LiveSessionController extends Controller
                             'total' => $completedQuery->total(),
                         ]
                     ]
-                ]);
+                ], 'Live sessions retrieved successfully');
             }
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve live sessions: ' . $e->getMessage(), 500);
@@ -181,7 +181,7 @@ class LiveSessionController extends Controller
                 return ApiResponse::error('Live session not found', 404);
             }
 
-            return ApiResponse::success('Live session retrieved successfully', $this->formatLiveSession($liveSession));
+            return ApiResponse::success($this->formatLiveSession($liveSession), 'Live session retrieved successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve live session: ' . $e->getMessage(), 500);
         }
@@ -237,7 +237,7 @@ class LiveSessionController extends Controller
                 'max_participants',
             ]));
 
-            return ApiResponse::success('Live session updated successfully', $this->formatLiveSession($liveSession));
+            return ApiResponse::success($this->formatLiveSession($liveSession), 'Live session updated successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to update live session: ' . $e->getMessage(), 500);
         }
@@ -272,7 +272,7 @@ class LiveSessionController extends Controller
             $title = $liveSession->title;
             $liveSession->delete();
 
-            return ApiResponse::success("Live session '{$title}' deleted successfully", null, 200);
+            return ApiResponse::success(null, "Live session '{$title}' deleted successfully", 200);
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to delete live session: ' . $e->getMessage(), 500);
         }
@@ -314,8 +314,8 @@ class LiveSessionController extends Controller
             $this->notifyAllUsersAboutLive($freshSession);
 
             return ApiResponse::success(
-                'Live session started successfully',
-                $this->formatLiveSession($freshSession)
+                $this->formatLiveSession($freshSession),
+                'Live session started successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to start live session: ' . $e->getMessage(), 500);
@@ -358,8 +358,8 @@ class LiveSessionController extends Controller
             ]);
 
             return ApiResponse::success(
-                'Live session ended successfully',
-                $this->formatLiveSession($liveSession->fresh())
+                $this->formatLiveSession($liveSession->fresh()),
+                'Live session ended successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to stop live session: ' . $e->getMessage(), 500);
@@ -384,12 +384,12 @@ class LiveSessionController extends Controller
                 ->first();
 
             if (!$liveSession) {
-                return ApiResponse::success('No active live session found', null);
+                return ApiResponse::success(null, 'No active live session found');
             }
 
             return ApiResponse::success(
-                'Current active live session retrieved successfully',
-                $this->formatLiveSession($liveSession)
+                $this->formatLiveSession($liveSession),
+                'Current active live session retrieved successfully'
             );
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve current live session: ' . $e->getMessage(), 500);
