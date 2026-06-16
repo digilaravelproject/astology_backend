@@ -60,6 +60,7 @@ Common fields returned in all live session responses (`formatLiveSession()`):
 | `scheduled_time` | string (H:i:s) | Scheduled time only |
 | `session_type` | string | `public` or `private` |
 | `status` | string | `upcoming` / `ongoing` / `completed` / `cancelled` |
+| `is_broadcasting` | boolean | LiveKit video broadcast active (true/false) |
 | `duration_minutes` | integer | Duration in minutes |
 | `max_participants` | integer | Max viewers (default: 100) |
 | `current_participants` | integer | Current viewer count |
@@ -355,6 +356,11 @@ No request body.
 }
 ```
 
+**Real-time side-effects:**
+- `LiveSessionEnded` broadcast on channel `live-sessions` (public) + `live-session.{id}` (presence)
+- LiveKit room is automatically deleted if one exists
+- All viewers receive `LiveSessionEnded` event → close video player
+
 > Only `ongoing` sessions can be stopped (422 for `upcoming`/`completed`).
 
 ---
@@ -385,6 +391,153 @@ Used to check if the astrologer has an ongoing live session.
 
 ---
 
+### 4.10 Start LiveKit Broadcast (Go Live with Video)
+
+**POST** `/api/v1/astrologer/live/{id}/broadcast`
+
+Creates a LiveKit room and returns a **publisher token** so the astrologer app can publish video/audio.
+
+No request body.
+
+**Response (200 OK):**
+```json
+{
+  "status": "success",
+  "message": "Broadcast started successfully",
+  "data": {
+    "livekit_ws_url": "wss://live.suryapathkundli.com",
+    "room_uuid": "live_12",
+    "token": "eyJhbGciOiJIUzI1NiJ9..."
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `livekit_ws_url` | WebSocket URL for Flutter LiveKit client to connect |
+| `room_uuid` | Unique LiveKit room name (e.g., `live_12`) |
+| `token` | JWT publisher token (allows publishing video/audio) |
+
+**Flutter Usage (Astrologer App — after receiving response):**
+
+Add to `pubspec.yaml`:
+```yaml
+dependencies:
+  livekit_client: ^2.0.0
+  flutter_webrtc: ^1.0.0  # Required by livekit_client
+  permission_handler: ^11.0.0
+```
+
+**Full broadcast function:**
+```dart
+import 'package:livekit_client/livekit_client.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+class LiveBroadcastService {
+  late Room _room;
+  bool _isConnected = false;
+
+  Future<void> startBroadcast(String wsUrl, String token) async {
+    try {
+      // 1. Request permissions
+      await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+
+      // 2. Create room + connect
+      _room = Room();
+      _room.on<RoomEvent>(onRoomEvent);
+      await _room.connect(wsUrl, token);
+
+      // 3. Publish camera
+      LocalVideoTrack cameraTrack = await LocalVideoTrack.create();
+      await _room.localParticipant?.publishTrack(cameraTrack);
+
+      // 4. Publish mic
+      LocalAudioTrack micTrack = await LocalAudioTrack.create();
+      await _room.localParticipant?.publishTrack(micTrack);
+
+      _isConnected = true;
+      debugPrint('Broadcast started: ${_room.name}');
+    } catch (e) {
+      debugPrint('Broadcast failed: $e');
+      rethrow;
+    }
+  }
+
+  void onRoomEvent(RoomEvent event, dynamic data) {
+    switch (event) {
+      case RoomEvent.Disconnected:
+        _isConnected = false;
+        debugPrint('Disconnected from LiveKit');
+        break;
+      case RoomEvent.ParticipantConnected:
+        debugPrint('Viewer joined: ${(data as RemoteParticipant).identity}');
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<void> stopBroadcast() async {
+    if (_isConnected) {
+      await _room.disconnect();
+      _isConnected = false;
+    }
+  }
+
+  void dispose() {
+    _room.dispose();
+  }
+}
+```
+
+**Real-time side-effects:**
+- `is_broadcasting` set to `true` on the session
+- `AstrologerBroadcastStarted` event broadcast on `live-session.{id}` (presence)
+- Users in the room receive the event → enable video player UI
+
+**Error (422):**
+```json
+{
+  "status": "error",
+  "message": "Only ongoing sessions can start broadcasting"
+}
+```
+
+> Only `ongoing` sessions can call this. If called again on an already broadcasting session, returns a fresh token.
+
+---
+
+### 4.11 Stop LiveKit Broadcast (Stop Video, Keep Chat)
+
+**POST** `/api/v1/astrologer/live/{id}/stop-broadcast`
+
+Stops the LiveKit video broadcast **without** ending the chat session. Chat, comments, and super chats continue working.
+
+No request body.
+
+**Response (200 OK):**
+```json
+{
+  "status": "success",
+  "message": "Broadcast stopped successfully",
+  "data": null
+}
+```
+
+**What happens:**
+1. LiveKit room is deleted
+2. `is_broadcasting` set to `false`
+3. `room_uuid` cleared
+4. All participants' `left_at` timestamps updated
+5. Viewers' Flutter app gets disconnected from LiveKit (video stops, but chat stays)
+
+> Useful when astrologer wants to stop video temporarily but keep the chat session alive.
+
+---
+
 ## 5. User (Viewer) API
 
 Base: `/api/v1/user/live` — all routes require `auth:sanctum` + `throttle:tiered`.
@@ -409,11 +562,14 @@ No request body. Returns only public, ongoing sessions.
         "name": "Priya Sharma",
         "profile_photo": "photos/abc.jpg"
       },
+      "is_broadcasting": true,
       "viewer_count": 0
     }
   ]
 }
 ```
+
+> `is_broadcasting` indicates whether the astrologer has activated LiveKit video. If `false`, session is chat-only until the astrologer calls `broadcast()`.
 
 ---
 
@@ -434,6 +590,7 @@ Returns session with astrologer profile details (name, photo, gender, date_of_bi
     "description": "Ask me anything live!",
     "session_type": "public",
     "status": "ongoing",
+    "is_broadcasting": true,
     "viewer_count": 0,
     "astrologer": {
       "id": 5,
@@ -466,6 +623,8 @@ No request body. Increments `viewer_count`.
 **Real-time event:**
 - `ViewerCountUpdated` on `live-session.{id}` (presence channel)
 
+> After joining, call **`/watch`** (section 5.8) to get a LiveKit subscriber token for video playback.
+
 > Error (400): `"Live session is not currently active"` if status is not `ongoing`.
 
 ---
@@ -474,7 +633,7 @@ No request body. Increments `viewer_count`.
 
 **POST** `/api/v1/user/live/{id}/leave`
 
-No request body. Decrements `viewer_count`.
+No request body. Decrements `viewer_count` and records `left_at` timestamp in `live_session_participants`.
 
 **Response (200 OK):**
 ```json
@@ -605,7 +764,7 @@ No request body. Decrements `viewer_count`.
         "id": 110,
         "user_id": 42,
         "user_name": "Rahul Kumar",
-        "user_avatar": "https://astrogravity.com/storage/photos/user42.jpg",
+        "user_avatar": "photos/user42.jpg",
         "message": "Hello Priya!",
         "created_at": "2026-06-16T14:32:00.000000Z"
       }
@@ -622,12 +781,144 @@ No request body. Decrements `viewer_count`.
 
 ---
 
+### 5.8 Get LiveKit Subscriber Token (Watch Video)
+
+**POST** `/api/v1/user/live/{id}/watch`
+
+Returns a LiveKit subscriber token. The Flutter app uses this to connect to LiveKit and receive the astrologer's video/audio stream.
+
+No request body.
+
+**Response (200 OK):**
+```json
+{
+  "status": "success",
+  "message": "Watch token generated successfully",
+  "data": {
+    "livekit_ws_url": "wss://live.suryapathkundli.com",
+    "room_uuid": "live_12",
+    "token": "eyJhbGciOiJIUzI1NiJ9..."
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `livekit_ws_url` | WebSocket URL for Flutter LiveKit client |
+| `room_uuid` | LiveKit room to join (same room as astrologer) |
+| `token` | JWT subscriber token (subscribe-only, cannot publish) |
+
+**Flutter Usage (User App — full watching flow):**
+
+Add to `pubspec.yaml`:
+```yaml
+dependencies:
+  livekit_client: ^2.0.0
+  flutter_webrtc: ^1.0.0
+```
+
+**Full watch function with video rendering:**
+```dart
+import 'package:livekit_client/livekit_client.dart';
+import 'package:flutter/material.dart';
+
+class LiveVideoWidget extends StatefulWidget {
+  final String wsUrl;
+  final String token;
+  const LiveVideoWidget({super.key, required this.wsUrl, required this.token});
+  @override
+  State<LiveVideoWidget> createState() => _LiveVideoWidgetState();
+}
+
+class _LiveVideoWidgetState extends State<LiveVideoWidget> {
+  late Room _room;
+  RemoteVideoTrack? _remoteTrack;
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _connectAndWatch();
+  }
+
+  Future<void> _connectAndWatch() async {
+    try {
+      _room = Room();
+      _room.on<RoomEvent>(_onRoomEvent);
+      await _room.connect(widget.wsUrl, widget.token);
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Failed to connect: $e';
+      });
+    }
+  }
+
+  void _onRoomEvent(RoomEvent event, dynamic data) {
+    switch (event) {
+      case RoomEvent.TrackSubscribed:
+        final track = data as RemoteTrack;
+        if (track is RemoteVideoTrack) {
+          setState(() => _remoteTrack = track);
+        }
+        break;
+      case RoomEvent.Disconnected:
+        setState(() => _error = 'Broadcast ended');
+        break;
+      default:
+        break;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) {
+      return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
+    }
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_remoteTrack == null) {
+      return const Center(child: Text('Waiting for video...'));
+    }
+    return VideoRenderer(
+      track: _remoteTrack!,
+      fit: BoxFit.contain,
+      mirror: false,
+    );
+  }
+
+  @override
+  void dispose() {
+    _room.dispose();
+    super.dispose();
+  }
+}
+
+// Usage in your screen:
+// LiveVideoWidget(wsUrl: data['livekit_ws_url'], token: data['token'])
+```
+
+**Error (400):**
+```json
+{
+  "status": "error",
+  "message": "Broadcast has not started yet"
+}
+```
+
+> If `is_broadcasting` is false, this endpoint returns 400. The user should periodically check `is_broadcasting` or listen for the `AstrologerBroadcastStarted` event.
+>
+> Must call `POST /join` first before this endpoint.
+
 ## 6. Complete Step-by-Step Flows
 
 ### 6.1 Scheduled Live Session
 
 ```
-Astrologer                API / Reverb                    User(s)
+Astrologer                API / Reverb + LiveKit          User(s)
     |                        |                               |
     |-- POST /astrologer/live -->|                           |
     |   {scheduled_at: ...}   |  201 Created (upcoming)      |
@@ -635,28 +926,43 @@ Astrologer                API / Reverb                    User(s)
     | ... time passes ...    |                               |
     |                        |                               |
     |-- POST /astrologer/live/{id}/start -->|                |
-    |                        |  Broadcast: LiveSessionStarted
+    |                        |  Status → ongoing             |
+    |                        |  Broadcast: LiveSessionStarted|
     |                        |  on 'live-sessions' (public)  |
     |                        |  + Push notification          |
+    |                        |                               |
+    |-- POST /astrologer/live/{id}/broadcast -->|            |
+    |                        |  LiveKit room created         |
+    |<-- {livekit_ws_url,    |                               |
+    |      room_uuid, token} |                               |
+    |                        |  Broadcast: AstrologerBroadcast|
+    |                        |  Started on 'live-session.{id}'|
+    |                        |                               |
+    |  Flutter: Connect to   |                               |
+    |  LiveKit, publish video|                               |
     |                        |                               |
     |                        |  <-- GET /user/live/now ------|
     |                        |  <-- POST /user/live/{id}/join|
     |                        |  Broadcast: ViewerCountUpdated|
-    |                        |  on 'live-session.{id}'       |
+    |                        |  <-- POST /user/live/{id}/watch|
+    |                        |  <-- {livekit_ws_url, token} --|
+    |                        |                               |
+    |                        |  User Flutter: Connect to     |
+    |                        |  LiveKit, receive video       |
     |                        |                               |
     |                        |  <-- POST /user/live/{id}/comment |
     |                        |  Broadcast: NewLiveComment    |
-    |                        |  on 'live-session.{id}'       |
-    |                        |                               |
     |                        |  <-- POST /user/live/{id}/super-chat |
     |                        |  Broadcast: SuperChatReceived |
-    |                        |  on 'live-session.{id}'       |
     |                        |                               |
     |                        |  <-- POST /user/live/{id}/leave (opt) |
     |                        |  Broadcast: ViewerCountUpdated|
     |                        |                               |
-    |-- POST /astrologer/live/{id}/stop -->|                 |
-    |                        |  status -> completed          |
+    |-- POST /astrologer/live/{id}/stop -->|                  |
+    |                        |  LiveKit room deleted         |
+    |                        |  Status → completed           |
+    |                        |  Broadcast: LiveSessionEnded  |
+    |                        |  on 'live-sessions' + room    |
 ```
 
 ### 6.2 Instant Live Session
@@ -665,8 +971,9 @@ Same flow as scheduled, but skip the scheduling step:
 1. `POST /astrologer/live` with `is_instant: true`
 2. Session created as `ongoing` immediately
 3. `LiveSessionStarted` broadcast + notification sent instantly
-4. Users see it in `GET /user/live/now`
-5. Same join/comment/super-chat/leave/stop flow as scheduled
+4. Astrologer calls `POST /astrologer/live/{id}/broadcast` to start LiveKit video
+5. Users see it in `GET /user/live/now`
+6. Same join/watch/comment/super-chat/leave/stop flow as scheduled
 
 ---
 
@@ -693,9 +1000,12 @@ All events use `ShouldBroadcastNow` for immediate delivery. Channel names here a
     "name": "Priya Sharma",
     "profile_photo": "photos/abc.jpg"
   },
-  "viewer_count": 0
+  "viewer_count": 0,
+  "is_broadcasting": false
 }
 ```
+
+> `is_broadcasting` is `false` initially. It becomes `true` after the astrologer calls `POST /broadcast`. User app should listen for `AstrologerBroadcastStarted` event to enable video UI.
 
 ---
 
@@ -730,7 +1040,7 @@ All events use `ShouldBroadcastNow` for immediate delivery. Channel names here a
 {
   "user_id": 42,
   "user_name": "Rahul Kumar",
-  "user_avatar": "https://astrogravity.com/storage/photos/user42.jpg",
+  "user_avatar": "photos/user42.jpg",
   "message": "Hello Priya, please answer my question!",
   "created_at": "2026-06-16T14:32:00.000000Z"
 }
@@ -751,19 +1061,69 @@ All events use `ShouldBroadcastNow` for immediate delivery. Channel names here a
 {
   "user_id": 42,
   "user_name": "Rahul Kumar",
-  "user_avatar": "https://astrogravity.com/storage/photos/user42.jpg",
+  "user_avatar": "photos/user42.jpg",
   "amount": 50.00,
   "message": "[Gift: Red Rose] Here is a Red Rose for you!",
   "gift": {
     "id": 3,
     "title": "Red Rose",
-    "icon_url": "https://astrogravity.com/storage/gifts/icons/red_rose.png"
+    "icon_url": "photos/gifts/red_rose.png"
   },
   "created_at": "2026-06-16T14:34:00.000000Z"
 }
 ```
 
 ---
+
+### 7.5 LiveSessionEnded
+
+| Property | Value |
+|----------|-------|
+| **Channel** | `live-sessions` (Public) + `live-session.{id}` (Presence) |
+| **Event Name** | `LiveSessionEnded` |
+| **broadcastAs** | `LiveSessionEnded` |
+| **Trigger** | Astrologer stops the session (`POST /stop`) |
+
+**Payload:**
+```json
+{
+  "id": 16,
+  "astrologer_id": 5,
+  "title": "Instant Tarot Reading & QA",
+  "status": "ended"
+}
+```
+
+**Flutter behavior on receiving this event:**
+- Close LiveKit connection (if still connected)
+- Hide video player
+- Show "Session Ended" screen
+- Disable comment/super-chat input
+
+---
+
+### 7.6 AstrologerBroadcastStarted
+
+| Property | Value |
+|----------|-------|
+| **Channel** | `live-session.{id}` (Presence Channel) |
+| **Event Name** | `AstrologerBroadcastStarted` |
+| **broadcastAs** | `AstrologerBroadcastStarted` |
+| **Trigger** | Astrologer calls `POST /broadcast` (LiveKit video activated) |
+
+**Payload:**
+```json
+{
+  "live_session_id": 16,
+  "room_uuid": "live_16",
+  "broadcast_started_at": "2026-06-16T10:00:00.000000Z"
+}
+```
+
+**Flutter behavior on receiving this event:**
+- Show "Video Available" indicator
+- Enable "Watch" button
+- Auto-call `POST /watch` to get subscriber token if user is already in the room
 
 ## 8. Presence Channel Auth
 
@@ -780,7 +1140,7 @@ Broadcast::channel('live-session.{id}', function ($user, $id) {
     return [
         'id'            => $user->id,
         'name'          => $user->name,
-        'profile_photo' => $user->profile_photo_url,
+        'profile_photo' => $user->profile_photo,
     ];
 });
 ```
@@ -793,12 +1153,16 @@ Broadcast::channel('live-session.{id}', function ($user, $id) {
 
 ```javascript
 // ==========================================
-// 1. Listen to new live streams (public)
+// 1. Listen to new/ended live streams (public)
 // ==========================================
 Echo.channel('live-sessions')
     .listen('.LiveSessionStarted', (e) => {
         console.log('New Stream Started:', e.title);
         // Prepend e to active streams list
+    })
+    .listen('.LiveSessionEnded', (e) => {
+        console.log('Stream Ended:', e.title);
+        // Remove from streams list
     });
 
 // ==========================================
@@ -827,6 +1191,17 @@ Echo.join('live-session.16')
     .listen('.SuperChatReceived', (e) => {
         console.log('Super Chat:', e.gift.title, 'Amount:', e.amount);
         // Show animated overlay with e.gift.icon_url
+    })
+    .listen('.AstrologerBroadcastStarted', (e) => {
+        console.log('Astrologer started broadcasting:', e.room_uuid);
+        // Show "Watch" button / auto-get subscriber token
+        // If user is already in room, call POST /watch
+    })
+    .listen('.LiveSessionEnded', (e) => {
+        console.log('Session ended:', e.id);
+        // Disconnect from LiveKit
+        // Show "Session Ended" screen
+        // Disable comment/super-chat input
     });
 ```
 
@@ -874,3 +1249,349 @@ These events exist for Chat and Call features (outside this guide's scope):
 | `CallAccepted` | `private-user.{consumer}` | Astrologer accepts call |
 | `CallEnded` | `private-user.{receiver}` | Call ends |
 | `PresenceUpdated` | `presence-room` | User online/offline pulse |
+
+---
+
+## 13. Flutter Integration Guide
+
+### 13.1 Required Packages
+
+Add to `pubspec.yaml`:
+```yaml
+dependencies:
+  livekit_client: ^2.0.0
+  flutter_webrtc: ^1.0.0
+  laravel_echo: ^1.0.0
+  pusher_client: ^1.0.0
+  permission_handler: ^11.0.0
+```
+
+### 13.2 Laravel Echo Connection (Reverb WebSocket)
+
+```dart
+import 'package:laravel_echo/laravel_echo.dart';
+import 'package:pusher_client/pusher_client.dart';
+
+class EchoService {
+  late Echo echo;
+  final String authToken;
+
+  EchoService(this.authToken);
+
+  void connect() {
+    echo = Echo(
+      broadcaster: 'pusher',
+      client: PusherClient(
+        'astrology-key',
+        PusherOptions(
+          host: 'suryapathkundli.com',
+          port: 443,
+          scheme: 'https',
+          encrypted: true,
+          auth: Auth(
+            endpoint: 'https://suryapathkundli.com/api/v1/broadcasting/auth',
+            headers: {'Authorization': 'Bearer $authToken'},
+          ),
+        ),
+      ),
+    );
+  }
+
+  void joinLiveSession(int sessionId) {
+    echo.join('live-session.$sessionId')
+      .here((users) => debugPrint('Viewers here: $users'))
+      .joining((user) => debugPrint('User joined: $user'))
+      .leaving((user) => debugPrint('User left: $user'))
+      .listen('.AstrologerBroadcastStarted', (e) {
+        debugPrint('Broadcast started: ${e['room_uuid']}');
+        // Call POST /watch to get LiveKit token
+      })
+      .listen('.LiveSessionEnded', (e) {
+        debugPrint('Session ended: ${e['id']}');
+        // Disconnect from LiveKit + show ended screen
+      })
+      .listen('.NewLiveComment', (e) {
+        debugPrint('New comment: ${e['message']}');
+        // Append to chat
+      })
+      .listen('.SuperChatReceived', (e) {
+        debugPrint('SuperChat: ${e['gift']['title']}');
+        // Show overlay animation
+      })
+      .listen('.ViewerCountUpdated', (e) {
+        debugPrint('Viewer count: ${e['viewer_count']}');
+        // Update counter
+      });
+  }
+
+  void listenPublicStreams() {
+    echo.channel('live-sessions')
+      .listen('.LiveSessionStarted', (e) {
+        debugPrint('New stream: ${e['title']}');
+      })
+      .listen('.LiveSessionEnded', (e) {
+        debugPrint('Stream ended: ${e['title']}');
+      });
+  }
+
+  void disconnect() {
+    echo.leaveAllChannels();
+    echo.disconnect();
+  }
+}
+```
+
+### 13.3 Astrologer App — Full Broadcast Flow
+
+```dart
+import 'package:livekit_client/livekit_client.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+class AstrologerBroadcastService {
+  late Room _room;
+  bool _isBroadcasting = false;
+
+  Future<Map<String, dynamic>> _apiCall(String url, String token) async {
+    final res = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+    if (res.statusCode != 200) {
+      throw Exception('API error ${res.statusCode}: ${res.body}');
+    }
+    return jsonDecode(res.body)['data'];
+  }
+
+  Future<void> startBroadcast(int sessionId, String authToken) async {
+    try {
+      // 1. Request camera + mic permissions
+      await [
+        Permission.camera,
+        Permission.microphone,
+      ].request();
+
+      // 2. Call API to create LiveKit room + get token
+      final data = await _apiCall(
+        'https://suryapathkundli.com/api/v1/astrologer/live/$sessionId/broadcast',
+        authToken,
+      );
+
+      final wsUrl = data['livekit_ws_url'] as String;
+      final roomUuid = data['room_uuid'] as String;
+      final token = data['token'] as String;
+
+      // 3. Connect to LiveKit room
+      _room = Room();
+      _room.on<RoomEvent>(_onRoomEvent);
+      await _room.connect(wsUrl, token, roomOptions: RoomOptions(
+        adaptiveStream: true,
+        dynacast: true,
+      ));
+
+      // 4. Publish camera track
+      final cameraTrack = await LocalVideoTrack.create();
+      await _room.localParticipant?.publishTrack(cameraTrack);
+
+      // 5. Publish microphone track
+      final micTrack = await LocalAudioTrack.create();
+      await _room.localParticipant?.publishTrack(micTrack);
+
+      _isBroadcasting = true;
+    } catch (e) {
+      _isBroadcasting = false;
+      debugPrint('Broadcast start failed: $e');
+      rethrow;
+    }
+  }
+
+  void _onRoomEvent(RoomEvent event, dynamic data) {
+    switch (event) {
+      case RoomEvent.Disconnected:
+        _isBroadcasting = false;
+        break;
+      case RoomEvent.ParticipantConnected:
+        debugPrint('Viewer joined: ${(data as RemoteParticipant).identity}');
+        break;
+      case RoomEvent.ParticipantDisconnected:
+        debugPrint('Viewer left: ${(data as RemoteParticipant).identity}');
+        break;
+      default:
+        break;
+    }
+  }
+
+  Future<void> stopBroadcast(int sessionId, String authToken) async {
+    try {
+      await http.post(
+        Uri.parse('https://suryapathkundli.com/api/v1/astrologer/live/$sessionId/stop-broadcast'),
+        headers: {'Authorization': 'Bearer $authToken'},
+      );
+    } catch (_) {}
+    if (_isBroadcasting) {
+      await _room.disconnect();
+      _isBroadcasting = false;
+    }
+  }
+
+  void dispose() {
+    _room.dispose();
+  }
+}
+```
+
+### 13.4 User App — Full Watch Flow
+
+```dart
+import 'package:livekit_client/livekit_client.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:flutter/material.dart';
+
+class LiveKitViewer extends StatefulWidget {
+  final int sessionId;
+  final String authToken;
+  const LiveKitViewer({super.key, required this.sessionId, required this.authToken});
+  @override
+  State<LiveKitViewer> createState() => _LiveKitViewerState();
+}
+
+class _LiveKitViewerState extends State<LiveKitViewer> {
+  Room? _room;
+  RemoteVideoTrack? _videoTrack;
+  bool _isLoading = false;
+  String? _error;
+
+  Future<void> _connect() async {
+    setState(() => _isLoading = true);
+
+    try {
+      // 1. Get subscriber token from API
+      final res = await http.post(
+        Uri.parse('https://suryapathkundli.com/api/v1/user/live/${widget.sessionId}/watch'),
+        headers: {
+          'Authorization': 'Bearer ${widget.authToken}',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (res.statusCode != 200) {
+        throw Exception('Watch API failed: ${res.body}');
+      }
+      final json = jsonDecode(res.body);
+      if (json['status'] != 'success') {
+        throw Exception(json['message'] ?? 'Watch API error');
+      }
+      final data = json['data'];
+      final wsUrl = data['livekit_ws_url'] as String;
+      final token = data['token'] as String;
+
+      // 2. Connect to LiveKit (subscribe-only token)
+      _room = Room();
+      _room.on<RoomEvent>(_onRoomEvent);
+      await _room!.connect(wsUrl, token);
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Connection failed: $e';
+      });
+    }
+  }
+
+  void _onRoomEvent(RoomEvent event, dynamic data) {
+    switch (event) {
+      case RoomEvent.TrackSubscribed:
+        final track = data as RemoteTrack;
+        if (track is RemoteVideoTrack && mounted) {
+          setState(() => _videoTrack = track);
+        }
+        break;
+      case RoomEvent.TrackUnsubscribed:
+        if (data is RemoteVideoTrack && mounted) {
+          setState(() => _videoTrack = null);
+        }
+        break;
+      case RoomEvent.Disconnected:
+        if (mounted) setState(() => _error = 'Broadcast ended');
+        break;
+      default:
+        break;
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _connect();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_error != null) {
+      return Center(child: Text(_error!, style: const TextStyle(color: Colors.red)));
+    }
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_videoTrack == null) {
+      return const Center(child: Text('Waiting for broadcast...'));
+    }
+    return VideoRenderer(
+      track: _videoTrack!,
+      fit: BoxFit.contain,
+      mirror: false,
+    );
+  }
+
+  @override
+  void dispose() {
+    _room?.dispose();
+    super.dispose();
+  }
+}
+
+// Usage:
+// LiveKitViewer(sessionId: 16, authToken: 'user-auth-token')
+```
+
+### 13.5 Handling Disconnection & Cleanup
+
+```dart
+class LiveSessionManager {
+  EchoService? echoService;
+  AstrologerBroadcastService? broadcastService;
+
+  void onSessionEnded(int sessionId) {
+    // 1. Disconnect from LiveKit
+    broadcastService?.dispose();
+    broadcastService = null;
+
+    // 2. Leave Echo presence channel
+    echoService?.echo.leave('live-session.$sessionId');
+
+    // 3. Navigate to "Session Ended" screen
+  }
+
+  void onBroadcastStopped() {
+    // Video stops but chat remains
+    broadcastService?.dispose();
+    broadcastService = null;
+  }
+}
+```
+
+### 13.6 Error Handling Checklist
+
+| Scenario | Handling |
+|----------|----------|
+| Token expired (401 from LiveKit) | Re-call `/broadcast` or `/watch`, re-connect with fresh token |
+| Network drop | Listen for `RoomEvent.Disconnected`, auto-reconnect with exponential backoff |
+| Permission denied | Show dialog asking user to enable camera/mic in settings |
+| API call fails | Retry with backoff (max 3 attempts), show user-friendly error |
+| LiveKit room deleted | LiveKit disconnects all clients — show "Broadcast ended" screen |
+| Concurrent broadcast | `/broadcast` returns existing token (idempotent) — just connect |
