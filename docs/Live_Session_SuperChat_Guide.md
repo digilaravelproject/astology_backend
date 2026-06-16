@@ -19,34 +19,41 @@ WebSockets are handled using **Laravel Reverb**. All WebSocket connection authen
 ## 2. Step-by-Step Flow: Scheduled Live Session
 
 ```mermaid
-sequence-diagram
+sequenceDiagram
     autonumber
-    Astrologer -> API: POST /api/v1/astrologer/live (Create Scheduled)
-    Astrologer -> API: POST /api/v1/astrologer/live/{id}/start (Go Live)
+    Astrologer->>API: POST /api/v1/astrologer/live (Create Scheduled)
+    Astrologer->>API: POST /api/v1/astrologer/live/{id}/start (Go Live)
     Note over Reverb: Broadcasts 'LiveSessionStarted' on 'live-sessions'
-    User -> API: GET /api/v1/user/live/now (Fetch ongoing streams)
-    User -> API: POST /api/v1/user/live/{id}/join
+    User->>API: GET /api/v1/user/live/now (Fetch ongoing streams)
+    User->>API: POST /api/v1/user/live/{id}/join
     Note over Reverb: Broadcasts 'ViewerCountUpdated' on 'live-session.{id}'
-    User -> API: POST /api/v1/user/live/{id}/comment
+    User->>API: POST /api/v1/user/live/{id}/comment
     Note over Reverb: Broadcasts 'NewLiveComment' on 'live-session.{id}'
-    User -> API: POST /api/v1/user/live/{id}/super-chat
+    User->>API: POST /api/v1/user/live/{id}/super-chat
     Note over Reverb: Broadcasts 'SuperChatReceived' on 'live-session.{id}'
-    Astrologer -> API: POST /api/v1/astrologer/live/{id}/stop (End stream)
+    Astrologer->>API: POST /api/v1/astrologer/live/{id}/stop (End stream)
 ```
 
 ### Step 1: Create Scheduled Session (Astrologer)
 The astrologer schedules a session for the future.
 
 - **HTTP Request**: `POST /api/v1/astrologer/live`
+- **Payload Parameters**:
+  - `title` (Required, string, max:255)
+  - `description` (Optional, string, max:1000)
+  - `scheduled_at` (Required, date_format:Y-m-d H:i:s, after:now)
+  - `session_type` (Required, in:public,private)
+  - `duration_minutes` (Optional, integer, min:15, max:480, default:60)
+  - `max_participants` (Optional, integer, min:1, max:5000, default:100)
 - **Request Body**:
   ```json
   {
-    "title": "Weekly Astrology Prediction",          // Required, string, max:255
-    "description": "Weekly horoscope analysis",      // Optional, string, max:1000
-    "scheduled_at": "2026-06-20 18:00:00",           // Required, date_format:Y-m-d H:i:s, after:now
-    "session_type": "public",                        // Required, in:public,private
-    "duration_minutes": 60,                         // Optional, integer, min:15, max:480, default:60
-    "max_participants": 500                          // Optional, integer, min:1, max:5000, default:100
+    "title": "Weekly Astrology Prediction",
+    "description": "Weekly horoscope analysis",
+    "scheduled_at": "2026-06-20 18:00:00",
+    "session_type": "public",
+    "duration_minutes": 60,
+    "max_participants": 500
   }
   ```
 - **Response (`201 Created`)**:
@@ -145,15 +152,22 @@ When the scheduled time arrives, the astrologer starts the stream.
 The astrologer skips scheduling and goes live right away.
 
 - **HTTP Request**: `POST /api/v1/astrologer/live`
+- **Payload Parameters**:
+  - `title` (Required, string, max:255)
+  - `description` (Optional, string, max:1000)
+  - `is_instant` (Required, boolean, true)
+  - `session_type` (Required, in:public,private)
+  - `duration_minutes` (Optional, integer, min:15, max:480, default:60)
+  - `max_participants` (Optional, integer, min:1, max:5000, default:100)
 - **Request Body**:
   ```json
   {
-    "title": "Instant Tarot Reading & QA",             // Required, string, max:255
-    "description": "Ask me anything live!",            // Optional, string, max:1000
-    "is_instant": true,                                // Required, boolean (true)
-    "session_type": "public",                          // Required, in:public,private
-    "duration_minutes": 45,                           // Optional, integer, min:15, max:480, default:60
-    "max_participants": 300                            // Optional, integer, min:1, max:5000, default:100
+    "title": "Instant Tarot Reading & QA",
+    "description": "Ask me anything live!",
+    "is_instant": true,
+    "session_type": "public",
+    "duration_minutes": 45,
+    "max_participants": 300
   }
   ```
 - **Response (`201 Created`)**:
@@ -271,10 +285,12 @@ User clicks on a live session card to watch and subscribe to real-time chats.
 User writes a text message in the chat box.
 
 - **HTTP Request**: `POST /api/v1/user/live/{id}/comment`
+- **Payload Parameters**:
+  - `message` (Required, string, max:500)
 - **Request Body**:
   ```json
   {
-    "message": "Hello Priya, please answer my question! 🔮"   // Required, string, max:500
+    "message": "Hello Priya, please answer my question! 🔮"
   }
   ```
 - **Response (`210 Created`)**:
@@ -306,14 +322,17 @@ User writes a text message in the chat box.
 ---
 
 ### Step 4: Send Super Chat (Gift Tip)
-User wants to catch the astrologer's attention by tipping a pre-defined Gift from their wallet balance.
+User tips a pre-defined Gift from their wallet balance.
 
 - **HTTP Request**: `POST /api/v1/user/live/{id}/super-chat`
+- **Payload Parameters**:
+  - `gift_id` (Required, integer, exists:gifts,id)
+  - `message` (Optional, string, max:500)
 - **Request Body**:
   ```json
   {
-    "gift_id": 3,                                              // Required, integer, exists:gifts,id
-    "message": "Here is a Red Rose for you!"                   // Optional, string, max:500
+    "gift_id": 3,
+    "message": "Here is a Red Rose for you!"
   }
   ```
 - **Response (`201 Created`)**:
@@ -413,7 +432,6 @@ If the astrologer's app closes accidentally but they are still streaming:
     "message": "Current active live session retrieved successfully"
   }
   ```
-- **Action**: The frontend recovers the `stream_key` from the response and reconnects/pushes RTMP without creating a new session.
 
 ---
 
@@ -463,7 +481,6 @@ Here is a quick reference for the frontend to bind events:
 Echo.channel('live-sessions')
     .listen('.LiveSessionStarted', (e) => {
         console.log('New Stream Started:', e);
-        // Add e to list of active streams reactively
     });
 
 // 2. Listen to updates inside a specific stream (e.g. stream ID = 16)
@@ -473,10 +490,8 @@ Echo.join('live-session.16')
     })
     .listen('.NewLiveComment', (e) => {
         console.log('New Comment:', e.message);
-        // Append comment to chat list
     })
     .listen('.SuperChatReceived', (e) => {
         console.log('Tipped Gift:', e.gift.title, 'Amount:', e.amount);
-        // Trigger overlay anim with e.gift.icon_url
     });
 ```
