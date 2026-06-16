@@ -95,7 +95,10 @@ class LiveKitService
             'iat' => $now,
             'nbf' => $now,
             'video' => [
-                'rest' => true,
+                'roomCreate' => true,
+                'roomList' => true,
+                'roomAdmin' => true,
+                'roomRecord' => true,
             ],
         ];
 
