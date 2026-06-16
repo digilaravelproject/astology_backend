@@ -28,7 +28,8 @@ class LiveKitService
     public function createRoom(string $roomName): array
     {
         try {
-            $response = Http::withBasicAuth($this->apiKey, $this->apiSecret)
+            $token = $this->generateApiToken();
+            $response = Http::withToken($token, 'Bearer')
                 ->timeout(5)
                 ->post("{$this->serverUrl}/livekit/room/create", [
                     'name' => $roomName,
@@ -62,7 +63,8 @@ class LiveKitService
     public function deleteRoom(string $roomName): void
     {
         try {
-            $response = Http::withBasicAuth($this->apiKey, $this->apiSecret)
+            $token = $this->generateApiToken();
+            $response = Http::withToken($token, 'Bearer')
                 ->timeout(5)
                 ->post("{$this->serverUrl}/livekit/room/delete", [
                     'room' => $roomName,
@@ -80,6 +82,28 @@ class LiveKitService
         } catch (\Exception $e) {
             Log::error('LiveKit deleteRoom exception', ['error' => $e->getMessage()]);
         }
+    }
+
+    private function generateApiToken(): string
+    {
+        $now = time();
+        $payload = [
+            'iss' => $this->apiKey,
+            'exp' => $now + 300,
+            'iat' => $now,
+            'nbf' => $now,
+            'video' => [
+                'rest' => true,
+            ],
+        ];
+
+        $header = $this->base64urlEncode(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
+        $payloadEncoded = $this->base64urlEncode(json_encode($payload));
+        $signature = $this->base64urlEncode(
+            hash_hmac('sha256', "{$header}.{$payloadEncoded}", $this->apiSecret, true)
+        );
+
+        return "{$header}.{$payloadEncoded}.{$signature}";
     }
 
     public function generateToken(
