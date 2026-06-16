@@ -27,7 +27,7 @@ class Gift extends Model
 
     public function getIconUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->attributes['icon_url'] ?? null);
+        return \App\Helpers\MediaHelper::getFullUrl($this->attributes['icon_url'] ?? null);
     }
 
     public function transactions()

@@ -21,7 +21,8 @@ class LiveSessionController extends Controller
         $validator = Validator::make($request->all(), [
             'title' => 'required|string|max:255',
             'description' => 'nullable|string|max:1000',
-            'scheduled_at' => 'required|date_format:Y-m-d H:i:s|after:now',
+            'is_instant' => 'nullable|boolean',
+            'scheduled_at' => 'required_unless:is_instant,true|nullable|date_format:Y-m-d H:i:s|after:now',
             'session_type' => 'required|in:public,private',
             'duration_minutes' => 'nullable|integer|min:15|max:480',
             'max_participants' => 'nullable|integer|min:1|max:5000',
@@ -39,17 +40,32 @@ class LiveSessionController extends Controller
                 return ApiResponse::error('User is not an astrologer', 403);
             }
 
+            $isInstant = $request->boolean('is_instant', false);
+
             // Create live session
-            $liveSession = LiveSession::create([
+            $liveSessionData = [
                 'astrologer_id' => $astrologer->id,
                 'title' => $request->title,
                 'description' => $request->description,
-                'scheduled_at' => $request->scheduled_at,
+                'scheduled_at' => $isInstant ? now() : $request->scheduled_at,
                 'session_type' => $request->session_type,
-                'status' => 'upcoming',
+                'status' => $isInstant ? 'ongoing' : 'upcoming',
                 'duration_minutes' => $request->duration_minutes ?? 60,
                 'max_participants' => $request->max_participants ?? 100,
-            ]);
+            ];
+
+            if ($isInstant) {
+                $liveSessionData['started_at'] = now();
+                $liveSessionData['stream_key'] = Str::random(32);
+            }
+
+            $liveSession = LiveSession::create($liveSessionData);
+
+            if ($isInstant) {
+                $freshSession = $liveSession->fresh(['astrologer.user']);
+                broadcast(new \App\Events\LiveSessionStarted($freshSession));
+                $this->notifyAllUsersAboutLive($freshSession);
+            }
 
             return ApiResponse::success(
                 'Live session created successfully',
@@ -293,9 +309,13 @@ class LiveSessionController extends Controller
                 'stream_key' => Str::random(32),
             ]);
 
+            $freshSession = $liveSession->fresh(['astrologer.user']);
+            broadcast(new \App\Events\LiveSessionStarted($freshSession));
+            $this->notifyAllUsersAboutLive($freshSession);
+
             return ApiResponse::success(
                 'Live session started successfully',
-                $this->formatLiveSession($liveSession->fresh())
+                $this->formatLiveSession($freshSession)
             );
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to start live session: ' . $e->getMessage(), 500);
@@ -343,6 +363,62 @@ class LiveSessionController extends Controller
             );
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to stop live session: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Get the currently ongoing live session for the astrologer
+     * GET /api/v1/astrologer/live/current
+     */
+    public function current()
+    {
+        try {
+            $astrologer = auth()->user()->astrologer;
+
+            if (!$astrologer) {
+                return ApiResponse::error('User is not an astrologer', 403);
+            }
+
+            $liveSession = LiveSession::where('astrologer_id', $astrologer->id)
+                ->where('status', 'ongoing')
+                ->first();
+
+            if (!$liveSession) {
+                return ApiResponse::success('No active live session found', null);
+            }
+
+            return ApiResponse::success(
+                'Current active live session retrieved successfully',
+                $this->formatLiveSession($liveSession)
+            );
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to retrieve current live session: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
+     * Send notification to all users when astrologer goes live
+     */
+    private function notifyAllUsersAboutLive($liveSession)
+    {
+        try {
+            $astrologerUser = $liveSession->astrologer?->user;
+            if ($astrologerUser) {
+                $title = "Astrologer Live Now!";
+                $body = "{$astrologerUser->name} is now streaming live. Join the session to ask your questions!";
+                $meta = [
+                    'type' => 'live_session',
+                    'live_session_id' => $liveSession->id,
+                ];
+
+                \App\Models\User::chunk(100, function ($users) use ($title, $body, $meta) {
+                    foreach ($users as $user) {
+                        \App\Services\NotificationHelper::send($user->id, $title, $body, $meta);
+                    }
+                });
+            }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to send live notifications: ' . $e->getMessage());
         }
     }
 

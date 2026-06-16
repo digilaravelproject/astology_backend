@@ -116,6 +116,7 @@ Route::prefix('v1')->group(function () {
             Route::prefix('live')->group(function () {
                 Route::post('/', [LiveSessionController::class, 'store']);
                 Route::get('/', [LiveSessionController::class, 'index']);
+                Route::get('/current', [LiveSessionController::class, 'current']);
                 Route::get('/{id}', [LiveSessionController::class, 'show']);
                 Route::put('/{id}', [LiveSessionController::class, 'update']);
                 Route::delete('/{id}', [LiveSessionController::class, 'destroy']);

@@ -95,6 +95,9 @@ class SuperChatController extends Controller
             }
 
             $session->increment('viewer_count');
+            $session->refresh();
+
+            broadcast(new \App\Events\ViewerCountUpdated($session->id, $session->viewer_count));
 
             return ApiResponse::success(null, 'Joined live session successfully');
         } catch (Exception $e) {
@@ -109,7 +112,10 @@ class SuperChatController extends Controller
 
             if ($session->viewer_count > 0) {
                 $session->decrement('viewer_count');
+                $session->refresh();
             }
+
+            broadcast(new \App\Events\ViewerCountUpdated($session->id, $session->viewer_count));
 
             return ApiResponse::success(null, 'Left live session successfully');
         } catch (Exception $e) {
@@ -163,7 +169,7 @@ class SuperChatController extends Controller
     public function sendSuperChat(Request $request, $id)
     {
         $validator = Validator::make($request->all(), [
-            'amount'  => 'required|numeric|min:1',
+            'gift_id' => 'required|integer|exists:gifts,id',
             'message' => 'nullable|string|max:500',
         ]);
 
@@ -178,24 +184,43 @@ class SuperChatController extends Controller
                 return ApiResponse::error('Live session is not currently active', 400);
             }
 
+            $gift = \App\Models\Gift::findOrFail($request->gift_id);
+            if (!$gift->is_active) {
+                return ApiResponse::error('Selected gift is not available.', 422);
+            }
+
             $user = $request->user();
-            $amount = (float) $request->amount;
+            $amount = (float) $gift->price;
             $astrologerUserId = $session->astrologer->user_id;
 
-            $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $request) {
-                $userWallet = \App\Models\Wallet::where('user_id', $user->id)->lockForUpdate()->first();
+            $giftMessage = "[Gift: {$gift->title}]" . ($request->message ? ' ' . $request->message : '');
+
+            $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $request, $giftMessage) {
+                // To prevent deadlocks, lock the wallets in a deterministic order based on user ID
+                $firstUserId = min($user->id, $astrologerUserId);
+                $secondUserId = max($user->id, $astrologerUserId);
+
+                if ($firstUserId === $secondUserId) {
+                    $userWallet = \App\Models\Wallet::where('user_id', $user->id)->lockForUpdate()->first();
+                    $astrologerWallet = $userWallet;
+                } else {
+                    $firstWallet = \App\Models\Wallet::where('user_id', $firstUserId)->lockForUpdate()->first();
+                    $secondWallet = \App\Models\Wallet::where('user_id', $secondUserId)->lockForUpdate()->first();
+
+                    $userWallet = $user->id === $firstUserId ? $firstWallet : $secondWallet;
+                    $astrologerWallet = $user->id === $firstUserId ? $secondWallet : $firstWallet;
+                }
+
                 if (!$userWallet || $userWallet->balance < $amount) {
                     throw new Exception('Insufficient balance in your wallet.');
                 }
-
-                $astrologerWallet = \App\Models\Wallet::where('user_id', $astrologerUserId)->lockForUpdate()->first();
 
                 $superChat = SuperChat::create([
                     'live_session_id'    => $session->id,
                     'user_id'            => $user->id,
                     'astrologer_id'       => $session->astrologer_id,
                     'amount'             => $amount,
-                    'message'            => $request->message,
+                    'message'            => $giftMessage,
                     'transaction_status' => 'pending',
                 ]);
 
@@ -216,6 +241,11 @@ class SuperChatController extends Controller
                 'user_avatar' => $user->profile_photo_url,
                 'amount'     => $amount,
                 'message'    => $superChat->message ?? '',
+                'gift'       => [
+                    'id'       => $gift->id,
+                    'title'    => $gift->title,
+                    'icon_url' => $gift->icon_url,
+                ],
                 'created_at' => $superChat->created_at->toISOString(),
             ]));
 
