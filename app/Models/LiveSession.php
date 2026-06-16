@@ -82,4 +82,26 @@ class LiveSession extends Model
     {
         return $query->where('status', $status);
     }
+
+    public function getLiveUrlAttribute($value): ?string
+    {
+        if ($value) {
+            return $value;
+        }
+        if ($this->stream_key) {
+            return "rtmp://suryapathkundli.com/live";
+        }
+        return null;
+    }
+
+    public function getStreamUrlAttribute($value): ?string
+    {
+        if ($value) {
+            return $value;
+        }
+        if ($this->stream_key) {
+            return "https://suryapathkundli.com/live/" . $this->stream_key . ".m3u8";
+        }
+        return null;
+    }
 }
