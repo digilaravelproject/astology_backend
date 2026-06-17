@@ -355,6 +355,19 @@ class LiveSessionController extends Controller
                 }
             }
 
+            try {
+                broadcast(new \App\Events\AstrologerMediaStatusChanged(
+                    $liveSession->id,
+                    ['live_session_id' => $liveSession->id, 'user_id' => auth()->id(), 'type' => 'camera', 'status' => 'off']
+                ));
+                broadcast(new \App\Events\AstrologerMediaStatusChanged(
+                    $liveSession->id,
+                    ['live_session_id' => $liveSession->id, 'user_id' => auth()->id(), 'type' => 'audio', 'status' => 'off']
+                ));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast media status on session end', ['error' => $e->getMessage()]);
+            }
+
             $liveSession->update([
                 'status' => 'completed',
                 'is_broadcasting' => false,
@@ -529,6 +542,19 @@ class LiveSessionController extends Controller
                 'is_broadcasting' => false,
                 'room_uuid' => null,
             ]);
+
+            try {
+                broadcast(new \App\Events\AstrologerMediaStatusChanged(
+                    $liveSession->id,
+                    ['live_session_id' => $liveSession->id, 'user_id' => auth()->id(), 'type' => 'camera', 'status' => 'off']
+                ));
+                broadcast(new \App\Events\AstrologerMediaStatusChanged(
+                    $liveSession->id,
+                    ['live_session_id' => $liveSession->id, 'user_id' => auth()->id(), 'type' => 'audio', 'status' => 'off']
+                ));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast media status on broadcast stop', ['error' => $e->getMessage()]);
+            }
 
             return ApiResponse::success(null, 'Broadcast stopped successfully');
         } catch (\Exception $e) {
