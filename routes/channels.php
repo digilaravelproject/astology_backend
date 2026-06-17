@@ -13,7 +13,7 @@ use App\Models\CallSession;
 */
 Broadcast::channel('user.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
-});
+}, ['guards' => ['sanctum']]);
 
 /*
 |--------------------------------------------------------------------------
@@ -35,11 +35,11 @@ Broadcast::channel('call.{sessionId}', function ($user, $sessionId) {
     // Mathematically verify: user must be EITHER the consumer OR the provider
     return (int) $user->id === (int) $session->consumer_id
         || (int) $user->id === (int) $session->provider_id;
-});
+}, ['guards' => ['sanctum']]);
 
 Broadcast::channel('presence-room', function ($user) {
     return ['id' => $user->id, 'name' => $user->name, 'profile_photo' => $user->profile_photo];
-});
+}, ['guards' => ['sanctum']]);
 
 /*
 |--------------------------------------------------------------------------
@@ -62,4 +62,4 @@ Broadcast::channel('live-session.{id}', function ($user, $id) {
         'name'          => $user->name,
         'profile_photo' => $user->profile_photo,
     ];
-});
+}, ['guards' => ['sanctum']]);
