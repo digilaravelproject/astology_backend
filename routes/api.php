@@ -124,6 +124,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{id}/stop', [LiveSessionController::class, 'stop']);
                 Route::post('/{id}/broadcast', [LiveSessionController::class, 'broadcast']);
                 Route::post('/{id}/stop-broadcast', [LiveSessionController::class, 'stopBroadcast']);
+                Route::post('/{id}/media-status', [LiveSessionController::class, 'updateMediaStatus']);
                 Route::get('/{id}/comments', [SuperChatController::class, 'comments']);
             });
 

@@ -535,6 +535,56 @@ class LiveSessionController extends Controller
     }
 
     /**
+     * Update astrologer media status (camera/audio on/off)
+     * POST /api/v1/astrologer/live/{id}/media-status
+     */
+    public function updateMediaStatus(Request $request, $id)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'type' => 'required|string|in:camera,audio',
+                'status' => 'required|string|in:on,off',
+            ]);
+
+            if ($validator->fails()) {
+                return ApiResponse::error('Validation failed', 422, $validator->errors());
+            }
+
+            $astrologer = auth()->user()->astrologer;
+
+            if (!$astrologer) {
+                return ApiResponse::error('User is not an astrologer', 403);
+            }
+
+            $liveSession = LiveSession::where('astrologer_id', $astrologer->id)
+                ->where('id', $id)
+                ->first();
+
+            if (!$liveSession) {
+                return ApiResponse::error('Live session not found', 404);
+            }
+
+            if (!$liveSession->is_broadcasting) {
+                return ApiResponse::error('No active broadcast', 422);
+            }
+
+            broadcast(new \App\Events\AstrologerMediaStatusChanged(
+                $liveSession->id,
+                [
+                    'live_session_id' => $liveSession->id,
+                    'user_id' => auth()->id(),
+                    'type' => $request->type,
+                    'status' => $request->status,
+                ]
+            ));
+
+            return ApiResponse::success(null, 'Media status updated');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to update media status: ' . $e->getMessage(), 500);
+        }
+    }
+
+    /**
      * Send notification to all users when astrologer goes live
      */
     private function notifyAllUsersAboutLive($liveSession)

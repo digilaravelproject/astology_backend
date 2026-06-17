@@ -538,6 +538,38 @@ No request body.
 
 ---
 
+### 4.12 Update Camera/Audio Status
+
+**POST** `/api/v1/astrologer/live/{id}/media-status`
+
+Astrologer ke Flutter app se tab call karein jab LiveKit track publish/unpublish ho (camera/mic on/off).
+
+**Request Body:**
+```json
+{
+  "type": "camera",
+  "status": "on"
+}
+```
+`type`: `"camera"` ya `"audio"`  
+`status`: `"on"` ya `"off"`
+
+**Response (200 OK):**
+```json
+{
+  "status": "success",
+  "message": "Media status updated",
+  "data": null
+}
+```
+
+**What happens:**
+1. Validates session ownership + broadcast active
+2. Broadcasts `AstrologerMediaStatusChanged` event on `live-session.{id}` presence channel
+3. All viewers receive the event in real-time and update their UI icons
+
+---
+
 ## 5. User (Viewer) API
 
 Base: `/api/v1/user/live` — all routes require `auth:sanctum` + `throttle:tiered`.
@@ -1125,6 +1157,34 @@ All events use `ShouldBroadcastNow` for immediate delivery. Channel names here a
 - Enable "Watch" button
 - Auto-call `POST /watch` to get subscriber token if user is already in the room
 
+### 7.7 AstrologerMediaStatusChanged
+
+| Property | Value |
+|----------|-------|
+| **Channel** | `live-session.{id}` (Presence Channel) |
+| **Event Name** | `AstrologerMediaStatusChanged` |
+| **broadcastAs** | `AstrologerMediaStatusChanged` |
+| **Trigger** | Astrologer toggles camera/audio on/off via `POST /media-status` |
+
+**Payload:**
+```json
+{
+  "live_session_id": 29,
+  "user_id": 1,
+  "type": "camera",
+  "status": "on"
+}
+```
+`type`: `"camera"` ya `"audio"`  
+`status`: `"on"` ya `"off"`
+
+**Flutter behavior on receiving this event:**
+- Camera: Toggle video icon (eye/eye-off)
+- Audio: Toggle mic icon (mic/mic-off)
+- Show toast "Astrologer turned camera off" etc.
+
+---
+
 ## 8. Presence Channel Auth
 
 Defined in `routes/channels.php:53`:
@@ -1321,6 +1381,15 @@ class EchoService {
       .listen('.ViewerCountUpdated', (e) {
         debugPrint('Viewer count: ${e['viewer_count']}');
         // Update counter
+      })
+      .listen('.AstrologerMediaStatusChanged', (e) {
+        debugPrint('Astrologer media: ${e['type']} ${e['status']}');
+        // Update camera/audio icons
+        if (e['type'] == 'camera') {
+          setState(() => isCameraOn = e['status'] == 'on');
+        } else if (e['type'] == 'audio') {
+          setState(() => isAudioOn = e['status'] == 'on');
+        }
       });
   }
 
@@ -1355,11 +1424,15 @@ import 'package:flutter/material.dart';
 class AstrologerBroadcastService {
   late Room _room;
   bool _isBroadcasting = false;
+  String? _authToken;
+  int? _sessionId;
 
   // ── Echo Connection for Real-Time Comments ──
   Echo? _echo;
 
   void _connectEcho(String authToken, int sessionId, void Function(Map) onNewComment) {
+    _authToken = authToken;
+    _sessionId = sessionId;
     _echo = Echo(
       broadcaster: 'pusher',
       client: PusherClient(
@@ -1470,8 +1543,45 @@ class AstrologerBroadcastService {
       case RoomEvent.ParticipantDisconnected:
         debugPrint('Viewer left LiveKit: ${(data as RemoteParticipant).identity}');
         break;
+      case RoomEvent.LocalTrackPublished:
+        _reportMediaStatus(data as LocalTrackPublication);
+        break;
+      case RoomEvent.LocalTrackUnpublished:
+        _reportMediaStatus(data as LocalTrackPublication);
+        break;
       default:
         break;
+    }
+  }
+
+  Future<void> _reportMediaStatus(LocalTrackPublication publication) async {
+    final type = publication.kind == TrackType.Video ? 'camera' : 'audio';
+    final status = publication.muted ? 'off' : 'on';
+    try {
+      await http.post(
+        Uri.parse('https://suryapathkundli.com/api/v1/astrologer/live/$_sessionId/media-status'),
+        headers: {
+          'Authorization': 'Bearer $_authToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'type': type, 'status': status}),
+      );
+    } catch (_) {}
+  }
+
+  void toggleCamera() async {
+    final pub = _room.localParticipant?.getTrackPublication(TrackType.Video);
+    if (pub != null) {
+      await pub.setMuted(!pub.muted);
+      await _reportMediaStatus(pub);
+    }
+  }
+
+  void toggleMic() async {
+    final pub = _room.localParticipant?.getTrackPublication(TrackType.Audio);
+    if (pub != null) {
+      await pub.setMuted(!pub.muted);
+      await _reportMediaStatus(pub);
     }
   }
 
@@ -1782,6 +1892,11 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
       .listen('.SuperChatReceived', (e) {
         debugPrint('SuperChat received: ${e['gift']['title']}');
         // Show overlay animation
+      })
+      .listen('.AstrologerMediaStatusChanged', (e) {
+        debugPrint('Media: ${e['type']} ${e['status']}');
+        if (e['type'] == 'camera') setState(() => isCameraOn = e['status'] == 'on');
+        if (e['type'] == 'audio') setState(() => isAudioOn = e['status'] == 'on');
       });
   }
 
@@ -1854,3 +1969,4 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
 | Astrologer starts video | `AstrologerBroadcastStarted` | `live-session.{id}` | ✅ Yes |
 | Session ends | `LiveSessionEnded` | `live-session.{id}` + public | ✅ Yes |
 | Viewer count changes | `ViewerCountUpdated` | `live-session.{id}` | ✅ Yes |
+| Astrologer toggles camera/audio | `AstrologerMediaStatusChanged` | `live-session.{id}` | ✅ Yes |
