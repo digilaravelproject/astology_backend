@@ -491,13 +491,18 @@ class LiveSessionController extends Controller
                 'is_broadcasting' => true,
             ]);
 
-            LiveSessionParticipant::create([
-                'live_session_id' => $liveSession->id,
-                'user_id' => auth()->id(),
-                'role' => 'astrologer',
-                'livekit_identity' => 'astro_' . auth()->id(),
-                'joined_at' => now(),
-            ]);
+            LiveSessionParticipant::updateOrCreate(
+                [
+                    'live_session_id' => $liveSession->id,
+                    'user_id' => auth()->id(),
+                    'role' => 'astrologer',
+                ],
+                [
+                    'livekit_identity' => 'astro_' . auth()->id(),
+                    'joined_at' => now(),
+                    'left_at' => null,
+                ]
+            );
 
             $token = $liveKit->generateToken(
                 $roomName,
