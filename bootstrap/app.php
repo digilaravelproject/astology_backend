@@ -59,6 +59,11 @@ RateLimiter::for('tiered', function ($request) {
     return Limit::perMinute(30)->by($key);
 });
 
+RateLimiter::for('live_watch', function ($request) {
+    $key = $request->user()?->id ?? $request->ip();
+    return Limit::perMinute(60)->by($key);
+});
+
 RateLimiter::for('api', function ($request) {
     $key = $request->user()?->id ?? $request->ip();
     return Limit::perMinute(120)->by($key);

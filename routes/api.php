@@ -191,7 +191,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/live/now', [SuperChatController::class, 'nowStreaming']);
             Route::get('/live/{id}', [SuperChatController::class, 'show']);
             Route::post('/live/{id}/join', [SuperChatController::class, 'join']);
-            Route::post('/live/{id}/watch', [SuperChatController::class, 'watch']);
+            Route::post('/live/{id}/watch', [SuperChatController::class, 'watch'])
+                ->withoutMiddleware('throttle:tiered')
+                ->middleware('throttle:live_watch');
             Route::post('/live/{id}/leave', [SuperChatController::class, 'leave']);
             Route::post('/live/{id}/comment', [SuperChatController::class, 'comment']);
             Route::post('/live/{id}/super-chat', [SuperChatController::class, 'sendSuperChat']);
