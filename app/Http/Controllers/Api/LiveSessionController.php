@@ -344,6 +344,8 @@ class LiveSessionController extends Controller
 
             $liveSession->update([
                 'status' => 'completed',
+                'is_broadcasting' => false,
+                'room_uuid' => null,
             ]);
 
             $freshSession = $liveSession->fresh();

@@ -77,6 +77,11 @@ class LiveKitService
                 return;
             }
 
+            if ($response->status() === 404) {
+                Log::debug('LiveKit room already gone', ['room' => $roomName]);
+                return;
+            }
+
             Log::warning('LiveKit deleteRoom failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),
