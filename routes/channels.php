@@ -37,7 +37,7 @@ Broadcast::channel('call.{sessionId}', function ($user, $sessionId) {
         || (int) $user->id === (int) $session->provider_id;
 }, ['guards' => ['sanctum']]);
 
-Broadcast::channel('presence-room', function ($user) {
+Broadcast::channel('room', function ($user) {
     return ['id' => $user->id, 'name' => $user->name, 'profile_photo' => $user->profile_photo];
 }, ['guards' => ['sanctum']]);
 
