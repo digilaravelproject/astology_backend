@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\GiftController;
 use App\Http\Controllers\Admin\GiftTransactionController;
 use App\Http\Controllers\Admin\FeedbackController;
+use App\Http\Controllers\Admin\RateLimitController;
 
 Route::get('/', function () {
     // return view('welcome');
@@ -186,6 +187,10 @@ Route::prefix('admin')->group(function () {
 
         // Settings
         Route::get('settings', function() { return view('admin.settings.index'); })->name('admin.settings.index');
+        Route::prefix('settings')->group(function () {
+            Route::get('rate-limits', [RateLimitController::class, 'index'])->name('admin.settings.rate-limits');
+            Route::post('rate-limits', [RateLimitController::class, 'update'])->name('admin.settings.rate-limits.update');
+        });
 
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
     });

@@ -24,16 +24,13 @@ class Setting extends Model
 
     public static function get(string $key, $default = null)
     {
-        $cached = Cache::rememberForever("setting:{$key}", function () use ($key) {
-            return self::where('key', $key)->value('value');
+        return Cache::rememberForever("setting:{$key}", function () use ($key, $default) {
+            $setting = self::where('key', $key)->first();
+            if (!$setting) {
+                return $default;
+            }
+            return self::castValue($setting->value, $setting->type);
         });
-
-        if ($cached === null) {
-            return $default;
-        }
-
-        $setting = self::where('key', $key)->first();
-        return self::castValue($cached, $setting?->type ?? 'string');
     }
 
     public static function set(string $key, $value, string $type = 'string', string $group = 'general', string $description = null): self

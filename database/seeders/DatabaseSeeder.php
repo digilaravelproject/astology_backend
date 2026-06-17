@@ -28,5 +28,6 @@ class DatabaseSeeder extends Seeder
         $this->call(SubscriptionTestSeeder::class);
         $this->call(WebRTCDemoSeeder::class);
         $this->call(SettingSeeder::class);
+        $this->call(RateLimitSettingSeeder::class);
     }
 }
