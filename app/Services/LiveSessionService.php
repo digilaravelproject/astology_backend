@@ -60,8 +60,6 @@ class LiveSessionService
             ],
             [
                 'livekit_identity' => $identity,
-                'joined_at' => now(),
-                'left_at' => null,
             ]
         );
 
@@ -87,8 +85,28 @@ class LiveSessionService
             throw new \RuntimeException('Live session is not currently active');
         }
 
-        $session->increment('viewer_count');
-        $session->refresh();
+        $participant = LiveSessionParticipant::where('live_session_id', $session->id)
+            ->where('user_id', $user->id)
+            ->whereNull('left_at')
+            ->first();
+
+        $shouldIncrement = false;
+
+        if (!$participant) {
+            $participant = LiveSessionParticipant::updateOrCreate(
+                ['live_session_id' => $session->id, 'user_id' => $user->id, 'role' => 'viewer'],
+                ['joined_at' => now(), 'left_at' => null]
+            );
+            $shouldIncrement = true;
+        } elseif (!$participant->joined_at) {
+            $participant->update(['joined_at' => now()]);
+            $shouldIncrement = true;
+        }
+
+        if ($shouldIncrement) {
+            $session->increment('viewer_count');
+            $session->refresh();
+        }
 
         broadcast(new ViewerCountUpdated($session->id, $session->viewer_count));
 
@@ -104,15 +122,19 @@ class LiveSessionService
     {
         $session = LiveSession::findOrFail($id);
 
-        if ($session->viewer_count > 0) {
-            $session->decrement('viewer_count');
-            $session->refresh();
-        }
-
-        LiveSessionParticipant::where('live_session_id', $session->id)
+        $participant = LiveSessionParticipant::where('live_session_id', $session->id)
             ->where('user_id', $user->id)
             ->whereNull('left_at')
-            ->update(['left_at' => now()]);
+            ->first();
+
+        if ($participant) {
+            $participant->update(['left_at' => now()]);
+
+            if ($session->viewer_count > 0) {
+                $session->decrement('viewer_count');
+                $session->refresh();
+            }
+        }
 
         broadcast(new ViewerCountUpdated($session->id, $session->viewer_count));
 
