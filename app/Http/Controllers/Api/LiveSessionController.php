@@ -342,6 +342,19 @@ class LiveSessionController extends Controller
                 return ApiResponse::error('Only ongoing sessions can be stopped', 422);
             }
 
+            // Delete LiveKit room BEFORE clearing room_uuid
+            $existingRoomUuid = $liveSession->room_uuid;
+            if ($existingRoomUuid) {
+                try {
+                    app(LiveKitService::class)->deleteRoom($existingRoomUuid);
+                } catch (\Exception $e) {
+                    Log::error('Failed to delete LiveKit room during stop', [
+                        'room' => $existingRoomUuid,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             $liveSession->update([
                 'status' => 'completed',
                 'is_broadcasting' => false,
@@ -349,17 +362,6 @@ class LiveSessionController extends Controller
             ]);
 
             $freshSession = $liveSession->fresh();
-
-            if ($freshSession->room_uuid) {
-                try {
-                    app(LiveKitService::class)->deleteRoom($freshSession->room_uuid);
-                } catch (\Exception $e) {
-                    Log::error('Failed to delete LiveKit room during stop', [
-                        'room' => $freshSession->room_uuid,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
 
             try {
                 broadcast(new \App\Events\LiveSessionEnded($freshSession));
