@@ -78,6 +78,10 @@ class LiveSessionController extends Controller
                 201
             );
         } catch (\Exception $e) {
+            Log::error('Failed to create live session', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return ApiResponse::error('Failed to create live session: ' . $e->getMessage(), 500);
         }
     }
@@ -329,6 +333,11 @@ class LiveSessionController extends Controller
                 'Live session started successfully'
             );
         } catch (\Exception $e) {
+            Log::error('Failed to start live session', [
+                'live_session_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return ApiResponse::error('Failed to start live session: ' . $e->getMessage(), 500);
         }
     }
@@ -405,6 +414,11 @@ class LiveSessionController extends Controller
                 'Live session ended successfully'
             );
         } catch (\Exception $e) {
+            Log::error('Failed to stop live session', [
+                'live_session_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return ApiResponse::error('Failed to stop live session: ' . $e->getMessage(), 500);
         }
     }
@@ -522,6 +536,11 @@ class LiveSessionController extends Controller
                 'token' => $token,
             ], 'Broadcast started successfully');
         } catch (\Exception $e) {
+            Log::error('Failed to start broadcast', [
+                'live_session_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return ApiResponse::error('Failed to start broadcast: ' . $e->getMessage(), 500);
         }
     }
@@ -583,6 +602,11 @@ class LiveSessionController extends Controller
 
             return ApiResponse::success(null, 'Broadcast stopped successfully');
         } catch (\Exception $e) {
+            Log::error('Failed to stop broadcast', [
+                'live_session_id' => $id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return ApiResponse::error('Failed to stop broadcast: ' . $e->getMessage(), 500);
         }
     }
