@@ -60,8 +60,16 @@ class LiveSessionController extends Controller
 
             if ($isInstant) {
                 $freshSession = $liveSession->fresh(['astrologer.user']);
-                broadcast(new \App\Events\LiveSessionStarted($freshSession));
-                $this->notifyAllUsersAboutLive($freshSession);
+                try {
+                    broadcast(new \App\Events\LiveSessionStarted($freshSession));
+                } catch (\Exception $e) {
+                    Log::error('Failed to broadcast LiveSessionStarted on create', ['error' => $e->getMessage()]);
+                }
+                try {
+                    $this->notifyAllUsersAboutLive($freshSession);
+                } catch (\Exception $e) {
+                    Log::error('Failed to notify users about live', ['error' => $e->getMessage()]);
+                }
             }
 
             return ApiResponse::success(
@@ -305,8 +313,16 @@ class LiveSessionController extends Controller
             ]);
 
             $freshSession = $liveSession->fresh(['astrologer.user']);
-            broadcast(new \App\Events\LiveSessionStarted($freshSession));
-            $this->notifyAllUsersAboutLive($freshSession);
+            try {
+                broadcast(new \App\Events\LiveSessionStarted($freshSession));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast LiveSessionStarted on start', ['error' => $e->getMessage()]);
+            }
+            try {
+                $this->notifyAllUsersAboutLive($freshSession);
+            } catch (\Exception $e) {
+                Log::error('Failed to notify users about live', ['error' => $e->getMessage()]);
+            }
 
             return ApiResponse::success(
                 $this->formatLiveSession($freshSession),

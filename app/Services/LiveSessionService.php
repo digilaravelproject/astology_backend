@@ -111,14 +111,22 @@ class LiveSessionService
             $session->refresh();
         }
 
-        broadcast(new ViewerCountUpdated($session->id, $session->viewer_count));
+        try {
+            broadcast(new ViewerCountUpdated($session->id, $session->viewer_count));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to broadcast viewer count on join', ['error' => $e->getMessage()]);
+        }
 
-        broadcast(new UserJoinedLiveSession($session->id, [
-            'user_id' => $user->id,
-            'user_name' => $user->name,
-            'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-            'joined_at' => now()->toISOString(),
-        ]));
+        try {
+            broadcast(new UserJoinedLiveSession($session->id, [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
+                'joined_at' => now()->toISOString(),
+            ]));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to broadcast UserJoinedLiveSession', ['error' => $e->getMessage()]);
+        }
 
         $lastComments = LiveComment::with('user:id,name,profile_photo')
             ->where('live_session_id', $session->id)
@@ -160,14 +168,22 @@ class LiveSessionService
             }
         }
 
-        broadcast(new ViewerCountUpdated($session->id, $session->viewer_count));
+        try {
+            broadcast(new ViewerCountUpdated($session->id, $session->viewer_count));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to broadcast viewer count on leave', ['error' => $e->getMessage()]);
+        }
 
-        broadcast(new UserLeftLiveSession($session->id, [
-            'user_id' => $user->id,
-            'user_name' => $user->name,
-            'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-            'left_at' => now()->toISOString(),
-        ]));
+        try {
+            broadcast(new UserLeftLiveSession($session->id, [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
+                'left_at' => now()->toISOString(),
+            ]));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to broadcast UserLeftLiveSession', ['error' => $e->getMessage()]);
+        }
     }
 
     public function addComment(int $sessionId, $user, string $message): array

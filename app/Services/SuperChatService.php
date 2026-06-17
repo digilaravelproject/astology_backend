@@ -7,6 +7,7 @@ use App\Models\SuperChat;
 use App\Models\Wallet;
 use App\Events\SuperChatReceived;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class SuperChatService
@@ -66,19 +67,23 @@ class SuperChatService
             return $superChat->fresh();
         }, 3);
 
-        broadcast(new SuperChatReceived($session->id, [
-            'user_id'    => $user->id,
-            'user_name'  => $user->name,
-            'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-            'amount'     => $amount,
-            'message'    => $superChat->message ?? '',
-            'gift'       => [
-                'id'       => $gift->id,
-                'title'    => $gift->title,
-                'icon_url' => $gift->icon_url,
-            ],
-            'created_at' => $superChat->created_at->toISOString(),
-        ]));
+        try {
+            broadcast(new SuperChatReceived($session->id, [
+                'user_id'    => $user->id,
+                'user_name'  => $user->name,
+                'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
+                'amount'     => $amount,
+                'message'    => $superChat->message ?? '',
+                'gift'       => [
+                    'id'       => $gift->id,
+                    'title'    => $gift->title,
+                    'icon_url' => $gift->icon_url,
+                ],
+                'created_at' => $superChat->created_at->toISOString(),
+            ]));
+        } catch (\Exception $e) {
+            Log::error('Failed to broadcast SuperChatReceived', ['error' => $e->getMessage()]);
+        }
 
         return [
             'superChat' => $superChat,
