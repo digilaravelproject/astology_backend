@@ -34,5 +34,17 @@ class RouteServiceProvider extends ServiceProvider
             $key = $request->user()?->id ?? $request->ip();
             return Limit::perMinute(30)->by($key);
         });
+
+        // Live watch: 60 requests per minute per user/IP
+        RateLimiter::for('live_watch', function ($request) {
+            $key = $request->user()?->id ?? $request->ip();
+            return Limit::perMinute(60)->by($key);
+        });
+
+        // General API: 120 requests per minute per user/IP
+        RateLimiter::for('api', function ($request) {
+            $key = $request->user()?->id ?? $request->ip();
+            return Limit::perMinute(120)->by($key);
+        });
     }
 }

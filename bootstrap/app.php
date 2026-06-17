@@ -3,9 +3,6 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Support\Facades\RateLimiter;
-
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -30,40 +27,3 @@ return Application::configure(basePath: dirname(__DIR__))
             return $request->is('api/*') || $request->expectsJson();
         });
     })->create();
-
-/*
-|--------------------------------------------------------------------------
-| Rate Limiters
-|--------------------------------------------------------------------------
-|
-| Register rate limiters for the application. These rates are applied
-| to API routes to prevent abuse and brute force attacks.
-|
-*/
-RateLimiter::for('otp', function ($request) {
-    return Limit::perMinute(5)->by($request->ip());
-});
-
-RateLimiter::for('auth', function ($request) {
-    return Limit::perMinute(10)->by($request->ip());
-});
-
-RateLimiter::for('general', function ($request) {
-    $key = $request->user()?->id ?? $request->ip();
-    return Limit::perMinute(60)->by($key);
-});
-
-RateLimiter::for('tiered', function ($request) {
-    $key = $request->user()?->id ?? $request->ip();
-    return Limit::perMinute(30)->by($key);
-});
-
-RateLimiter::for('live_watch', function ($request) {
-    $key = $request->user()?->id ?? $request->ip();
-    return Limit::perMinute(60)->by($key);
-});
-
-RateLimiter::for('api', function ($request) {
-    $key = $request->user()?->id ?? $request->ip();
-    return Limit::perMinute(120)->by($key);
-});
