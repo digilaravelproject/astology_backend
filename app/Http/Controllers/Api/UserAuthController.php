@@ -658,7 +658,7 @@ class UserAuthController extends Controller
                     'name' => $astrologer->user->name,
                     'email' => $astrologer->user->email,
                     'phone' => $astrologer->user->phone,
-                    'profile_photo' => $astrologer->profile_photo_url,
+                    'profile_photo' => $astrologer->profile_photo,
                     'years_of_experience' => $astrologer->years_of_experience,
                     'areas_of_expertise' => $astrologer->areas_of_expertise,
                     'languages' => $astrologer->languages,

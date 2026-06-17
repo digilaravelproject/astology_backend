@@ -44,7 +44,7 @@ class CallController extends Controller
             broadcast(new CallInitiated($session, [
                 'id'            => $request->user()->id,
                 'name'          => $request->user()->name,
-                'profile_photo' => $request->user()->profile_photo_url,
+                'profile_photo' => \App\Helpers\MediaHelper::getUrl($request->user()->profile_photo),
                 'offer'         => $request->offer,
             ]));
 
@@ -244,7 +244,7 @@ class CallController extends Controller
                     'caller'      => $session->consumer ? [
                         'id'            => $session->consumer->id,
                         'name'          => $session->consumer->name,
-                        'profile_photo' => $session->consumer->profile_photo_url,
+                        'profile_photo' => \App\Helpers\MediaHelper::getUrl($session->consumer->profile_photo),
                     ] : null,
                     'created_at'  => $session->created_at->toISOString(),
                     'expires_at'  => $session->created_at->addSeconds(60)->toISOString(),

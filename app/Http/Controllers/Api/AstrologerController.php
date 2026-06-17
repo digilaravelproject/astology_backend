@@ -412,7 +412,7 @@ class AstrologerController extends Controller
                     'order_id' => $item->id,
                     'user_id' => $item->consumer_id,
                     'user_name' => $consumer->name ?? 'User',
-                    'user_profile_image' => $consumer ? $consumer->profile_photo_url : null,
+                    'user_profile_image' => $consumer ? \App\Helpers\MediaHelper::getUrl($consumer->profile_photo) : null,
                     'request_type' => $item->type,
                     'status' => $item->status,
                     'requested_at' => $item->created_at,

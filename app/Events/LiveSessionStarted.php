@@ -40,7 +40,7 @@ class LiveSessionStarted implements ShouldBroadcastNow
             'astrologer' => $astrologerUser ? [
                 'id' => $astrologerUser->id,
                 'name' => $astrologerUser->name,
-                'profile_photo' => $astrologerUser->profile_photo,
+                'profile_photo' => $astrologerUser->profile_photo ? \App\Helpers\MediaHelper::getUrl($astrologerUser->profile_photo) : null,
             ] : null,
             'viewer_count' => $this->liveSession->viewer_count,
             'is_broadcasting' => $this->liveSession->is_broadcasting,

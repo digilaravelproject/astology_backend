@@ -3,6 +3,7 @@
 namespace App\Helpers;
 
 use App\Models\User;
+use App\Helpers\MediaHelper;
 
 class RtcHelper
 {
@@ -11,7 +12,7 @@ class RtcHelper
         $data = [
             'id' => $user->id,
             'name' => $user->name,
-            'profile_photo' => $user->profile_photo_url,
+            'profile_photo' => MediaHelper::getUrl($user->profile_photo),
             'is_online' => $user->is_online,
             'is_busy' => $user->is_busy,
             'user_type' => $user->user_type,
