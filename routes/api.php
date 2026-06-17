@@ -223,7 +223,7 @@ Route::prefix('v1')->group(function () {
     // Public/Debug Broadcast Auth (Move inside v1 group)
     Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
         return Broadcast::auth($request);
-    })->middleware(['auth:sanctum', 'throttle:auth']);
+    })->middleware(['auth:sanctum', 'throttle:general']);
 
     Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
         Route::post('/presence/pulse', [PresenceController::class, 'pulse']);

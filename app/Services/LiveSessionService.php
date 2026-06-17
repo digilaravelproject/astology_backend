@@ -160,13 +160,17 @@ class LiveSessionService
             'message' => $message,
         ]);
 
-        broadcast(new NewLiveComment($session->id, [
-            'user_id' => $user->id,
-            'user_name' => $user->name,
-            'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-            'message' => $comment->message,
-            'created_at' => $comment->created_at->toISOString(),
-        ]));
+        try {
+            broadcast(new NewLiveComment($session->id, [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
+                'message' => $comment->message,
+                'created_at' => $comment->created_at->toISOString(),
+            ]));
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to broadcast comment', ['error' => $e->getMessage()]);
+        }
 
         return [
             'id' => $comment->id,

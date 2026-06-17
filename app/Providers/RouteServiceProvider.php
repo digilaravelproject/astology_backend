@@ -18,9 +18,9 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($request->ip());
         });
 
-        // Authentication endpoints: 10 attempts per minute per IP
+        // Authentication endpoints: 60 attempts per minute per IP
         RateLimiter::for('auth', function ($request) {
-            return Limit::perMinute(10)->by($request->ip());
+            return Limit::perMinute(60)->by($request->ip());
         });
 
         // General API endpoints: 60 requests per minute per user/IP
@@ -35,10 +35,10 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by($key);
         });
 
-        // Live watch: 60 requests per minute per user/IP
+        // Live watch: 100 requests per minute per user/IP
         RateLimiter::for('live_watch', function ($request) {
             $key = $request->user()?->id ?? $request->ip();
-            return Limit::perMinute(60)->by($key);
+            return Limit::perMinute(100)->by($key);
         });
 
         // General API: 120 requests per minute per user/IP

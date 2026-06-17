@@ -596,15 +596,19 @@ class LiveSessionController extends Controller
                 return ApiResponse::error('No active broadcast', 422);
             }
 
-            broadcast(new \App\Events\AstrologerMediaStatusChanged(
-                $liveSession->id,
-                [
-                    'live_session_id' => $liveSession->id,
-                    'user_id' => auth()->id(),
-                    'type' => $request->type,
-                    'status' => $request->status,
-                ]
-            ));
+            try {
+                broadcast(new \App\Events\AstrologerMediaStatusChanged(
+                    $liveSession->id,
+                    [
+                        'live_session_id' => $liveSession->id,
+                        'user_id' => auth()->id(),
+                        'type' => $request->type,
+                        'status' => $request->status,
+                    ]
+                ));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast media status', ['error' => $e->getMessage()]);
+            }
 
             return ApiResponse::success(null, 'Media status updated');
         } catch (\Exception $e) {
