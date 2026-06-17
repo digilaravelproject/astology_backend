@@ -1183,6 +1183,52 @@ All events use `ShouldBroadcastNow` for immediate delivery. Channel names here a
 - Audio: Toggle mic icon (mic/mic-off)
 - Show toast "Astrologer turned camera off" etc.
 
+### 7.8 UserJoinedLiveSession
+
+| Property | Value |
+|----------|-------|
+| **Channel** | `live-session.{id}` (Presence Channel) |
+| **Event Name** | `UserJoinedLiveSession` |
+| **broadcastAs** | `UserJoinedLiveSession` |
+| **Trigger** | User calls `POST /live/{id}/join` |
+
+**Payload:**
+```json
+{
+  "user_id": 42,
+  "user_name": "Rahul Kumar",
+  "user_avatar": "users/42/profile_photo.jpg",
+  "joined_at": "2026-06-17T10:00:00.000000Z"
+}
+```
+
+**Flutter behavior on receiving this event:**
+- Add system message to chat: "Rahul Kumar joined"
+- Update viewer presence indicator
+
+### 7.9 UserLeftLiveSession
+
+| Property | Value |
+|----------|-------|
+| **Channel** | `live-session.{id}` (Presence Channel) |
+| **Event Name** | `UserLeftLiveSession` |
+| **broadcastAs** | `UserLeftLiveSession` |
+| **Trigger** | User calls `POST /live/{id}/leave` |
+
+**Payload:**
+```json
+{
+  "user_id": 42,
+  "user_name": "Rahul Kumar",
+  "user_avatar": "users/42/profile_photo.jpg",
+  "left_at": "2026-06-17T10:30:00.000000Z"
+}
+```
+
+**Flutter behavior on receiving this event:**
+- Add system message to chat: "Rahul Kumar left"
+- Remove from viewer presence indicator
+
 ---
 
 ## 8. Presence Channel Auth
@@ -1390,6 +1436,14 @@ class EchoService {
         } else if (e['type'] == 'audio') {
           setState(() => isAudioOn = e['status'] == 'on');
         }
+      })
+      .listen('.UserJoinedLiveSession', (e) {
+        debugPrint('User joined: ${e['user_name']}');
+        // Add system message to chat feed: "${e['user_name']} joined"
+      })
+      .listen('.UserLeftLiveSession', (e) {
+        debugPrint('User left: ${e['user_name']}');
+        // Add system message to chat feed: "${e['user_name']} left"
       });
   }
 
@@ -1897,6 +1951,16 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
         debugPrint('Media: ${e['type']} ${e['status']}');
         if (e['type'] == 'camera') setState(() => isCameraOn = e['status'] == 'on');
         if (e['type'] == 'audio') setState(() => isAudioOn = e['status'] == 'on');
+      })
+      .listen('.UserJoinedLiveSession', (e) {
+        debugPrint('User joined: ${e['user_name']}');
+        if (!mounted) return;
+        setState(() => chatMessages.add(SystemMessage('${e['user_name']} joined')));
+      })
+      .listen('.UserLeftLiveSession', (e) {
+        debugPrint('User left: ${e['user_name']}');
+        if (!mounted) return;
+        setState(() => chatMessages.add(SystemMessage('${e['user_name']} left')));
       });
   }
 
@@ -1970,3 +2034,5 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
 | Session ends | `LiveSessionEnded` | `live-session.{id}` + public | ✅ Yes |
 | Viewer count changes | `ViewerCountUpdated` | `live-session.{id}` | ✅ Yes |
 | Astrologer toggles camera/audio | `AstrologerMediaStatusChanged` | `live-session.{id}` | ✅ Yes |
+| User joins live session | `UserJoinedLiveSession` | `live-session.{id}` | ✅ Yes |
+| User leaves live session | `UserLeftLiveSession` | `live-session.{id}` | ✅ Yes |

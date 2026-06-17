@@ -11,6 +11,8 @@ use App\Models\SuperChat;
 use App\Services\LiveKitService;
 use App\Services\WalletService;
 use App\Events\NewLiveComment;
+use App\Events\UserJoinedLiveSession;
+use App\Events\UserLeftLiveSession;
 use App\Events\SuperChatReceived;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -154,6 +156,14 @@ class SuperChatController extends Controller
 
             broadcast(new \App\Events\ViewerCountUpdated($session->id, $session->viewer_count));
 
+            $user = auth()->user();
+            broadcast(new UserJoinedLiveSession($session->id, [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_avatar' => $user->profile_photo,
+                'joined_at' => now()->toISOString(),
+            ]));
+
             return ApiResponse::success(null, 'Joined live session successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
@@ -176,6 +186,14 @@ class SuperChatController extends Controller
                 ->update(['left_at' => now()]);
 
             broadcast(new \App\Events\ViewerCountUpdated($session->id, $session->viewer_count));
+
+            $user = auth()->user();
+            broadcast(new UserLeftLiveSession($session->id, [
+                'user_id' => $user->id,
+                'user_name' => $user->name,
+                'user_avatar' => $user->profile_photo,
+                'left_at' => now()->toISOString(),
+            ]));
 
             return ApiResponse::success(null, 'Left live session successfully');
         } catch (Exception $e) {
