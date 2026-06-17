@@ -1347,12 +1347,70 @@ class EchoService {
 import 'package:livekit_client/livekit_client.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:http/http.dart' as http;
+import 'package:laravel_echo/laravel_echo.dart';
+import 'package:pusher_client/pusher_client.dart';
 import 'dart:convert';
+import 'package:flutter/material.dart';
 
 class AstrologerBroadcastService {
   late Room _room;
   bool _isBroadcasting = false;
 
+  // ── Echo Connection for Real-Time Comments ──
+  Echo? _echo;
+
+  void _connectEcho(String authToken, int sessionId, void Function(Map) onNewComment) {
+    _echo = Echo(
+      broadcaster: 'pusher',
+      client: PusherClient(
+        'astrology-key',
+        PusherOptions(
+          host: 'suryapathkundli.com',
+          port: 443,
+          scheme: 'https',
+          encrypted: true,
+          auth: Auth(
+            endpoint: 'https://suryapathkundli.com/api/v1/broadcasting/auth',
+            headers: {'Authorization': 'Bearer $authToken'},
+          ),
+        ),
+      ),
+    );
+
+    _echo!.join('live-session.$sessionId')
+      .here((users) => debugPrint('Viewers connected: $users'))
+      .joining((user) => debugPrint('Viewer joined: $user'))
+      .leaving((user) => debugPrint('Viewer left: $user'))
+      .listen('.NewLiveComment', (e) {
+        debugPrint('Comment: ${e['user_name']}: ${e['message']}');
+        onNewComment(e);
+      })
+      .listen('.SuperChatReceived', (e) {
+        debugPrint('SuperChat: ${e['gift']['title']} - ${e['amount']}');
+      })
+      .listen('.LiveSessionEnded', (e) {
+        debugPrint('Session ended by astrologer: ${e['id']}');
+        _disconnectAll();
+      })
+      .listen('.ViewerCountUpdated', (e) {
+        debugPrint('Viewer count: ${e['viewer_count']}');
+      });
+  }
+
+  // ── Fetch Historical Comments ──
+  Future<List<dynamic>> fetchComments(int sessionId, String authToken) async {
+    final res = await http.get(
+      Uri.parse('https://suryapathkundli.com/api/v1/astrologer/live/$sessionId/comments'),
+      headers: {'Authorization': 'Bearer $authToken'},
+    );
+    if (res.statusCode == 200) {
+      final body = jsonDecode(res.body);
+      return body['data']['data'] as List<dynamic>;
+    }
+    return [];
+  }
+
+  // ── LiveKit Broadcast ──
   Future<Map<String, dynamic>> _apiCall(String url, String token) async {
     final res = await http.post(
       Uri.parse(url),
@@ -1369,13 +1427,8 @@ class AstrologerBroadcastService {
 
   Future<void> startBroadcast(int sessionId, String authToken) async {
     try {
-      // 1. Request camera + mic permissions
-      await [
-        Permission.camera,
-        Permission.microphone,
-      ].request();
+      await [Permission.camera, Permission.microphone].request();
 
-      // 2. Call API to create LiveKit room + get token
       final data = await _apiCall(
         'https://suryapathkundli.com/api/v1/astrologer/live/$sessionId/broadcast',
         authToken,
@@ -1385,7 +1438,6 @@ class AstrologerBroadcastService {
       final roomUuid = data['room_uuid'] as String;
       final token = data['token'] as String;
 
-      // 3. Connect to LiveKit room
       _room = Room();
       _room.on<RoomEvent>(_onRoomEvent);
       await _room.connect(wsUrl, token, roomOptions: RoomOptions(
@@ -1393,11 +1445,9 @@ class AstrologerBroadcastService {
         dynacast: true,
       ));
 
-      // 4. Publish camera track
       final cameraTrack = await LocalVideoTrack.create();
       await _room.localParticipant?.publishTrack(cameraTrack);
 
-      // 5. Publish microphone track
       final micTrack = await LocalAudioTrack.create();
       await _room.localParticipant?.publishTrack(micTrack);
 
@@ -1415,10 +1465,10 @@ class AstrologerBroadcastService {
         _isBroadcasting = false;
         break;
       case RoomEvent.ParticipantConnected:
-        debugPrint('Viewer joined: ${(data as RemoteParticipant).identity}');
+        debugPrint('Viewer joined LiveKit: ${(data as RemoteParticipant).identity}');
         break;
       case RoomEvent.ParticipantDisconnected:
-        debugPrint('Viewer left: ${(data as RemoteParticipant).identity}');
+        debugPrint('Viewer left LiveKit: ${(data as RemoteParticipant).identity}');
         break;
       default:
         break;
@@ -1438,7 +1488,19 @@ class AstrologerBroadcastService {
     }
   }
 
+  void _disconnectAll() {
+    _echo?.leaveAllChannels();
+    _echo?.disconnect();
+    _echo = null;
+    if (_isBroadcasting) {
+      _room.disconnect();
+      _isBroadcasting = false;
+    }
+  }
+
   void dispose() {
+    _echo?.leaveAllChannels();
+    _echo?.disconnect();
     _room.dispose();
   }
 }
@@ -1595,3 +1657,200 @@ class LiveSessionManager {
 | API call fails | Retry with backoff (max 3 attempts), show user-friendly error |
 | LiveKit room deleted | LiveKit disconnects all clients — show "Broadcast ended" screen |
 | Concurrent broadcast | `/broadcast` returns existing token (idempotent) — just connect |
+
+### 13.7 Astrologer Comment Integration
+
+Astrologer comments real-time dekhne ke liye **do cheezen** chahiye:
+
+1. **Echo (WebSocket) join** — `live-session.{id}` presence channel join kare aur `.NewLiveComment` event listen kare
+2. **Historical comments API** — screen load hone par purani comments fetch kare
+
+#### API: GET /api/v1/astrologer/live/{id}/comments
+
+Returns paginated comments (same format as user endpoint). Astrologer authenticated hona chahiye.
+
+**Response (200 OK):**
+```json
+{
+  "status": "success",
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "user_id": 42,
+        "user_name": "Rahul Kumar",
+        "user_avatar": "photos/user42.jpg",
+        "message": "Hello ji",
+        "created_at": "2026-06-17T10:00:00.000000Z"
+      }
+    ],
+    "pagination": {
+      "current_page": 1,
+      "total_pages": 1,
+      "per_page": 50,
+      "total": 1
+    }
+  }
+}
+```
+
+#### Flutter Astrologer Screen (Complete Example)
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:laravel_echo/laravel_echo.dart';
+import 'package:pusher_client/pusher_client.dart';
+
+class AstrologerChatScreen extends StatefulWidget {
+  final int sessionId;
+  final String authToken;
+  const AstrologerChatScreen({super.key, required this.sessionId, required this.authToken});
+  @override
+  State<AstrologerChatScreen> createState() => _AstrologerChatScreenState();
+}
+
+class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
+  final List<Map<String, dynamic>> _messages = [];
+  final ScrollController _scrollController = ScrollController();
+  bool _isLoading = true;
+  Echo? _echo;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistorical();
+    _connectEcho();
+  }
+
+  // ── Load historical comments from API ──
+  Future<void> _loadHistorical() async {
+    try {
+      final res = await http.get(
+        Uri.parse('https://suryapathkundli.com/api/v1/astrologer/live/${widget.sessionId}/comments'),
+        headers: {'Authorization': 'Bearer ${widget.authToken}'},
+      );
+      if (res.statusCode == 200) {
+        final List comments = jsonDecode(res.body)['data']['data'];
+        setState(() {
+          _messages.addAll(comments.cast<Map<String, dynamic>>().reversed);
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    } catch (e) {
+      debugPrint('Failed to load comments: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  // ── Connect Echo for real-time comments ──
+  void _connectEcho() {
+    _echo = Echo(
+      broadcaster: 'pusher',
+      client: PusherClient(
+        'astrology-key',
+        PusherOptions(
+          host: 'suryapathkundli.com',
+          port: 443,
+          scheme: 'https',
+          encrypted: true,
+          auth: Auth(
+            endpoint: 'https://suryapathkundli.com/api/v1/broadcasting/auth',
+            headers: {'Authorization': 'Bearer ${widget.authToken}'},
+          ),
+        ),
+      ),
+    );
+
+    _echo!.join('live-session.${widget.sessionId}')
+      .listen('.NewLiveComment', (e) {
+        if (!mounted) return;
+        setState(() {
+          _messages.add({
+            'id': e['user_id']?.toString() ?? '${DateTime.now().millisecondsSinceEpoch}',
+            'user_id': e['user_id'],
+            'user_name': e['user_name'] ?? 'Unknown',
+            'user_avatar': e['user_avatar'],
+            'message': e['message'] ?? '',
+            'created_at': e['created_at'] ?? DateTime.now().toIso8601String(),
+          });
+        });
+        _scrollToBottom();
+      })
+      .listen('.SuperChatReceived', (e) {
+        debugPrint('SuperChat received: ${e['gift']['title']}');
+        // Show overlay animation
+      });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // Messages list
+        Expanded(
+          child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _messages.isEmpty
+              ? const Center(child: Text('No comments yet'))
+              : ListView.builder(
+                  controller: _scrollController,
+                  itemCount: _messages.length,
+                  itemBuilder: (ctx, i) {
+                    final msg = _messages[i];
+                    final isAstrologer = msg['user_id'] == null;
+                    return ListTile(
+                      leading: CircleAvatar(
+                        backgroundImage: msg['user_avatar'] != null
+                          ? NetworkImage('https://suryapathkundli.com/${msg['user_avatar']}')
+                          : null,
+                        child: msg['user_avatar'] == null
+                          ? Text((msg['user_name'] as String)[0].toUpperCase())
+                          : null,
+                      ),
+                      title: Text(msg['user_name'] ?? 'System',
+                        style: TextStyle(fontWeight: isAstrologer ? FontWeight.bold : FontWeight.normal)),
+                      subtitle: Text(msg['message'] ?? ''),
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _echo?.leaveAllChannels();
+    _echo?.disconnect();
+    _scrollController.dispose();
+    super.dispose();
+  }
+}
+```
+
+**Important:** Astrologer screen pe video (LiveKit VideoRenderer) aur chat (above widget) dono ek saath ho sakte hain — alag-alag widgets ek Column/Stack mein.
+
+#### Event Flow Summary
+
+| Action | Event | Channel | Astrologer Receives? |
+|--------|-------|---------|---------------------|
+| User sends comment | `NewLiveComment` | `live-session.{id}` | ✅ Yes (via Echo join) |
+| User sends super chat | `SuperChatReceived` | `live-session.{id}` | ✅ Yes (via Echo join) |
+| Astrologer starts video | `AstrologerBroadcastStarted` | `live-session.{id}` | ✅ Yes |
+| Session ends | `LiveSessionEnded` | `live-session.{id}` + public | ✅ Yes |
+| Viewer count changes | `ViewerCountUpdated` | `live-session.{id}` | ✅ Yes |
