@@ -1631,6 +1631,9 @@ class AstrologerBroadcastService {
     }
   }
 
+  bool _isTogglingCamera = false;
+  bool _isTogglingMic = false;
+
   void _onRoomEvent(RoomEvent event, dynamic data) {
     switch (event) {
       case RoomEvent.Disconnected:
@@ -1643,19 +1646,24 @@ class AstrologerBroadcastService {
         debugPrint('Viewer left LiveKit: ${(data as RemoteParticipant).identity}');
         break;
       case RoomEvent.LocalTrackPublished:
-        _reportMediaStatus(data as LocalTrackPublication);
+        _reportMediaStatus(data as LocalTrackPublication, 'on');
         break;
       case RoomEvent.LocalTrackUnpublished:
-        _reportMediaStatus(data as LocalTrackPublication);
+        _reportMediaStatus(data as LocalTrackPublication, 'off');
+        break;
+      case RoomEvent.LocalTrackMuted:
+        _reportMediaStatus(data as LocalTrackPublication, 'off');
+        break;
+      case RoomEvent.LocalTrackUnmuted:
+        _reportMediaStatus(data as LocalTrackPublication, 'on');
         break;
       default:
         break;
     }
   }
 
-  Future<void> _reportMediaStatus(LocalTrackPublication publication) async {
+  Future<void> _reportMediaStatus(LocalTrackPublication publication, String explicitStatus) async {
     final type = publication.kind == TrackType.Video ? 'camera' : 'audio';
-    final status = publication.muted ? 'off' : 'on';
     try {
       await http.post(
         Uri.parse('https://suryapathkundli.com/api/v1/astrologer/live/$_sessionId/media-status'),
@@ -1663,24 +1671,38 @@ class AstrologerBroadcastService {
           'Authorization': 'Bearer $_authToken',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'type': type, 'status': status}),
+        body: jsonEncode({'type': type, 'status': explicitStatus}),
       );
     } catch (_) {}
   }
 
   void toggleCamera() async {
-    final pub = _room.localParticipant?.getTrackPublication(TrackType.Video);
-    if (pub != null) {
-      await pub.setMuted(!pub.muted);
-      await _reportMediaStatus(pub);
+    if (_isTogglingCamera) return;
+    _isTogglingCamera = true;
+    try {
+      final pub = _room.localParticipant?.getTrackPublication(TrackType.Video);
+      if (pub != null) {
+        final newMuted = !pub.muted;
+        await pub.setMuted(newMuted);
+        await _reportMediaStatus(pub, newMuted ? 'off' : 'on');
+      }
+    } finally {
+      _isTogglingCamera = false;
     }
   }
 
   void toggleMic() async {
-    final pub = _room.localParticipant?.getTrackPublication(TrackType.Audio);
-    if (pub != null) {
-      await pub.setMuted(!pub.muted);
-      await _reportMediaStatus(pub);
+    if (_isTogglingMic) return;
+    _isTogglingMic = true;
+    try {
+      final pub = _room.localParticipant?.getTrackPublication(TrackType.Audio);
+      if (pub != null) {
+        final newMuted = !pub.muted;
+        await pub.setMuted(newMuted);
+        await _reportMediaStatus(pub, newMuted ? 'off' : 'on');
+      }
+    } finally {
+      _isTogglingMic = false;
     }
   }
 
@@ -2096,6 +2118,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
 | 4 | **stop() broadcasts media=off before session end** | LiveSessionController | Session end hote waqt pehle media=off broadcast hota hai, phir `LiveSessionEnded`. |
 | 5 | **Rate limits increased** | RouteServiceProvider, routes/api.php | `auth` limiter: 10→**60/min**. `live_watch` limiter: 60→**100/min**. `/broadcasting/auth` throttle: `auth`→**`general`** (60/min). |
 | 6 | **Broadcast error handling** | LiveSessionController, LiveSessionService | `updateMediaStatus()` aur `addComment()` me ab broadcast fail hone par error log hota hai (500 error nahi aata). |
+| 7 | **Inverse toggle fix (Flutter)** | Guide §9 (astrologer code samples) | `toggleCamera()`/`toggleMic()` ab `newMuted` state ko `setMuted()` se pehle capture karta hai, `_reportMediaStatus` mei explicit status pass karta hai, `LocalTrackMuted`/`LocalTrackUnmuted` events handle karta hai, aur debounce guard (`_isTogglingCamera`/`_isTogglingMic`) add kiya gaya hai. |
 
 **Migration to run on production:**
 ```bash
