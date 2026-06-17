@@ -19,6 +19,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Broadcast auth routes with Sanctum middleware (token auth)
+        \Illuminate\Support\Facades\Broadcast::routes([
+            'middleware' => ['auth:sanctum'],
+            'prefix' => 'api/v1',
+        ]);
+        require base_path('routes/channels.php');
+
         // Automatically handle initiated chat cancellations when a user goes offline/leaves presence channel
         \Illuminate\Support\Facades\Event::listen(
             \Illuminate\Broadcasting\Events\PresenceChannelMemberLeft::class,
