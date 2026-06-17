@@ -61,6 +61,8 @@ Common fields returned in all live session responses (`formatLiveSession()`):
 | `session_type` | string | `public` or `private` |
 | `status` | string | `upcoming` / `ongoing` / `completed` / `cancelled` |
 | `is_broadcasting` | boolean | LiveKit video broadcast active (true/false) |
+| `is_camera_on` | boolean | Astrologer camera currently on (true/false) |
+| `is_audio_on` | boolean | Astrologer microphone currently on (true/false) |
 | `duration_minutes` | integer | Duration in minutes |
 | `max_participants` | integer | Max viewers (default: 100) |
 | `current_participants` | integer | Current viewer count |
@@ -357,9 +359,11 @@ No request body.
 ```
 
 **Real-time side-effects:**
+- `AstrologerMediaStatusChanged` (camera=off, audio=off) broadcast on `live-session.{id}` (presence)
 - `LiveSessionEnded` broadcast on channel `live-sessions` (public) + `live-session.{id}` (presence)
 - LiveKit room is automatically deleted if one exists
-- All viewers receive `LiveSessionEnded` event → close video player
+- `is_camera_on` / `is_audio_on` / `is_broadcasting` reset to `false`
+- All viewers receive events → update media icons → close video player
 
 > Only `ongoing` sessions can be stopped (422 for `upcoming`/`completed`).
 
@@ -530,9 +534,11 @@ No request body.
 **What happens:**
 1. LiveKit room is deleted
 2. `is_broadcasting` set to `false`
-3. `room_uuid` cleared
-4. All participants' `left_at` timestamps updated
-5. Viewers' Flutter app gets disconnected from LiveKit (video stops, but chat stays)
+3. `is_camera_on` / `is_audio_on` reset to `false`
+4. `room_uuid` cleared
+5. All participants' `left_at` timestamps updated
+6. `AstrologerMediaStatusChanged` (camera=off, audio=off) broadcast on `live-session.{id}`
+7. Viewers' Flutter app gets disconnected from LiveKit (video stops, but chat stays)
 
 > Useful when astrologer wants to stop video temporarily but keep the chat session alive.
 
@@ -559,14 +565,19 @@ Astrologer ke Flutter app se tab call karein jab LiveKit track publish/unpublish
 {
   "status": "success",
   "message": "Media status updated",
-  "data": null
+  "data": {
+    "live_session_id": 16,
+    "is_camera_on": true,
+    "is_audio_on": false
+  }
 }
 ```
 
 **What happens:**
 1. Validates session ownership + broadcast active
-2. Broadcasts `AstrologerMediaStatusChanged` event on `live-session.{id}` presence channel
-3. All viewers receive the event in real-time and update their UI icons
+2. Persists media state to database (`live_sessions.is_camera_on` / `is_audio_on`)
+3. Broadcasts `AstrologerMediaStatusChanged` event on `live-session.{id}` presence channel
+4. All viewers receive the event in real-time and update their UI icons
 
 ---
 
@@ -595,6 +606,8 @@ No request body. Returns only public, ongoing sessions.
         "profile_photo": "photos/abc.jpg"
       },
       "is_broadcasting": true,
+      "is_camera_on": true,
+      "is_audio_on": true,
       "viewer_count": 0
     }
   ]
@@ -623,6 +636,8 @@ Returns session with astrologer profile details (name, photo, gender, date_of_bi
     "session_type": "public",
     "status": "ongoing",
     "is_broadcasting": true,
+    "is_camera_on": true,
+    "is_audio_on": true,
     "viewer_count": 0,
     "astrologer": {
       "id": 5,
@@ -641,19 +656,49 @@ Returns session with astrologer profile details (name, photo, gender, date_of_bi
 
 **POST** `/api/v1/user/live/{id}/join`
 
-No request body. Increments `viewer_count`.
+No request body. Increments `viewer_count`. Returns session details + last 20 comments.
 
 **Response (200 OK):**
 ```json
 {
   "status": "success",
   "message": "Joined live session successfully",
-  "data": null
+  "data": {
+    "session": {
+      "id": 16,
+      "title": "Instant Tarot Reading & QA",
+      "description": "Ask me anything live!",
+      "session_type": "public",
+      "status": "ongoing",
+      "is_broadcasting": true,
+      "is_camera_on": true,
+      "is_audio_on": true,
+      "viewer_count": 5,
+      "astrologer": {
+        "id": 5,
+        "name": "Priya Sharma",
+        "profile_photo": "photos/abc.jpg",
+        "gender": "female",
+        "date_of_birth": "1990-05-15"
+      }
+    },
+    "last_comments": [
+      {
+        "id": 42,
+        "user_id": 10,
+        "user_name": "Rahul",
+        "user_avatar": "photos/rahul.jpg",
+        "message": "Hello ji!",
+        "created_at": "2026-06-17T10:30:00.000000Z"
+      }
+    ]
+  }
 }
 ```
 
-**Real-time event:**
+**Real-time events:**
 - `ViewerCountUpdated` on `live-session.{id}` (presence channel)
+- `UserJoinedLiveSession` on `live-session.{id}` (presence channel)
 
 > After joining, call **`/watch`** (section 5.8) to get a LiveKit subscriber token for video playback.
 
@@ -2036,3 +2081,23 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
 | Astrologer toggles camera/audio | `AstrologerMediaStatusChanged` | `live-session.{id}` | ✅ Yes |
 | User joins live session | `UserJoinedLiveSession` | `live-session.{id}` | ✅ Yes |
 | User leaves live session | `UserLeftLiveSession` | `live-session.{id}` | ✅ Yes |
+
+---
+
+## 11. Changelog — Recent Backend Changes
+
+### 2026-06-17
+
+| # | Change | Files | Details |
+|---|--------|-------|---------|
+| 1 | **Media state persistence** | migration + LiveSession model + LiveSessionController | `live_sessions` table me `is_camera_on` / `is_audio_on` columns added. `updateMediaStatus()` ab DB bhi update karta hai. API response me `is_camera_on`, `is_audio_on` return hota hai. |
+| 2 | **Join API now returns data** | LiveSessionService + SuperChatController | `POST /join` ab `{session: {...}, last_comments: [...]}` return karta hai, null nahi. Ek hi API call me viewer_count, live_status, media_state, aur last 20 comments mil jate hain. |
+| 3 | **stopBroadcast() broadcasts media=off** | LiveSessionController | Jab broadcast stop hota hai, ab `AstrologerMediaStatusChanged` (camera=off, audio=off) event broadcast hota hai taki viewers ko pata chale. |
+| 4 | **stop() broadcasts media=off before session end** | LiveSessionController | Session end hote waqt pehle media=off broadcast hota hai, phir `LiveSessionEnded`. |
+| 5 | **Rate limits increased** | RouteServiceProvider, routes/api.php | `auth` limiter: 10→**60/min**. `live_watch` limiter: 60→**100/min**. `/broadcasting/auth` throttle: `auth`→**`general`** (60/min). |
+| 6 | **Broadcast error handling** | LiveSessionController, LiveSessionService | `updateMediaStatus()` aur `addComment()` me ab broadcast fail hone par error log hota hai (500 error nahi aata). |
+
+**Migration to run on production:**
+```bash
+php artisan migrate
+```

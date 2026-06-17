@@ -371,6 +371,8 @@ class LiveSessionController extends Controller
             $liveSession->update([
                 'status' => 'completed',
                 'is_broadcasting' => false,
+                'is_camera_on' => false,
+                'is_audio_on' => false,
                 'room_uuid' => null,
             ]);
 
@@ -540,6 +542,8 @@ class LiveSessionController extends Controller
 
             $liveSession->update([
                 'is_broadcasting' => false,
+                'is_camera_on' => false,
+                'is_audio_on' => false,
                 'room_uuid' => null,
             ]);
 
@@ -596,6 +600,14 @@ class LiveSessionController extends Controller
                 return ApiResponse::error('No active broadcast', 422);
             }
 
+            $status = $request->status === 'on';
+
+            if ($request->type === 'camera') {
+                $liveSession->update(['is_camera_on' => $status]);
+            } elseif ($request->type === 'audio') {
+                $liveSession->update(['is_audio_on' => $status]);
+            }
+
             try {
                 broadcast(new \App\Events\AstrologerMediaStatusChanged(
                     $liveSession->id,
@@ -610,7 +622,11 @@ class LiveSessionController extends Controller
                 Log::error('Failed to broadcast media status', ['error' => $e->getMessage()]);
             }
 
-            return ApiResponse::success(null, 'Media status updated');
+            return ApiResponse::success([
+                'live_session_id' => $liveSession->id,
+                'is_camera_on' => $liveSession->fresh()->is_camera_on,
+                'is_audio_on' => $liveSession->fresh()->is_audio_on,
+            ], 'Media status updated');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to update media status: ' . $e->getMessage(), 500);
         }

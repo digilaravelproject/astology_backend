@@ -77,9 +77,12 @@ class LiveSessionService
         ];
     }
 
-    public function joinSession(int $id, $user): void
+    public function joinSession(int $id, $user): array
     {
-        $session = LiveSession::findOrFail($id);
+        $session = LiveSession::with([
+            'astrologer.user:id,name,gender,profile_photo',
+            'astrologer.skill',
+        ])->findOrFail($id);
 
         if ($session->status !== 'ongoing') {
             throw new \RuntimeException('Live session is not currently active');
@@ -116,6 +119,27 @@ class LiveSessionService
             'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
             'joined_at' => now()->toISOString(),
         ]));
+
+        $lastComments = LiveComment::with('user:id,name,profile_photo')
+            ->where('live_session_id', $session->id)
+            ->latest()
+            ->limit(20)
+            ->get()
+            ->map(fn($comment) => [
+                'id' => $comment->id,
+                'user_id' => $comment->user_id,
+                'user_name' => $comment->user->name ?? 'Unknown',
+                'user_avatar' => $comment->user->profile_photo
+                    ? \App\Helpers\MediaHelper::getUrl($comment->user->profile_photo)
+                    : null,
+                'message' => $comment->message,
+                'created_at' => $comment->created_at->toISOString(),
+            ]);
+
+        return [
+            'session' => $this->formatSessionDetail($session),
+            'last_comments' => $lastComments->values(),
+        ];
     }
 
     public function leaveSession(int $id, $user): void
@@ -224,6 +248,8 @@ class LiveSessionService
                     : $astrologer?->profile_photo,
             ] : null,
             'is_broadcasting' => $session->is_broadcasting,
+            'is_camera_on' => $session->is_camera_on ?? false,
+            'is_audio_on' => $session->is_audio_on ?? false,
             'viewer_count' => $session->viewer_count,
         ];
     }
@@ -240,6 +266,8 @@ class LiveSessionService
             'session_type' => $session->session_type,
             'status' => $session->status,
             'is_broadcasting' => $session->is_broadcasting,
+            'is_camera_on' => $session->is_camera_on ?? false,
+            'is_audio_on' => $session->is_audio_on ?? false,
             'viewer_count' => $session->viewer_count,
             'astrologer' => $astrologer ? [
                 'id' => $astrologer->user_id,

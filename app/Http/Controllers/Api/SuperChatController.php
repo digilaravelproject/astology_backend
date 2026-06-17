@@ -57,8 +57,8 @@ class SuperChatController extends Controller
     public function join($id)
     {
         try {
-            $this->liveSessionService->joinSession($id, auth()->user());
-            return ApiResponse::success(null, 'Joined live session successfully');
+            $data = $this->liveSessionService->joinSession($id, auth()->user());
+            return ApiResponse::success($data, 'Joined live session successfully');
         } catch (\RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 400);
         } catch (Exception $e) {

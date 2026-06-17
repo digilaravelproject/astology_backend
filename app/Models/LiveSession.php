@@ -20,6 +20,8 @@ class LiveSession extends Model
         'session_type',
         'status',
         'is_broadcasting',
+        'is_camera_on',
+        'is_audio_on',
         'duration_minutes',
         'max_participants',
         'current_participants',
@@ -35,6 +37,8 @@ class LiveSession extends Model
         'viewer_count' => 'integer',
         'duration_minutes' => 'integer',
         'is_broadcasting' => 'boolean',
+        'is_camera_on' => 'boolean',
+        'is_audio_on' => 'boolean',
     ];
 
     public function participants(): HasMany
