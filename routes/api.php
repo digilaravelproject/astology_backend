@@ -196,7 +196,8 @@ Route::prefix('v1')->group(function () {
                 ->withoutMiddleware('throttle:tiered')
                 ->middleware('throttle:live_watch');
             Route::post('/live/{id}/leave', [SuperChatController::class, 'leave']);
-            Route::post('/live/{id}/comment', [SuperChatController::class, 'comment']);
+            Route::post('/live/{id}/comment', [SuperChatController::class, 'comment'])
+                ->middleware('throttle:tiered');
             Route::post('/live/{id}/super-chat', [SuperChatController::class, 'sendSuperChat']);
             Route::get('/live/{id}/comments', [SuperChatController::class, 'comments']);
 

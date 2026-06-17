@@ -207,7 +207,7 @@ class LiveSessionService
                 'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
                 'message' => $comment->message,
                 'created_at' => $comment->created_at->toISOString(),
-            ]));
+            ]))->toOthers();
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to broadcast comment', ['error' => $e->getMessage()]);
         }

@@ -702,6 +702,17 @@ No request body. Increments `viewer_count`. Returns session details + last 20 co
 
 > After joining, call **`/watch`** (section 5.8) to get a LiveKit subscriber token for video playback.
 
+> **⚠️ Echo subscription ordering (Flutter):** Subscribe to the presence channel
+> **BEFORE** calling POST /join, otherwise the joining user will miss the
+> `UserJoinedLiveSession` event. Correct order:
+> ```dart
+> // 1. Subscribe FIRST
+> final channel = echo.join('live-session.$sessionId');
+> // 2. Wait for subscription to establish
+> // 3. THEN call the join API
+> await http.post(Uri.parse('https://.../live/$sessionId/join'), headers: {...});
+> ```
+
 > Error (400): `"Live session is not currently active"` if status is not `ongoing`.
 
 ---
@@ -756,6 +767,82 @@ No request body. Decrements `viewer_count` and records `left_at` timestamp in `l
 
 **Real-time event:**
 - `NewLiveComment` on `live-session.{id}` (presence channel)
+
+> **⚠️ Backend uses `->toOthers()`:** The sender does NOT receive their own
+> `NewLiveComment` event back. Render the comment locally from the API response.
+
+#### Flutter Comment Send (with Debounce)
+
+```dart
+// Add to pubspec.yaml: http, laravel_echo, pusher_client
+
+class LiveCommentInput extends StatefulWidget {
+  final int sessionId;
+  final String authToken;
+  const LiveCommentInput({super.key, required this.sessionId, required this.authToken});
+  @override
+  State<LiveCommentInput> createState() => _LiveCommentInputState();
+}
+
+class _LiveCommentInputState extends State<LiveCommentInput> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isSending = false; // ← DEBOUNCE GUARD
+
+  Future<void> _sendComment() async {
+    if (_isSending) return; // ← Block rapid taps
+    final msg = _controller.text.trim();
+    if (msg.isEmpty) return;
+
+    _isSending = true;
+    try {
+      final res = await http.post(
+        Uri.parse('https://suryapathkundli.com/api/v1/user/live/${widget.sessionId}/comment'),
+        headers: {
+          'Authorization': 'Bearer ${widget.authToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'message': msg}),
+      );
+
+      if (res.statusCode == 201) {
+        _controller.clear();
+        // Render "You: ..." locally from the API response
+        final data = jsonDecode(res.body)['data'];
+        onCommentSent(data); // ← parent callback adds to chat as "You"
+      }
+    } catch (e) {
+      debugPrint('Send comment failed: $e');
+    } finally {
+      _isSending = false; // ← Release guard
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: TextField(
+            controller: _controller,
+            decoration: const InputDecoration(hintText: 'Type a comment...'),
+            onSubmitted: (_) => _sendComment(),
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Icons.send),
+          onPressed: _isSending ? null : _sendComment, // ← Button disabled while sending
+        ),
+      ],
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+}
+```
 
 ---
 
@@ -1111,6 +1198,7 @@ All events use `ShouldBroadcastNow` for immediate delivery. Channel names here a
 | **Channel** | `live-session.{id}` (Presence Channel) |
 | **Event Name** | `NewLiveComment` |
 | **Trigger** | User sends a comment |
+| **`toOthers()`** | ✅ **Yes** — sender does NOT receive this event back. Render from API response instead. |
 
 **Payload:**
 ```json
@@ -1448,8 +1536,12 @@ class EchoService {
     );
   }
 
-  void joinLiveSession(int sessionId) {
-    echo.join('live-session.$sessionId')
+  /// Returns the PresenceChannel so caller can await subscription
+  /// BEFORE calling POST /live/{id}/join.
+  PresenceChannel joinLiveSession(int sessionId, {required int currentUserId}) {
+    final channel = echo.join('live-session.$sessionId');
+
+    channel
       .here((users) => debugPrint('Viewers here: $users'))
       .joining((user) => debugPrint('User joined: $user'))
       .leaving((user) => debugPrint('User left: $user'))
@@ -1462,6 +1554,9 @@ class EchoService {
         // Disconnect from LiveKit + show ended screen
       })
       .listen('.NewLiveComment', (e) {
+        // SAFETY: Backend uses ->toOthers() for comments, so sender never
+        // receives their own.  Double-check here anyway to prevent dupes.
+        if (e['user_id'] == currentUserId) return;
         debugPrint('New comment: ${e['message']}');
         // Append to chat
       })
@@ -1490,6 +1585,8 @@ class EchoService {
         debugPrint('User left: ${e['user_name']}');
         // Add system message to chat feed: "${e['user_name']} left"
       });
+
+    return channel;
   }
 
   void listenPublicStreams() {
@@ -1526,13 +1623,16 @@ class AstrologerBroadcastService {
   String? _authToken;
   int? _sessionId;
 
-  // ── Echo Connection for Real-Time Comments ──
-  Echo? _echo;
+  // ── Echo Connection – SHARED instance (do NOT create a second one) ──
+  Echo? echo;
 
-  void _connectEcho(String authToken, int sessionId, void Function(Map) onNewComment) {
+  /// Connects Echo and subscribes to [live-session.$sessionId].
+  /// Returns the [Echo] instance so other widgets (e.g. chat screen) can
+  /// listen on the same connection without creating a duplicate socket.
+  Echo _connectEcho(String authToken, int sessionId) {
     _authToken = authToken;
     _sessionId = sessionId;
-    _echo = Echo(
+    echo = Echo(
       broadcaster: 'pusher',
       client: PusherClient(
         'astrology-key',
@@ -1549,14 +1649,10 @@ class AstrologerBroadcastService {
       ),
     );
 
-    _echo!.join('live-session.$sessionId')
+    echo!.join('live-session.$sessionId')
       .here((users) => debugPrint('Viewers connected: $users'))
       .joining((user) => debugPrint('Viewer joined: $user'))
       .leaving((user) => debugPrint('Viewer left: $user'))
-      .listen('.NewLiveComment', (e) {
-        debugPrint('Comment: ${e['user_name']}: ${e['message']}');
-        onNewComment(e);
-      })
       .listen('.SuperChatReceived', (e) {
         debugPrint('SuperChat: ${e['gift']['title']} - ${e['amount']}');
       })
@@ -1567,6 +1663,8 @@ class AstrologerBroadcastService {
       .listen('.ViewerCountUpdated', (e) {
         debugPrint('Viewer count: ${e['viewer_count']}');
       });
+
+    return echo!;
   }
 
   // ── Fetch Historical Comments ──
@@ -1927,17 +2025,27 @@ Returns paginated comments (same format as user endpoint). Astrologer authentica
 
 #### Flutter Astrologer Screen (Complete Example)
 
+> ⚠️ **SINGLE Echo connection rule:** Never create a second Echo instance.
+> The `AstrologerBroadcastService` above creates ONE shared Echo. Pass it to this
+> widget via the `echo` parameter. This prevents duplicate sockets and ensures
+> the astrologer receives all real-time events.
+
 ```dart
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:laravel_echo/laravel_echo.dart';
-import 'package:pusher_client/pusher_client.dart';
 
 class AstrologerChatScreen extends StatefulWidget {
   final int sessionId;
   final String authToken;
-  const AstrologerChatScreen({super.key, required this.sessionId, required this.authToken});
+  final Echo echo; // ← SHARED Echo from AstrologerBroadcastService
+  const AstrologerChatScreen({
+    super.key,
+    required this.sessionId,
+    required this.authToken,
+    required this.echo,
+  });
   @override
   State<AstrologerChatScreen> createState() => _AstrologerChatScreenState();
 }
@@ -1946,13 +2054,12 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
   final List<Map<String, dynamic>> _messages = [];
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = true;
-  Echo? _echo;
 
   @override
   void initState() {
     super.initState();
     _loadHistorical();
-    _connectEcho();
+    _listenEcho();
   }
 
   // ── Load historical comments from API ──
@@ -1976,26 +2083,9 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
     }
   }
 
-  // ── Connect Echo for real-time comments ──
-  void _connectEcho() {
-    _echo = Echo(
-      broadcaster: 'pusher',
-      client: PusherClient(
-        'astrology-key',
-        PusherOptions(
-          host: 'suryapathkundli.com',
-          port: 443,
-          scheme: 'https',
-          encrypted: true,
-          auth: Auth(
-            endpoint: 'https://suryapathkundli.com/api/v1/broadcasting/auth',
-            headers: {'Authorization': 'Bearer ${widget.authToken}'},
-          ),
-        ),
-      ),
-    );
-
-    _echo!.join('live-session.${widget.sessionId}')
+  // ── Listen on the SHARED Echo (do NOT create a new one) ──
+  void _listenEcho() {
+    widget.echo.join('live-session.${widget.sessionId}')
       .listen('.NewLiveComment', (e) {
         if (!mounted) return;
         setState(() {
@@ -2081,8 +2171,7 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
 
   @override
   void dispose() {
-    _echo?.leaveAllChannels();
-    _echo?.disconnect();
+    // Do NOT leave or disconnect echo — it is owned by BroadcastService.
     _scrollController.dispose();
     super.dispose();
   }
@@ -2093,16 +2182,16 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
 
 #### Event Flow Summary
 
-| Action | Event | Channel | Astrologer Receives? |
-|--------|-------|---------|---------------------|
-| User sends comment | `NewLiveComment` | `live-session.{id}` | ✅ Yes (via Echo join) |
-| User sends super chat | `SuperChatReceived` | `live-session.{id}` | ✅ Yes (via Echo join) |
-| Astrologer starts video | `AstrologerBroadcastStarted` | `live-session.{id}` | ✅ Yes |
-| Session ends | `LiveSessionEnded` | `live-session.{id}` + public | ✅ Yes |
-| Viewer count changes | `ViewerCountUpdated` | `live-session.{id}` | ✅ Yes |
-| Astrologer toggles camera/audio | `AstrologerMediaStatusChanged` | `live-session.{id}` | ✅ Yes |
-| User joins live session | `UserJoinedLiveSession` | `live-session.{id}` | ✅ Yes |
-| User leaves live session | `UserLeftLiveSession` | `live-session.{id}` | ✅ Yes |
+| Action | Event | Channel | `toOthers()` | Sender Receives? |
+|--------|-------|---------|-------------|-----------------|
+| User sends comment | `NewLiveComment` | `live-session.{id}` | ✅ Yes | ❌ No (render from API) |
+| User sends super chat | `SuperChatReceived` | `live-session.{id}` | ❌ No | ✅ Yes |
+| Astrologer starts video | `AstrologerBroadcastStarted` | `live-session.{id}` | ❌ No | ✅ Yes |
+| Session ends | `LiveSessionEnded` | `live-session.{id}` + public | ❌ No | ✅ Yes |
+| Viewer count changes | `ViewerCountUpdated` | `live-session.{id}` | ❌ No | ✅ Yes |
+| Astrologer toggles camera/audio | `AstrologerMediaStatusChanged` | `live-session.{id}` | ❌ No | ✅ Yes |
+| User joins live session | `UserJoinedLiveSession` | `live-session.{id}` | ❌ No | ✅ Yes |
+| User leaves live session | `UserLeftLiveSession` | `live-session.{id}` | ❌ No | ✅ Yes |
 
 ---
 
@@ -2119,6 +2208,12 @@ class _AstrologerChatScreenState extends State<AstrologerChatScreen> {
 | 5 | **Rate limits increased** | RouteServiceProvider, routes/api.php | `auth` limiter: 10→**60/min**. `live_watch` limiter: 60→**100/min**. `/broadcasting/auth` throttle: `auth`→**`general`** (60/min). |
 | 6 | **Broadcast error handling** | LiveSessionController, LiveSessionService | `updateMediaStatus()` aur `addComment()` me ab broadcast fail hone par error log hota hai (500 error nahi aata). |
 | 7 | **Inverse toggle fix (Flutter)** | Guide §9 (astrologer code samples) | `toggleCamera()`/`toggleMic()` ab `newMuted` state ko `setMuted()` se pehle capture karta hai, `_reportMediaStatus` mei explicit status pass karta hai, `LocalTrackMuted`/`LocalTrackUnmuted` events handle karta hai, aur debounce guard (`_isTogglingCamera`/`_isTogglingMic`) add kiya gaya hai. |
+| 8 | **Duplicate comment fix** | `LiveSessionService::addComment()` | `broadcast(new NewLiveComment(...))` me `->toOthers()` add kiya gaya. Sender ab apna comment WebSocket se nahi paata — API response se render karega. |
+| 9 | **Single Echo connection (Flutter)** | AstrologerChatScreen | Duplicate Echo instance hata diya. Ab `AstrologerBroadcastService` ka shared `Echo` reuse hota hai. `AstrologerChatScreen` Echo nahi banata, parent se leta hai. |
+| 10 | **Comment send debounce (Flutter)** | Send Comment API §5.5 | User comment input me `_isSending` guard add kiya — rapid taps block hote hain. |
+| 11 | **Join ordering documented** | Join Session §5.3 | Echo subscription API call se pehle karna hai, yeh ab guide mein explicitly documented hai. |
+| 12 | **Comment route rate limit explicit** | `routes/api.php` | `POST /live/{id}/comment` pe `throttle:tiered` (30/min) ab explicitly lagaya gaya (pehle group middleware se inherit ho raha tha). |
+| 13 | **`toOthers()` documented in event table** | Event Flow Summary | Nayi column `toOthers()` add ki gayi hai — har event ke liye clear hai ki sender ko event milta hai ya nahi. |
 
 **Migration to run on production:**
 ```bash
