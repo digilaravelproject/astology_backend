@@ -53,7 +53,7 @@ Broadcast::channel('room', function ($user) {
 Broadcast::channel('live-session.{id}', function ($user, $id) {
     $session = \App\Models\LiveSession::find((int) $id);
 
-    if (!$session || $session->status !== 'ongoing') {
+    if (!$session || !in_array($session->status, ['ongoing', 'completed'])) {
         return false;
     }
 
