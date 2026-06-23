@@ -48,4 +48,9 @@ class WalletService
     {
         return $this->walletRepo->credit($astrologerUserId, $amount, 'super_chat_credit', 'App\Models\SuperChat', $superChatId);
     }
+
+    public function transferForSuperChat(int $userId, int $astrologerUserId, float $amount, \App\Models\SuperChat $superChat): array
+    {
+        return $this->walletRepo->transferForSuperChat($userId, $astrologerUserId, $amount, $superChat);
+    }
 }

@@ -176,4 +176,91 @@ class WalletRepository
             ]);
         });
     }
+
+    public function transferForSuperChat(int $userId, int $astrologerUserId, float $amount, \App\Models\SuperChat $superChat): array
+    {
+        $firstUserId = min($userId, $astrologerUserId);
+        $secondUserId = max($userId, $astrologerUserId);
+
+        if ($firstUserId === $secondUserId) {
+            Wallet::firstOrCreate(['user_id' => $userId], ['balance' => 0]);
+            $userWallet = Wallet::where('user_id', $userId)->lockForUpdate()->first();
+            $astrologerWallet = $userWallet;
+        } else {
+            Wallet::firstOrCreate(['user_id' => $userId], ['balance' => 0]);
+            Wallet::firstOrCreate(['user_id' => $astrologerUserId], ['balance' => 0]);
+
+            $firstWallet = Wallet::where('user_id', $firstUserId)->lockForUpdate()->first();
+            $secondWallet = Wallet::where('user_id', $secondUserId)->lockForUpdate()->first();
+
+            $userWallet = $userId === $firstUserId ? $firstWallet : $secondWallet;
+            $astrologerWallet = $userId === $firstUserId ? $secondWallet : $firstWallet;
+        }
+
+        if (!$userWallet) {
+            throw new \Exception("Wallet not found for user ID: {$userId}");
+        }
+        if ($userWallet->balance < $amount) {
+            throw new \Exception("Insufficient balance in user wallet.", 402);
+        }
+        if (!$astrologerWallet) {
+            throw new \Exception("Wallet not found for astrologer ID: {$astrologerUserId}");
+        }
+
+        $superChat->loadMissing(['user', 'astrologer.user']);
+
+        $userName = $superChat->user->name ?? 'User';
+        $astrologerName = $superChat->astrologer?->user?->name ?? 'Astrologer';
+        $description = "Super Chat from {$userName} to Astrologer {$astrologerName}";
+        
+        $meta = [
+            'type' => 'super_chat',
+            'user_id' => $superChat->user_id,
+            'user_name' => $userName,
+            'astrologer_id' => $superChat->astrologer_id,
+            'astrologer_name' => $astrologerName,
+            'live_session_id' => $superChat->live_session_id,
+        ];
+
+        // Process debit
+        $userBalanceBefore = $userWallet->balance;
+        $userWallet->balance -= $amount;
+        $userWallet->save();
+
+        $debitTxn = WalletTransaction::create([
+            'wallet_id' => $userWallet->id,
+            'transaction_type' => 'debit',
+            'amount' => $amount,
+            'status' => 'completed',
+            'description' => $description,
+            'meta' => $meta,
+            'balance_before' => $userBalanceBefore,
+            'balance_after' => $userWallet->balance,
+            'reference_type' => 'App\Models\SuperChat',
+            'reference_id' => $superChat->id,
+        ]);
+
+        // Process credit
+        $astroBalanceBefore = $astrologerWallet->balance;
+        $astrologerWallet->balance += $amount;
+        $astrologerWallet->save();
+
+        $creditTxn = WalletTransaction::create([
+            'wallet_id' => $astrologerWallet->id,
+            'transaction_type' => 'credit',
+            'amount' => $amount,
+            'status' => 'completed',
+            'description' => $description,
+            'meta' => $meta,
+            'balance_before' => $astroBalanceBefore,
+            'balance_after' => $astrologerWallet->balance,
+            'reference_type' => 'App\Models\SuperChat',
+            'reference_id' => $superChat->id,
+        ]);
+
+        return [
+            'debit' => $debitTxn,
+            'credit' => $creditTxn,
+        ];
+    }
 }

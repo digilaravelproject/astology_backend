@@ -43,10 +43,6 @@ class SuperChatService
                 $astrologerWallet = $user->id === $firstUserId ? $secondWallet : $firstWallet;
             }
 
-            if (!$userWallet || $userWallet->balance < $amount) {
-                throw new Exception('Insufficient balance in your wallet.', 402);
-            }
-
             $superChat = SuperChat::create([
                 'live_session_id'    => $session->id,
                 'user_id'            => $user->id,
@@ -56,12 +52,11 @@ class SuperChatService
                 'transaction_status' => 'pending',
             ]);
 
-            $txn = $this->walletService->deductForSuperChat($user->id, $amount, $superChat->id);
-            $this->walletService->creditAstrologerForSuperChat($astrologerUserId, $amount, $superChat->id);
+            $txns = $this->walletService->transferForSuperChat($user->id, $astrologerUserId, $amount, $superChat);
 
             $superChat->update([
                 'transaction_status'  => 'completed',
-                'wallet_transaction_id' => $txn->id,
+                'wallet_transaction_id' => $txns['debit']->id,
             ]);
 
             return $superChat->fresh();
