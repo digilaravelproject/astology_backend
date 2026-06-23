@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\{
     SuperChatController,
     TrainingVideoController,
     GiftController,
+    TurnCredentialsController,
     UserAuthController,
     WalletController
 };
