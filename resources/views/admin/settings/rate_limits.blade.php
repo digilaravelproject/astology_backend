@@ -40,9 +40,7 @@
                                value="1"
                                {{ $enabled ? 'checked' : '' }}
                                class="w-12 h-7 appearance-none bg-gray-lighter rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-6 after:h-6 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-full checked:bg-primary checked:border-primary border-2"
-                               onchange="this.form.submit()"
-                               x-model="masterEnabled"
-                               @change="$refs.enabledForm.submit()">
+                               onchange="this.form.submit()">
                         <span class="text-xs font-black uppercase tracking-widest {{ $enabled ? 'text-primary' : 'text-gray' }}">
                             {{ $enabled ? 'ENABLED' : 'DISABLED' }}
                         </span>
