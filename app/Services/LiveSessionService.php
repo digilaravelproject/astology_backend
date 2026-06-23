@@ -640,7 +640,8 @@ class LiveSessionService
         }
 
         if (!$liveSession->is_broadcasting || !$liveSession->room_uuid) {
-            throw new \Exception('No active broadcast to stop');
+            // Already stopped or not broadcasting, treat as success (idempotent)
+            return;
         }
 
         try {
