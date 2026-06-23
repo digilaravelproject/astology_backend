@@ -8,6 +8,10 @@ use Illuminate\Support\Facades\DB;
 
 class WalletRepository
 {
+    /**
+     * @param int $userId
+     * @return Wallet|null
+     */
     public function findByUserId($userId): Wallet
     {
         return Wallet::firstOrCreate(
@@ -16,6 +20,15 @@ class WalletRepository
         );
     }
 
+    /**
+     * @param int $userId
+     * @param float $amount
+     * @param string $description
+     * @param string|null $reference_type
+     * @param int|null $reference_id
+     * @return WalletTransaction
+     * @throws \Exception
+     */
     public function debit($userId, $amount, $description, $reference_type = null, $reference_id = null): WalletTransaction
     {
         return DB::transaction(function () use ($userId, $amount, $description, $reference_type, $reference_id) {
@@ -97,6 +110,15 @@ class WalletRepository
         });
     }
 
+    /**
+     * @param int $userId
+     * @param float $amount
+     * @param string $description
+     * @param string|null $reference_type
+     * @param int|null $reference_id
+     * @return WalletTransaction
+     * @throws \Exception
+     */
     public function credit($userId, $amount, $description, $reference_type = null, $reference_id = null): WalletTransaction
     {
         return DB::transaction(function () use ($userId, $amount, $description, $reference_type, $reference_id) {
