@@ -2,14 +2,10 @@
 
 namespace App\Models;
 
+use App\Helpers\MediaHelper;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Models\AstrologerSkill;
-use App\Models\AstrologerOtherDetail;
-use App\Models\AstrologerCommunity;
-use App\Models\AstrologerBankAccount;
-use App\Models\CallSession;
-use App\Models\ChatSession;
+use Illuminate\Support\Facades\Schema;
 
 class Astrologer extends Model
 {
@@ -75,17 +71,21 @@ class Astrologer extends Model
 
     protected $hidden = [];
 
+    /**
+     *  Check if the column is_chat_enabled exists
+     */
     protected static $hasIsChatEnabledColumn = null;
 
     protected function hasIsChatEnabledColumn()
     {
         if (self::$hasIsChatEnabledColumn === null) {
             try {
-                self::$hasIsChatEnabledColumn = \Illuminate\Support\Facades\Schema::hasColumn($this->getTable(), 'is_chat_enabled');
+                self::$hasIsChatEnabledColumn = Schema::hasColumn($this->getTable(), 'is_chat_enabled');
             } catch (\Exception $e) {
                 self::$hasIsChatEnabledColumn = false;
             }
         }
+
         return self::$hasIsChatEnabledColumn;
     }
 
@@ -93,6 +93,7 @@ class Astrologer extends Model
     public function getIsChatEnabledAttribute(): bool
     {
         $col = $this->hasIsChatEnabledColumn() ? 'is_chat_enabled' : 'chat_enabled';
+
         return (bool) ($this->attributes[$col] ?? false);
     }
 
@@ -105,6 +106,7 @@ class Astrologer extends Model
     public function getIsCallEnabledAttribute(): bool
     {
         $col = $this->hasIsChatEnabledColumn() ? 'is_call_enabled' : 'call_enabled';
+
         return (bool) ($this->attributes[$col] ?? false);
     }
 
@@ -117,6 +119,7 @@ class Astrologer extends Model
     public function getIsVideoCallEnabledAttribute(): bool
     {
         $col = $this->hasIsChatEnabledColumn() ? 'is_video_call_enabled' : 'video_call_enabled';
+
         return (bool) ($this->attributes[$col] ?? false);
     }
 
@@ -129,6 +132,7 @@ class Astrologer extends Model
     public function getChatEnabledAttribute(): bool
     {
         $col = $this->hasIsChatEnabledColumn() ? 'is_chat_enabled' : 'chat_enabled';
+
         return (bool) ($this->attributes[$col] ?? false);
     }
 
@@ -141,6 +145,7 @@ class Astrologer extends Model
     public function getCallEnabledAttribute(): bool
     {
         $col = $this->hasIsChatEnabledColumn() ? 'is_call_enabled' : 'call_enabled';
+
         return (bool) ($this->attributes[$col] ?? false);
     }
 
@@ -153,6 +158,7 @@ class Astrologer extends Model
     public function getVideoCallEnabledAttribute(): bool
     {
         $col = $this->hasIsChatEnabledColumn() ? 'is_video_call_enabled' : 'video_call_enabled';
+
         return (bool) ($this->attributes[$col] ?? false);
     }
 
@@ -164,35 +170,44 @@ class Astrologer extends Model
 
     public function getProfilePhotoAttribute($value): ?string
     {
-        if (empty($value)) return null;
+        if (empty($value)) {
+            return null;
+        }
+
         return ltrim(preg_replace('#^/?storage/#', '', $value), '/');
     }
 
     public function getIdProofAttribute($value): ?string
     {
-        if (empty($value)) return null;
+        if (empty($value)) {
+            return null;
+        }
+
         return ltrim(preg_replace('#^/?storage/#', '', $value), '/');
     }
 
     public function getCertificateAttribute($value): ?string
     {
-        if (empty($value)) return null;
+        if (empty($value)) {
+            return null;
+        }
+
         return ltrim(preg_replace('#^/?storage/#', '', $value), '/');
     }
 
     public function getProfilePhotoUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getFullUrl($this->profile_photo);
+        return MediaHelper::getFullUrl($this->profile_photo);
     }
 
     public function getIdProofUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->id_proof);
+        return MediaHelper::getUrl($this->id_proof);
     }
 
     public function getCertificateUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->certificate);
+        return MediaHelper::getUrl($this->certificate);
     }
 
     /**
