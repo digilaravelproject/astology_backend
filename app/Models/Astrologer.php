@@ -74,19 +74,13 @@ class Astrologer extends Model
     /**
      *  Check if the column is_chat_enabled exists
      */
-    protected static $hasIsChatEnabledColumn = null;
-
     protected function hasIsChatEnabledColumn()
     {
-        if (self::$hasIsChatEnabledColumn === null) {
-            try {
-                self::$hasIsChatEnabledColumn = Schema::hasColumn($this->getTable(), 'is_chat_enabled');
-            } catch (\Exception $e) {
-                self::$hasIsChatEnabledColumn = false;
-            }
+        try {
+            return Schema::hasColumn($this->getTable(), 'is_chat_enabled');
+        } catch (\Exception $e) {
+            return false;
         }
-
-        return self::$hasIsChatEnabledColumn;
     }
 
     // Accessors and Mutators for backward compatibility mapping
