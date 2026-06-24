@@ -75,35 +75,91 @@ class Astrologer extends Model
 
     protected $hidden = [];
 
+    protected static $hasIsChatEnabledColumn = null;
+
+    protected function hasIsChatEnabledColumn()
+    {
+        if (self::$hasIsChatEnabledColumn === null) {
+            try {
+                self::$hasIsChatEnabledColumn = \Illuminate\Support\Facades\Schema::hasColumn($this->getTable(), 'is_chat_enabled');
+            } catch (\Exception $e) {
+                self::$hasIsChatEnabledColumn = false;
+            }
+        }
+        return self::$hasIsChatEnabledColumn;
+    }
+
     // Accessors and Mutators for backward compatibility mapping
     public function getIsChatEnabledAttribute(): bool
     {
-        return (bool) ($this->attributes['chat_enabled'] ?? false);
+        $col = $this->hasIsChatEnabledColumn() ? 'is_chat_enabled' : 'chat_enabled';
+        return (bool) ($this->attributes[$col] ?? false);
     }
 
     public function setIsChatEnabledAttribute($value)
     {
-        $this->attributes['chat_enabled'] = $value;
+        $col = $this->hasIsChatEnabledColumn() ? 'is_chat_enabled' : 'chat_enabled';
+        $this->attributes[$col] = $value;
     }
 
     public function getIsCallEnabledAttribute(): bool
     {
-        return (bool) ($this->attributes['call_enabled'] ?? false);
+        $col = $this->hasIsChatEnabledColumn() ? 'is_call_enabled' : 'call_enabled';
+        return (bool) ($this->attributes[$col] ?? false);
     }
 
     public function setIsCallEnabledAttribute($value)
     {
-        $this->attributes['call_enabled'] = $value;
+        $col = $this->hasIsChatEnabledColumn() ? 'is_call_enabled' : 'call_enabled';
+        $this->attributes[$col] = $value;
     }
 
     public function getIsVideoCallEnabledAttribute(): bool
     {
-        return (bool) ($this->attributes['video_call_enabled'] ?? false);
+        $col = $this->hasIsChatEnabledColumn() ? 'is_video_call_enabled' : 'video_call_enabled';
+        return (bool) ($this->attributes[$col] ?? false);
     }
 
     public function setIsVideoCallEnabledAttribute($value)
     {
-        $this->attributes['video_call_enabled'] = $value;
+        $col = $this->hasIsChatEnabledColumn() ? 'is_video_call_enabled' : 'video_call_enabled';
+        $this->attributes[$col] = $value;
+    }
+
+    public function getChatEnabledAttribute(): bool
+    {
+        $col = $this->hasIsChatEnabledColumn() ? 'is_chat_enabled' : 'chat_enabled';
+        return (bool) ($this->attributes[$col] ?? false);
+    }
+
+    public function setChatEnabledAttribute($value)
+    {
+        $col = $this->hasIsChatEnabledColumn() ? 'is_chat_enabled' : 'chat_enabled';
+        $this->attributes[$col] = $value;
+    }
+
+    public function getCallEnabledAttribute(): bool
+    {
+        $col = $this->hasIsChatEnabledColumn() ? 'is_call_enabled' : 'call_enabled';
+        return (bool) ($this->attributes[$col] ?? false);
+    }
+
+    public function setCallEnabledAttribute($value)
+    {
+        $col = $this->hasIsChatEnabledColumn() ? 'is_call_enabled' : 'call_enabled';
+        $this->attributes[$col] = $value;
+    }
+
+    public function getVideoCallEnabledAttribute(): bool
+    {
+        $col = $this->hasIsChatEnabledColumn() ? 'is_video_call_enabled' : 'video_call_enabled';
+        return (bool) ($this->attributes[$col] ?? false);
+    }
+
+    public function setVideoCallEnabledAttribute($value)
+    {
+        $col = $this->hasIsChatEnabledColumn() ? 'is_video_call_enabled' : 'video_call_enabled';
+        $this->attributes[$col] = $value;
     }
 
     public function getProfilePhotoAttribute($value): ?string
