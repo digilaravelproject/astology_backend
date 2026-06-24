@@ -51,7 +51,7 @@ class ChatBillingTickJob implements ShouldQueue
                 }
 
                 // Perform debit (throws exception on failure)
-                $walletService->deductForChat($session->consumer_id, $session->rate_per_minute, $session->id);
+                $walletService->debitBalanceOnly($session->consumer_id, $session->rate_per_minute);
 
                 // Calculate provider share based on active offer or global fallback
                 $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
@@ -61,7 +61,7 @@ class ChatBillingTickJob implements ShouldQueue
                 $creditAmount = round(($session->rate_per_minute * $astrologerSharePct) / 100, 2);
 
                 // Perform credit (throws exception on failure)
-                $walletService->creditProviderForChat($session->provider_id, $creditAmount, $session->id);
+                $walletService->creditBalanceOnly($session->provider_id, $creditAmount);
 
                 // Update session
                 $session->last_billed_at = now();

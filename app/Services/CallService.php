@@ -243,7 +243,7 @@ class CallService
                 if ($unbilledBalance > 0 && $consumerWallet) {
                     $chargeAmount = min($unbilledBalance, $consumerWallet->balance);
                     if ($chargeAmount > 0) {
-                        $this->walletService->deductForCall($session->consumer_id, $chargeAmount, $session->id);
+                        $this->walletService->debitBalanceOnly($session->consumer_id, $chargeAmount);
                         
                         // Calculate astrologer share based on active offer or global fallback
                         $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
@@ -252,15 +252,30 @@ class CallService
                         $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
                         $creditAmount = round(($chargeAmount * $astrologerSharePct) / 100, 2);
 
-                        $this->walletService->creditProviderForCall($session->provider_id, $creditAmount, $session->id);
+                        $this->walletService->creditBalanceOnly($session->provider_id, $creditAmount);
                     }
+                }
+
+                $totalCost = $alreadyBilled + $chargeAmount;
+
+                // Create consolidated transaction records for the entire session at once!
+                if ($totalCost > 0) {
+                    $this->walletService->logDebitOnly($session->consumer_id, $totalCost, 'call_deduction', 'App\Models\CallSession', $session->id);
+                    
+                    $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
+                    $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                    $pricing = $pricingCalculator->calculate($provider->astrologer, 'call');
+                    $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                    $totalCreditAmount = round(($totalCost * $astrologerSharePct) / 100, 2);
+
+                    $this->walletService->logCreditOnly($session->provider_id, $totalCreditAmount, 'call_credit', 'App\Models\CallSession', $session->id);
                 }
 
                 $this->callRepo->update($sessionId, [
                     'status' => 'completed',
                     'ended_at' => $endTime,
                     'duration_seconds' => $durationSeconds,
-                    'total_cost' => $alreadyBilled + $chargeAmount,
+                    'total_cost' => $totalCost,
                 ]);
 
                 // Reset presence status for both users

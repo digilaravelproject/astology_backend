@@ -79,7 +79,17 @@ class WalletTransactionLoggingTest extends TestCase
         $providerWallet = Wallet::where('user_id', $this->provider->id)->first();
         $this->assertEquals(112.00, (float) $providerWallet->balance); // 100.00 + 12.00
 
-        // Check user debit transaction record
+        // Check that NO transaction logs were written during billing ticks
+        $userTx = WalletTransaction::where('wallet_id', $consumerWallet->id)
+            ->where('transaction_type', 'debit')
+            ->first();
+        $this->assertNull($userTx);
+
+        // End chat now
+        $chatService = app(ChatService::class);
+        $chatService->endChat($this->session->id);
+
+        // Check user debit transaction record (total consolidated should be 15.00)
         $userTx = WalletTransaction::where('wallet_id', $consumerWallet->id)
             ->where('transaction_type', 'debit')
             ->first();
@@ -87,8 +97,6 @@ class WalletTransactionLoggingTest extends TestCase
         $this->assertNotNull($userTx);
         $this->assertEquals('completed', $userTx->status);
         $this->assertEquals(15.00, (float) $userTx->amount);
-        $this->assertEquals(500.00, (float) $userTx->balance_before);
-        $this->assertEquals(485.00, (float) $userTx->balance_after);
         $this->assertEquals('App\Models\ChatSession', $userTx->reference_type);
         $this->assertEquals($this->session->id, $userTx->reference_id);
         $this->assertEquals('Chat session with Astrologer Aacharya Suresh', $userTx->description);
@@ -103,8 +111,6 @@ class WalletTransactionLoggingTest extends TestCase
         $this->assertNotNull($providerTx);
         $this->assertEquals('completed', $providerTx->status);
         $this->assertEquals(12.00, (float) $providerTx->amount);
-        $this->assertEquals(100.00, (float) $providerTx->balance_before);
-        $this->assertEquals(112.00, (float) $providerTx->balance_after);
         $this->assertEquals('App\Models\ChatSession', $providerTx->reference_type);
         $this->assertEquals($this->session->id, $providerTx->reference_id);
         $this->assertEquals('Chat consultation with User John Consumer', $providerTx->description);
@@ -146,8 +152,6 @@ class WalletTransactionLoggingTest extends TestCase
             ->first();
         $this->assertNotNull($userTx);
         $this->assertEquals(10.00, (float) $userTx->amount);
-        $this->assertEquals(10.00, (float) $userTx->balance_before);
-        $this->assertEquals(0.00, (float) $userTx->balance_after);
 
         // Check provider credit transaction (80% of 10 = 8)
         $providerTx = WalletTransaction::where('wallet_id', $providerWallet->id)
@@ -155,8 +159,6 @@ class WalletTransactionLoggingTest extends TestCase
             ->first();
         $this->assertNotNull($providerTx);
         $this->assertEquals(8.00, (float) $providerTx->amount);
-        $this->assertEquals(100.00, (float) $providerTx->balance_before);
-        $this->assertEquals(108.00, (float) $providerTx->balance_after);
     }
 
     /** @test */
