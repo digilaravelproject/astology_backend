@@ -152,7 +152,7 @@ class AstrologerWalletController extends Controller
     }
 
     /**
-     * Download monthly invoice as text/plain.
+     * Download monthly invoice as PDF.
      */
     public function downloadInvoice(Request $request, $year, $month)
     {
@@ -174,38 +174,91 @@ class AstrologerWalletController extends Controller
                 ->get();
 
             $totalEarnings = $transactions->sum('amount');
+            $monthName = $startDate->format('F Y');
 
-            // Generate simple text invoice
-            $invoiceText = "========================================\n";
-            $invoiceText .= "            EARNINGS INVOICE            \n";
-            $invoiceText .= "========================================\n";
-            $invoiceText .= "Astrologer Name: " . $user->name . "\n";
-            $invoiceText .= "Email: " . $user->email . "\n";
-            $invoiceText .= "Period: " . $startDate->format('F Y') . "\n";
-            $invoiceText .= "Generated At: " . now()->toDateTimeString() . "\n";
-            $invoiceText .= "----------------------------------------\n";
-            $invoiceText .= "Transaction ID | Date | Description | Amount\n";
-            $invoiceText .= "----------------------------------------\n";
+            // Build dynamic styled HTML template
+            $html = '<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Invoice - ' . $monthName . '</title>
+    <style>
+        body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #333; margin: 15px; font-size: 14px; }
+        .invoice-box { padding: 20px; border: 1px solid #eee; }
+        .header-table, .info-table, .items-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .header-title { font-size: 28px; line-height: 35px; color: #ff5722; font-weight: bold; }
+        .text-right { text-align: right; }
+        .heading-row { background: #fbe9e7; border-bottom: 1px solid #ddd; font-weight: bold; color: #d84315; }
+        .heading-row td { padding: 10px; }
+        .item-row td { padding: 10px; border-bottom: 1px solid #eee; }
+        .total-row td { padding: 10px; text-align: right; font-weight: bold; font-size: 15px; }
+        .footer { text-align: center; margin-top: 50px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="invoice-box">
+        <table class="header-table">
+            <tr>
+                <td class="header-title">SURYAPATH KUNDLI</td>
+                <td class="text-right">
+                    <strong>Invoice #:</strong> INV-' . $year . '-' . $month . '<br>
+                    <strong>Date:</strong> ' . now()->toDateString() . '<br>
+                    <strong>Billing Period:</strong> ' . $monthName . '
+                </td>
+            </tr>
+        </table>
+
+        <table class="info-table">
+            <tr>
+                <td style="width: 50%;">
+                    <strong>Platform Operator:</strong><br>
+                    Suryapath Kundli Team<br>
+                    support@suryapathkundli.com<br>
+                    https://suryapathkundli.com
+                </td>
+                <td class="text-right" style="width: 50%;">
+                    <strong>Recipient Astrologer:</strong><br>
+                    ' . htmlspecialchars($user->name) . '<br>
+                    ' . htmlspecialchars($user->email) . '
+                </td>
+            </tr>
+        </table>
+
+        <table class="items-table">
+            <tr class="heading-row">
+                <td>Transaction ID & Details</td>
+                <td class="text-right">Amount</td>
+            </tr>';
+
             foreach ($transactions as $tx) {
-                $invoiceText .= sprintf(
-                    "%s | %s | %s | INR %s\n",
-                    $tx->id,
-                    $tx->created_at->toDateString(),
-                    substr($tx->description, 0, 20),
-                    $tx->amount
-                );
+                $html .= '<tr class="item-row">
+                    <td>
+                        TX-' . $tx->id . ' (' . $tx->created_at->toDateString() . ')<br>
+                        <span style="font-size: 11px; color: #666;">' . htmlspecialchars($tx->description) . '</span>
+                    </td>
+                    <td class="text-right">₹' . number_format($tx->amount, 2) . '</td>
+                </tr>';
             }
-            $invoiceText .= "----------------------------------------\n";
-            $invoiceText .= "Gross Earnings: INR " . number_format($totalEarnings, 2) . "\n";
-            $invoiceText .= "Net Payable: INR " . number_format($totalEarnings, 2) . "\n";
-            $invoiceText .= "========================================\n";
 
-            $fileName = "invoice_{$year}_{$month}.txt";
+            $html .= '<tr class="total-row">
+                <td colspan="2" style="color: #d84315;">Gross Earnings: ₹' . number_format($totalEarnings, 2) . '</td>
+            </tr>
+            <tr class="total-row">
+                <td colspan="2" style="color: #d84315; border-top: 1px solid #ddd; padding-top: 5px;">Net Payable: ₹' . number_format($totalEarnings, 2) . '</td>
+            </tr>
+        </table>
 
-            return response($invoiceText, 200, [
-                'Content-Type' => 'text/plain',
-                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
-            ]);
+        <div class="footer">
+            Thank you for your valuable services and contributions on Suryapath Kundli!
+        </div>
+    </div>
+</body>
+</html>';
+
+            $fileName = "invoice_{$year}_{$month}.pdf";
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($html);
+            return $pdf->download($fileName);
 
         } catch (Exception $e) {
             return response()->json([

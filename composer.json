@@ -8,6 +8,7 @@
     "require": {
         "php": "^8.2",
         "aws/aws-sdk-php": "*",
+        "barryvdh/laravel-dompdf": "*",
         "firebase/php-jwt": "*",
         "laravel/framework": "^12.0",
         "laravel/reverb": "*",

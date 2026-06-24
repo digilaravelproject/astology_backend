@@ -71,6 +71,7 @@ class AstrologerInvoiceApiTest extends TestCase
                     'month_name',
                     'gross_earnings',
                     'net_payable',
+                    'total_withdrawn',
                     'status',
                 ],
                 'invoices' => [
@@ -78,6 +79,7 @@ class AstrologerInvoiceApiTest extends TestCase
                         'month_name',
                         'gross_earnings',
                         'net_payable',
+                        'total_withdrawn',
                         'status',
                         'download_url',
                     ]
@@ -95,13 +97,13 @@ class AstrologerInvoiceApiTest extends TestCase
         $this->assertNotNull($janInvoice);
         $this->assertEquals(45403.76, $janInvoice['gross_earnings']);
         $this->assertEquals(45403.76, $janInvoice['net_payable']);
+        $this->assertEquals(20000.00, $janInvoice['total_withdrawn']);
         $this->assertEquals('Paid', $janInvoice['status']);
         $this->assertStringContainsString('/api/v1/astrologer/wallet/invoices/2026/01/download', $janInvoice['download_url']);
 
         // 5. Test Download Route
         $downloadResponse = $this->actingAs($user)->get("/api/v1/astrologer/wallet/invoices/2026/01/download");
         $downloadResponse->assertStatus(200);
-        $downloadResponse->assertHeader('Content-Type', 'text/plain; charset=UTF-8');
-        $this->assertStringContainsString('Gross Earnings: INR 45,403.76', $downloadResponse->getContent());
+        $downloadResponse->assertHeader('Content-Type', 'application/pdf');
     }
 }
