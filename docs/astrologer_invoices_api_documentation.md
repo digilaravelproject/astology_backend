@@ -34,14 +34,14 @@ Retrieves the astrologer's total earnings, total withdrawn, total invoices, and 
         "gross_earnings": 45403.76,
         "net_payable": 45403.76,
         "status": "Paid",
-        "download_url": "http://localhost/api/v1/astrologer/wallet/invoices/2026/01/download"
+        "download_url": "https://suryapathkundli.com/api/v1/astrologer/wallet/invoices/2026/01/download"
       },
       {
         "month_name": "December 2025",
         "gross_earnings": 32100,
         "net_payable": 32100,
         "status": "Paid",
-        "download_url": "http://localhost/api/v1/astrologer/wallet/invoices/2025/12/download"
+        "download_url": "https://suryapathkundli.com/api/v1/astrologer/wallet/invoices/2025/12/download"
       }
     ]
   }
