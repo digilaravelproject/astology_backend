@@ -131,4 +131,87 @@ class AstrologerWalletController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get monthly invoice summary list and stats for the astrologer.
+     */
+    public function invoices(Request $request): JsonResponse
+    {
+        try {
+            $invoices = $this->walletService->getInvoicesSummary($request->user());
+            return response()->json([
+                'status' => 'success',
+                'data' => $invoices
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch invoice summary: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Download monthly invoice as text/plain.
+     */
+    public function downloadInvoice(Request $request, $year, $month)
+    {
+        try {
+            $user = $request->user();
+            $wallet = \App\Models\Wallet::where('user_id', $user->id)->first();
+            if (!$wallet) {
+                return response()->json(['status' => 'error', 'message' => 'Wallet not found.'], 404);
+            }
+
+            // Fetch transactions for that year-month
+            $startDate = \Carbon\Carbon::createFromDate($year, $month, 1)->startOfMonth();
+            $endDate = \Carbon\Carbon::createFromDate($year, $month, 1)->endOfMonth();
+
+            $transactions = \App\Models\WalletTransaction::where('wallet_id', $wallet->id)
+                ->where('transaction_type', 'credit')
+                ->where('status', 'completed')
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->get();
+
+            $totalEarnings = $transactions->sum('amount');
+
+            // Generate simple text invoice
+            $invoiceText = "========================================\n";
+            $invoiceText .= "            EARNINGS INVOICE            \n";
+            $invoiceText .= "========================================\n";
+            $invoiceText .= "Astrologer Name: " . $user->name . "\n";
+            $invoiceText .= "Email: " . $user->email . "\n";
+            $invoiceText .= "Period: " . $startDate->format('F Y') . "\n";
+            $invoiceText .= "Generated At: " . now()->toDateTimeString() . "\n";
+            $invoiceText .= "----------------------------------------\n";
+            $invoiceText .= "Transaction ID | Date | Description | Amount\n";
+            $invoiceText .= "----------------------------------------\n";
+            foreach ($transactions as $tx) {
+                $invoiceText .= sprintf(
+                    "%s | %s | %s | INR %s\n",
+                    $tx->id,
+                    $tx->created_at->toDateString(),
+                    substr($tx->description, 0, 20),
+                    $tx->amount
+                );
+            }
+            $invoiceText .= "----------------------------------------\n";
+            $invoiceText .= "Gross Earnings: INR " . number_format($totalEarnings, 2) . "\n";
+            $invoiceText .= "Net Payable: INR " . number_format($totalEarnings, 2) . "\n";
+            $invoiceText .= "========================================\n";
+
+            $fileName = "invoice_{$year}_{$month}.txt";
+
+            return response($invoiceText, 200, [
+                'Content-Type' => 'text/plain',
+                'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            ]);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to download invoice: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

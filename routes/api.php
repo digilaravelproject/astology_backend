@@ -102,6 +102,8 @@ Route::prefix('v1')->group(function () {
                 Route::get('/withdrawals', [AstrologerWalletController::class, 'withdrawals']);
                 Route::post('/withdraw', [AstrologerWalletController::class, 'withdraw']);
                 Route::get('/weekly-rankings', [AstrologerWalletController::class, 'weeklyRankings']);
+                Route::get('/invoices', [AstrologerWalletController::class, 'invoices']);
+                Route::get('/invoices/{year}/{month}/download', [AstrologerWalletController::class, 'downloadInvoice']);
             });
 
             // Gallery routes
