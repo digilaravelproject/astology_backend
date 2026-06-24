@@ -186,8 +186,12 @@ Route::prefix('admin')->group(function () {
         Route::get('reports', function() { return view('admin.reports.index'); })->name('admin.reports.index');
 
         // Settings
-        Route::get('settings', function() { return view('admin.settings.index'); })->name('admin.settings.index');
+        Route::get('settings', [\App\Http\Controllers\Admin\SettingController::class, 'index'])->name('admin.settings.index');
+        Route::post('settings', [\App\Http\Controllers\Admin\SettingController::class, 'update'])->name('admin.settings.update');
         Route::prefix('settings')->group(function () {
+            Route::post('operators', [\App\Http\Controllers\Admin\SettingController::class, 'storeOperator'])->name('admin.settings.operators.store');
+            Route::put('operators/{id}', [\App\Http\Controllers\Admin\SettingController::class, 'updateOperator'])->name('admin.settings.operators.update');
+            Route::delete('operators/{id}', [\App\Http\Controllers\Admin\SettingController::class, 'destroyOperator'])->name('admin.settings.operators.destroy');
             Route::get('rate-limits', [RateLimitController::class, 'index'])->name('admin.settings.rate-limits');
             Route::post('rate-limits', [RateLimitController::class, 'update'])->name('admin.settings.rate-limits.update');
         });
