@@ -196,6 +196,10 @@ Route::prefix('admin')->group(function () {
             Route::post('rate-limits', [RateLimitController::class, 'update'])->name('admin.settings.rate-limits.update');
         });
 
+        // Offers Management
+        Route::resource('offers', \App\Http\Controllers\Admin\OfferController::class)->names('admin.offers');
+        Route::post('offers/{offer}/toggle-status', [\App\Http\Controllers\Admin\OfferController::class, 'toggleStatus'])->name('admin.offers.toggle-status');
+
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
     });
 });

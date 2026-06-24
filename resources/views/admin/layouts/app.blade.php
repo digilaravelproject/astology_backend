@@ -198,6 +198,18 @@
                         </ul>
                     </li>
 
+                    <!-- Offers & Splits -->
+                    <li>
+                        <a href="{{ route('admin.offers.index') }}"
+                           class="flex items-center gap-4 px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                  {{ request()->routeIs('admin.offers.*')
+                                     ? 'bg-sidebar-hover text-primary border-r-[3px] border-primary'
+                                     : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <i class="fas fa-percentage w-5 text-center text-base"></i>
+                            <span>Offers & Splits</span>
+                        </a>
+                    </li>
+
                     <!-- Order Management -->
                     <li x-data="{ open: {{ request()->routeIs('admin.orders.*') ? 'true' : 'false' }} }">
                         <button @click="open = !open" 
