@@ -19,8 +19,20 @@ class AstrologerController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Astrologer::with(['user', 'skill', 'otherDetails'])
-                ->withAvg('reviews', 'rating');
+            $query = Astrologer::with([
+                'user',
+                'skill',
+                'otherDetails',
+                'offers' => function ($q) {
+                    $q->wherePivot('status', 'active')
+                      ->where('is_active', true)
+                      ->where(function ($query) {
+                          $query->whereNull('expires_at')
+                                ->orWhere('expires_at', '>', \Carbon\Carbon::now());
+                      });
+                }
+            ])
+            ->withAvg('reviews', 'rating');
 
             $type = $request->query('type', 'all');
             $minPrice = $request->query('min_price');
@@ -126,7 +138,8 @@ class AstrologerController extends Controller
                 ->toArray();
             $busyProviderIds = array_unique(array_merge($activeChatProviders, $activeCallProviders));
 
-            $astrologers = $query->get()->map(function ($astrologer) use ($busyProviderIds) {
+            $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+            $astrologers = $query->get()->map(function ($astrologer) use ($busyProviderIds, $pricingCalculator) {
                 // Eager loaded avg rating
                 $avgRating = $astrologer->reviews_avg_rating;
                 $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
@@ -141,6 +154,30 @@ class AstrologerController extends Controller
                 $astrologer->is_busy = $isBusy;
                 if ($astrologer->user) {
                     $astrologer->user->is_busy = $isBusy;
+                }
+
+                // Dynamic Pricing Calculation
+                $chatPricing = $pricingCalculator->calculate($astrologer, 'chat');
+                $callPricing = $pricingCalculator->calculate($astrologer, 'call');
+
+                $astrologer->original_chat_rate_per_minute = (float) $astrologer->chat_rate_per_minute;
+                $astrologer->original_call_rate_per_minute = (float) $astrologer->call_rate_per_minute;
+
+                // Override current rates with offer rates
+                $astrologer->chat_rate_per_minute = (float) $chatPricing['customer_rate'];
+                $astrologer->call_rate_per_minute = (float) $callPricing['customer_rate'];
+
+                $astrologer->has_offer = $chatPricing['has_offer'] || $callPricing['has_offer'];
+                if ($astrologer->has_offer && $astrologer->offers->isNotEmpty()) {
+                    $activeOffer = $astrologer->offers->first();
+                    $astrologer->offer_details = [
+                        'id' => $activeOffer->id,
+                        'name' => $activeOffer->name,
+                        'discount_percentage' => (float) $activeOffer->discount_percentage,
+                        'expires_at' => $activeOffer->expires_at ? $activeOffer->expires_at->toDateTimeString() : null
+                    ];
+                } else {
+                    $astrologer->offer_details = null;
                 }
                 
                 return $astrologer;
@@ -204,14 +241,50 @@ class AstrologerController extends Controller
     public function show($id): JsonResponse
     {
         try {
-            $astrologer = Astrologer::with(['user', 'skill', 'otherDetails'])
-                ->find($id);
+            $astrologer = Astrologer::with([
+                'user',
+                'skill',
+                'otherDetails',
+                'offers' => function ($q) {
+                    $q->wherePivot('status', 'active')
+                      ->where('is_active', true)
+                      ->where(function ($query) {
+                          $query->whereNull('expires_at')
+                                ->orWhere('expires_at', '>', \Carbon\Carbon::now());
+                      });
+                }
+            ])->find($id);
 
             if (!$astrologer) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Astrologer not found.',
                 ], 404);
+            }
+
+            // Dynamic Pricing Calculation
+            $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+            $chatPricing = $pricingCalculator->calculate($astrologer, 'chat');
+            $callPricing = $pricingCalculator->calculate($astrologer, 'call');
+
+            $astrologer->original_chat_rate_per_minute = (float) $astrologer->chat_rate_per_minute;
+            $astrologer->original_call_rate_per_minute = (float) $astrologer->call_rate_per_minute;
+
+            // Override current rates with offer rates
+            $astrologer->chat_rate_per_minute = (float) $chatPricing['customer_rate'];
+            $astrologer->call_rate_per_minute = (float) $callPricing['customer_rate'];
+
+            $astrologer->has_offer = $chatPricing['has_offer'] || $callPricing['has_offer'];
+            if ($astrologer->has_offer && $astrologer->offers->isNotEmpty()) {
+                $activeOffer = $astrologer->offers->first();
+                $astrologer->offer_details = [
+                    'id' => $activeOffer->id,
+                    'name' => $activeOffer->name,
+                    'discount_percentage' => (float) $activeOffer->discount_percentage,
+                    'expires_at' => $activeOffer->expires_at ? $activeOffer->expires_at->toDateTimeString() : null
+                ];
+            } else {
+                $astrologer->offer_details = null;
             }
 
             // Calculate dynamic average rating from reviews

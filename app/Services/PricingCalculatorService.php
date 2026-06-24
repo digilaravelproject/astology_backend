@@ -23,14 +23,19 @@ class PricingCalculatorService
             : (float) $astrologer->call_rate_per_minute;
 
         // 2. Fetch currently active, unexpired offer
-        $activeOfferPivot = $astrologer->offers()
-            ->wherePivot('status', 'active')
-            ->where('is_active', true)
-            ->where(function ($query) {
-                $query->whereNull('expires_at')
-                      ->orWhere('expires_at', '>', Carbon::now());
-            })
-            ->first();
+        $activeOfferPivot = null;
+        if ($astrologer->relationLoaded('offers')) {
+            $activeOfferPivot = $astrologer->offers->first();
+        } else {
+            $activeOfferPivot = $astrologer->offers()
+                ->wherePivot('status', 'active')
+                ->where('is_active', true)
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                          ->orWhere('expires_at', '>', Carbon::now());
+                })
+                ->first();
+        }
 
         // 3. Fallback logic if no active offer exists
         if (!$activeOfferPivot) {

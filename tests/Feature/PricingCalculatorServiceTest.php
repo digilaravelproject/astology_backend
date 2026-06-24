@@ -153,4 +153,61 @@ class PricingCalculatorServiceTest extends TestCase
         $this->assertEquals(80.00, $chatPricing['astrologer_payout']); // Astro share 80% (100 - 20% commission)
         $this->assertEquals(20.00, $chatPricing['admin_revenue']);
     }
+
+    /** @test */
+    public function it_returns_offer_pricing_in_astrologers_listing_and_details_apis()
+    {
+        // 1. Create astrologer
+        $user = User::factory()->create(['name' => 'Offer Astrologer']);
+        $astrologer = Astrologer::create([
+            'user_id' => $user->id,
+            'chat_rate_per_minute' => 100.00,
+            'call_rate_per_minute' => 200.00,
+            'chat_enabled' => true,
+            'call_enabled' => true,
+        ]);
+
+        // 2. Create and associate offer (20% off)
+        $offer = Offer::create([
+            'name' => 'Big Discount 20%',
+            'discount_percentage' => 20.00,
+            'chat_astrologer_share' => 70.00,
+            'chat_admin_share' => 30.00,
+            'call_astrologer_share' => 60.00,
+            'call_admin_share' => 40.00,
+            'is_active' => true,
+            'expires_at' => Carbon::now()->addDays(2),
+        ]);
+
+        $astrologer->offers()->attach($offer->id, [
+            'status' => 'active',
+            'activated_at' => Carbon::now(),
+        ]);
+
+        // 3. Request listing API
+        $response = $this->getJson('/api/v1/user/astrologers');
+        $response->assertStatus(200);
+        $data = $response->json('data.astrologers');
+        
+        $item = collect($data)->firstWhere('id', $astrologer->id);
+        $this->assertNotNull($item);
+        $this->assertEquals(80.00, $item['chat_rate_per_minute']);
+        $this->assertEquals(160.00, $item['call_rate_per_minute']);
+        $this->assertEquals(100.00, $item['original_chat_rate_per_minute']);
+        $this->assertEquals(200.00, $item['original_call_rate_per_minute']);
+        $this->assertTrue($item['has_offer']);
+        $this->assertEquals('Big Discount 20%', $item['offer_details']['name']);
+
+        // 4. Request show API
+        $responseShow = $this->getJson("/api/v1/user/astrologers/{$astrologer->id}");
+        $responseShow->assertStatus(200);
+        $details = $responseShow->json('data.astrologer');
+        
+        $this->assertEquals(80.00, $details['chat_rate_per_minute']);
+        $this->assertEquals(160.00, $details['call_rate_per_minute']);
+        $this->assertEquals(100.00, $details['original_chat_rate_per_minute']);
+        $this->assertEquals(200.00, $details['original_call_rate_per_minute']);
+        $this->assertTrue($details['has_offer']);
+        $this->assertEquals('Big Discount 20%', $details['offer_details']['name']);
+    }
 }
