@@ -26,6 +26,7 @@ Retrieves the astrologer's total earnings, total withdrawn, total invoices, and 
       "month_name": "June 2026",
       "gross_earnings": 0,
       "net_payable": 0,
+      "total_withdrawn": 0,
       "status": "Paid"
     },
     "invoices": [
@@ -33,6 +34,7 @@ Retrieves the astrologer's total earnings, total withdrawn, total invoices, and 
         "month_name": "January 2026",
         "gross_earnings": 45403.76,
         "net_payable": 45403.76,
+        "total_withdrawn": 20000,
         "status": "Paid",
         "download_url": "https://suryapathkundli.com/api/v1/astrologer/wallet/invoices/2026/01/download"
       },
@@ -40,6 +42,7 @@ Retrieves the astrologer's total earnings, total withdrawn, total invoices, and 
         "month_name": "December 2025",
         "gross_earnings": 32100,
         "net_payable": 32100,
+        "total_withdrawn": 0,
         "status": "Paid",
         "download_url": "https://suryapathkundli.com/api/v1/astrologer/wallet/invoices/2025/12/download"
       }
@@ -51,7 +54,7 @@ Retrieves the astrologer's total earnings, total withdrawn, total invoices, and 
 ---
 
 ## 2. Download Monthly Invoice
-Streams a formatted text/plain file representing the transaction breakdown for a specific month.
+Generates and downloads a beautifully styled PDF invoice representing the transaction breakdown for a specific month.
 
 - **URL**: `/api/v1/astrologer/wallet/invoices/{year}/{month}/download`
 - **Method**: `GET`
@@ -59,24 +62,7 @@ Streams a formatted text/plain file representing the transaction breakdown for a
   - `Authorization: Bearer <token>`
 
 ### Success Response (`200 OK`)
-- **Content-Type**: `text/plain`
-- **Content-Disposition**: `attachment; filename="invoice_2026_01.txt"`
+- **Content-Type**: `application/pdf`
+- **Content-Disposition**: `attachment; filename="invoice_2026_01.pdf"`
+- **Response Body**: Binary PDF stream.
 
-#### Body Example:
-```text
-========================================
-            EARNINGS INVOICE            
-========================================
-Astrologer Name: Aacharya Suresh
-Email: suresh@test.com
-Period: January 2026
-Generated At: 2026-06-24 17:50:00
-----------------------------------------
-Transaction ID | Date | Description | Amount
-----------------------------------------
-14 | 2026-01-15 | Chat Session Earnings | INR 45403.76
-----------------------------------------
-Gross Earnings: INR 45,403.76
-Net Payable: INR 45,403.76
-========================================
-```
