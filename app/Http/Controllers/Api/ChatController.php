@@ -101,6 +101,12 @@ class ChatController extends Controller
             $durationSeconds = (int) ($session->duration_seconds ?? 0);
             $totalCost = (float) ($session->total_cost ?? 0.00);
 
+            // Calculate astrologer share based on active offer or global fallback
+            $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+            $pricing = $pricingCalculator->calculate($session->provider->astrologer, 'chat');
+            $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+            $astrologerEarning = round(($totalCost * $astrologerSharePct) / 100, 2);
+
             $billingDetails = [
                 'duration_seconds' => $durationSeconds,
                 'user_details' => [
@@ -109,7 +115,7 @@ class ChatController extends Controller
                 ],
                 'astrologer_details' => [
                     'duration_seconds' => $durationSeconds,
-                    'amount_added' => (float) $totalCost,
+                    'amount_added' => (float) $astrologerEarning,
                 ],
             ];
 

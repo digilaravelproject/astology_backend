@@ -136,6 +136,13 @@ Route::prefix('v1')->group(function () {
                 Route::get('/history', [\App\Http\Controllers\Api\AstrologerPriceIncreaseController::class, 'history']);
             });
 
+            // Offers & Commission routes
+            Route::prefix('offers')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Api\AstrologerOfferController::class, 'index']);
+                Route::post('/{id}/activate', [\App\Http\Controllers\Api\AstrologerOfferController::class, 'activate']);
+                Route::get('/history', [\App\Http\Controllers\Api\AstrologerOfferController::class, 'history']);
+            });
+
             Route::post('/logout', [AstrologerAuthController::class, 'logout']);
             Route::delete('/delete-account', [AstrologerAuthController::class, 'deleteAccount']);
         });

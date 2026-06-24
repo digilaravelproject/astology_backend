@@ -102,7 +102,7 @@ class ChatEndBillingTest extends TestCase
 
         $response->assertJsonPath('data.billing.duration_seconds', $expectedDuration);
         $response->assertJsonPath('data.billing.user_details.amount_deducted', $expectedCost);
-        $response->assertJsonPath('data.billing.astrologer_details.amount_added', $expectedCost);
+        $response->assertJsonPath('data.billing.astrologer_details.amount_added', 72); // 90 * 0.8 (20% commission fallback)
 
         // Verify database updates
         $this->assertDatabaseHas('chat_sessions', [
@@ -117,10 +117,10 @@ class ChatEndBillingTest extends TestCase
             'balance' => 410.00 // 500.00 - 90.00
         ]);
 
-        // Verify provider wallet credited
+        // Verify provider wallet credited with astrologer share (72.00)
         $this->assertDatabaseHas('wallets', [
             'user_id' => $this->provider->id,
-            'balance' => 190.00 // 100.00 + 90.00
+            'balance' => 172.00 // 100.00 + 72.00
         ]);
 
         // Verify busy state reset to false
@@ -154,7 +154,7 @@ class ChatEndBillingTest extends TestCase
         // Verify API response
         $response->assertJsonPath('data.billing.duration_seconds', $expectedDuration);
         $response->assertJsonPath('data.billing.user_details.amount_deducted', $expectedCost);
-        $response->assertJsonPath('data.billing.astrologer_details.amount_added', $expectedCost);
+        $response->assertJsonPath('data.billing.astrologer_details.amount_added', 48); // 60 * 0.8 (20% commission fallback)
 
         // Verify consumer wallet deducted
         $this->assertDatabaseHas('wallets', [
@@ -165,7 +165,7 @@ class ChatEndBillingTest extends TestCase
         // Verify provider wallet credited
         $this->assertDatabaseHas('wallets', [
             'user_id' => $this->provider->id,
-            'balance' => 160.00 // 100 + 60
+            'balance' => 148.00 // 100 + 48
         ]);
 
         // Verify busy state reset

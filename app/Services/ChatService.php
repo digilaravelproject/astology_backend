@@ -78,7 +78,14 @@ class ChatService
                     throw new Exception("You already have a pending or waiting request.");
                 }
                 
-                $rate = $provider->astrologer->chat_rate_per_minute ?? 15.00;
+                $astrologer = $provider->astrologer;
+                if (!$astrologer || !$astrologer->is_chat_enabled) {
+                    throw new Exception("Astrologer is not available for chat.");
+                }
+
+                $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                $pricing = $pricingCalculator->calculate($astrologer, 'chat');
+                $rate = $pricing['customer_rate'];
                 
                 $balance = $this->walletService->getBalance($consumerId);
                 if ($balance < $rate * 5) {
@@ -340,7 +347,15 @@ class ChatService
                     $chargeAmount = min($unbilledBalance, $consumerWallet->balance);
                     if ($chargeAmount > 0) {
                         $this->walletService->deductForChat($session->consumer_id, $chargeAmount, $session->id);
-                        $this->walletService->creditProviderForChat($session->provider_id, $chargeAmount, $session->id);
+                        
+                        // Calculate astrologer share based on active offer or global fallback
+                        $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
+                        $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                        $pricing = $pricingCalculator->calculate($provider->astrologer, 'chat');
+                        $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                        $creditAmount = round(($chargeAmount * $astrologerSharePct) / 100, 2);
+
+                        $this->walletService->creditProviderForChat($session->provider_id, $creditAmount, $session->id);
                     }
                 }
 

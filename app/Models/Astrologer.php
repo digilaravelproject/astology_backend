@@ -34,6 +34,9 @@ class Astrologer extends Model
         'is_chat_enabled',
         'is_call_enabled',
         'is_video_call_enabled',
+        'chat_enabled',
+        'call_enabled',
+        'video_call_enabled',
         'chat_rate_per_minute',
         'call_rate_per_minute',
         'video_call_rate_per_minute',
@@ -59,6 +62,9 @@ class Astrologer extends Model
         'is_chat_enabled' => 'boolean',
         'is_call_enabled' => 'boolean',
         'is_video_call_enabled' => 'boolean',
+        'chat_enabled' => 'boolean',
+        'call_enabled' => 'boolean',
+        'video_call_enabled' => 'boolean',
         'chat_rate_per_minute' => 'decimal:2',
         'call_rate_per_minute' => 'decimal:2',
         'video_call_rate_per_minute' => 'decimal:2',
@@ -68,6 +74,37 @@ class Astrologer extends Model
     ];
 
     protected $hidden = [];
+
+    // Accessors and Mutators for backward compatibility mapping
+    public function getIsChatEnabledAttribute(): bool
+    {
+        return (bool) ($this->attributes['chat_enabled'] ?? false);
+    }
+
+    public function setIsChatEnabledAttribute($value)
+    {
+        $this->attributes['chat_enabled'] = $value;
+    }
+
+    public function getIsCallEnabledAttribute(): bool
+    {
+        return (bool) ($this->attributes['call_enabled'] ?? false);
+    }
+
+    public function setIsCallEnabledAttribute($value)
+    {
+        $this->attributes['call_enabled'] = $value;
+    }
+
+    public function getIsVideoCallEnabledAttribute(): bool
+    {
+        return (bool) ($this->attributes['video_call_enabled'] ?? false);
+    }
+
+    public function setIsVideoCallEnabledAttribute($value)
+    {
+        $this->attributes['video_call_enabled'] = $value;
+    }
 
     public function getProfilePhotoAttribute($value): ?string
     {
@@ -173,6 +210,13 @@ class Astrologer extends Model
     public function priceIncreaseRequests()
     {
         return $this->hasMany(PriceIncreaseRequest::class);
+    }
+
+    public function offers()
+    {
+        return $this->belongsToMany(Offer::class, 'astrologer_offers')
+            ->withPivot('id', 'status', 'activated_at', 'deactivated_at')
+            ->withTimestamps();
     }
 
     public function getTotalBusyMinutesAttribute(): float

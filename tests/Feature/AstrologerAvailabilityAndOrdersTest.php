@@ -45,7 +45,9 @@ class AstrologerAvailabilityAndOrdersTest extends TestCase
             'user_id' => $this->provider->id,
             'is_online' => true,
             'chat_rate_per_minute' => 10.00,
-            'call_rate_per_minute' => 12.00
+            'call_rate_per_minute' => 12.00,
+            'chat_enabled' => true,
+            'call_enabled' => true,
         ]);
         Wallet::create(['user_id' => $this->provider->id, 'balance' => 100.00]);
     }
@@ -102,6 +104,7 @@ class AstrologerAvailabilityAndOrdersTest extends TestCase
         ]);
 
         // Another user initiates chat
+        /** @var User $secondConsumer */
         $secondConsumer = User::factory()->create();
         Wallet::create(['user_id' => $secondConsumer->id, 'balance' => 300.00]);
 

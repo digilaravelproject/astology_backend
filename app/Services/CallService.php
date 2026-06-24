@@ -37,34 +37,34 @@ class CallService
     {
         return DB::transaction(function () use ($consumerId, $providerId) {
             try {
-                // Eager load provider and astrologer details to prevent N+1
                 $provider = User::with('astrologer')->lockForUpdate()->findOrFail($providerId);
-                
                 $astrologer = $provider->astrologer;
-
                 if (!$astrologer || !$astrologer->is_call_enabled) {
                     throw new Exception("Astrologer is not available for calls.");
                 }
-                $rate = $astrologer->call_rate_per_minute ?? 15.00;
+
+                $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                $pricing = $pricingCalculator->calculate($astrologer, 'call');
+                $rate = $pricing['customer_rate'];
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
-                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->whereIn('status', ['accepted', 'ongoing'], 'and', false)
                     ->exists();
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
-                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'], 'and', false)
                     ->exists();
-                $isBusy = $isChatBusy || $isCallBusy;
-                if ($isBusy) {
-                    throw new Exception("Astrologer is currently busy on another session. Please try again later.");
-                }
+                $hasWaitingQueue = \App\Models\CallSession::where('provider_id', $providerId)
+                    ->where('status', 'waiting')
+                    ->exists();
+                $isBusy = $isChatBusy || $isCallBusy || $hasWaitingQueue;
 
                 // Dynamic check for consumer
                 $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->whereIn('status', ['accepted', 'ongoing'], 'and', false)
                     ->exists();
                 $isConsumerCallBusy = \App\Models\CallSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'], 'and', false)
                     ->exists();
                 if ($isConsumerChatBusy || $isConsumerCallBusy) {
                     throw new Exception("You are already in an active session.");
@@ -72,10 +72,10 @@ class CallService
 
                 // Prevent duplicate pending or waiting requests
                 $existingChatPending = \App\Models\ChatSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['initiated', 'waiting'])
+                    ->whereIn('status', ['initiated', 'waiting'], 'and', false)
                     ->exists();
                 $existingCallPending = \App\Models\CallSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['initiated', 'ringing', 'waiting'])
+                    ->whereIn('status', ['initiated', 'ringing', 'waiting'], 'and', false)
                     ->exists();
                 if ($existingChatPending || $existingCallPending) {
                     throw new Exception("You already have a pending or waiting request.");
@@ -87,16 +87,20 @@ class CallService
                     throw new Exception("Insufficient balance. You need minimum " . ($rate * 5) . " in your wallet to start this call.");
                 }
 
+                $status = $isBusy ? 'waiting' : 'initiated';
+
                 $session = $this->callRepo->create([
                     'consumer_id' => $consumerId,
                     'provider_id' => $providerId,
                     'call_type'   => 'audio',
-                    'status' => 'initiated',
+                    'status' => $status,
                     'rate_per_minute' => $rate,
                 ]);
 
-                // Dispatch timeout cleanup (60 seconds ringing timeout)
-                \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
+                if ($status === 'initiated') {
+                    // Dispatch timeout cleanup (60 seconds ringing timeout)
+                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
+                }
 
                 return $session;
 
@@ -117,7 +121,7 @@ class CallService
                 // Lock the session row FIRST (prevents deadlock with missedCall/endCall/rejectCall)
                 $session = \App\Models\CallSession::where('id', $sessionId)->lockForUpdate()->first();
 
-                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing'])) {
+                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing', 'waiting'])) {
                     throw new Exception("The call session is no longer valid or has been cancelled.");
                 }
 
@@ -126,10 +130,10 @@ class CallService
 
                 // Check dynamic busy check under lock to prevent double booking
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
-                    ->whereIn('status', ['accepted', 'ongoing'])
+                    ->whereIn('status', ['accepted', 'ongoing'], 'and', false)
                     ->exists();
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
-                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'], 'and', false)
                     ->where('id', '!=', $sessionId)
                     ->exists();
                 if ($isChatBusy || $isCallBusy) {
@@ -240,7 +244,15 @@ class CallService
                     $chargeAmount = min($unbilledBalance, $consumerWallet->balance);
                     if ($chargeAmount > 0) {
                         $this->walletService->deductForCall($session->consumer_id, $chargeAmount, $session->id);
-                        $this->walletService->creditProviderForCall($session->provider_id, $chargeAmount, $session->id);
+                        
+                        // Calculate astrologer share based on active offer or global fallback
+                        $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
+                        $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                        $pricing = $pricingCalculator->calculate($provider->astrologer, 'call');
+                        $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                        $creditAmount = round(($chargeAmount * $astrologerSharePct) / 100, 2);
+
+                        $this->walletService->creditProviderForCall($session->provider_id, $creditAmount, $session->id);
                     }
                 }
 

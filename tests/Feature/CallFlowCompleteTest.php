@@ -39,6 +39,8 @@ class CallFlowCompleteTest extends TestCase
             'user_id'             => $user->id,
             'call_rate_per_minute' => $callRate,
             'is_online'           => true,
+            'call_enabled'        => true,
+            'chat_enabled'        => true,
         ]);
         return $user;
     }

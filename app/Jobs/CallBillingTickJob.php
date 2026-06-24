@@ -53,8 +53,15 @@ class CallBillingTickJob implements ShouldQueue
                 // Perform debit (throws exception on failure)
                 $walletService->deductForCall($session->consumer_id, $session->rate_per_minute, $session->id);
 
+                // Calculate provider share based on active offer or global fallback
+                $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
+                $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                $pricing = $pricingCalculator->calculate($provider->astrologer, 'call');
+                $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                $creditAmount = round(($session->rate_per_minute * $astrologerSharePct) / 100, 2);
+
                 // Perform credit (throws exception on failure)
-                $walletService->creditProviderForCall($session->provider_id, $session->rate_per_minute, $session->id);
+                $walletService->creditProviderForCall($session->provider_id, $creditAmount, $session->id);
 
                 // Update session
                 $session->last_billed_at = now();
