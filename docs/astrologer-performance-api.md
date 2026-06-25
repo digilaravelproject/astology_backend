@@ -46,6 +46,11 @@ This API endpoint provides dynamic performance statistics for the authenticated 
       "total_users": 500,
       "loyal_users": 112,
       "loyal_user_level": 2
+    },
+    "today_progress": {
+      "target_hours": 8.0,
+      "completed_minutes": 120,
+      "remaining_hours": 6.0
     }
   }
 }
@@ -94,3 +99,8 @@ This API endpoint provides dynamic performance statistics for the authenticated 
      - `10 <= loyal_users < 50` -> **Level 2**
      - `50 <= loyal_users < 100` -> **Level 3**
      - `loyal_users >= 100` -> **Level 4**
+
+5. **Today's Progress (Daily Target)**:
+   - `target_hours`: Static daily online target (default: `8.0` hours).
+   - `completed_minutes`: Computed as the astrologer's total busy minutes today.
+   - `remaining_hours`: Calculated as `max(0.0, target_hours - (completed_minutes / 60))`.

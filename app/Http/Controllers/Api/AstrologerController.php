@@ -10,6 +10,7 @@ use App\Models\AstrologerReview;
 use App\Models\CallSession;
 use App\Models\ChatSession;
 use App\Models\Message;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\PricingCalculatorService;
 use Carbon\Carbon;
@@ -749,6 +750,11 @@ class AstrologerController extends Controller
                         'total_users' => $totalUsersCount,
                         'loyal_users' => $loyalUsersCount,
                         'loyal_user_level' => $loyalUserLevel,
+                    ],
+                    'today_progress' => [
+                        'target_hours' => (float) Setting::get('astrologer_daily_target_hours', 8.0),
+                        'completed_minutes' => round($busyMinsToday, 0),
+                        'remaining_hours' => round(max(0.0, (float) Setting::get('astrologer_daily_target_hours', 8.0) - (round($busyMinsToday, 0) / 60.0)), 1),
                     ],
                 ],
             ], 200);
