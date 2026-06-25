@@ -18,4 +18,5 @@ class StaticPageController extends Controller
     public function paymentPolicy()   { return $this->show('payment_policy'); }
     public function aboutUs()          { return $this->show('about_us'); }
     public function customerSupport()  { return $this->show('customer_support'); }
+    public function contactUs()         { return $this->show('contact_us'); }
 }

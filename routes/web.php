@@ -28,6 +28,7 @@ Route::prefix('page')->group(function () {
     Route::get('/payment-policy',     [StaticPageController::class, 'paymentPolicy'])->name('page.payment-policy');
     Route::get('/about-us',           [StaticPageController::class, 'aboutUs'])->name('page.about-us');
     Route::get('/customer-support',   [StaticPageController::class, 'customerSupport'])->name('page.customer-support');
+    Route::get('/contact-us',         [StaticPageController::class, 'contactUs'])->name('page.contact-us');
 });
 // Admin Routes
 Route::prefix('admin')->group(function () {
