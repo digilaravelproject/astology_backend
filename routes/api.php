@@ -57,6 +57,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
             Route::get('/orders', [AstrologerController::class, 'getOrders']);
+            Route::get('/performance', [AstrologerController::class, 'getPerformance']);
             
             Route::prefix('default-messages')->group(function () {
                 Route::get('/', [\App\Http\Controllers\Api\AstrologerDefaultMessageController::class, 'index']);

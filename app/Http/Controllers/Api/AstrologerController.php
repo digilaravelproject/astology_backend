@@ -2,9 +2,17 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Helpers\MediaHelper;
 use App\Http\Controllers\Controller;
 use App\Models\Astrologer;
 use App\Models\AstrologerCommunity;
+use App\Models\AstrologerReview;
+use App\Models\CallSession;
+use App\Models\ChatSession;
+use App\Models\Message;
+use App\Models\User;
+use App\Services\PricingCalculatorService;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,14 +33,14 @@ class AstrologerController extends Controller
                 'otherDetails',
                 'offers' => function ($q) {
                     $q->wherePivot('status', 'active')
-                      ->where('is_active', true)
-                      ->where(function ($query) {
-                          $query->whereNull('expires_at')
-                                ->orWhere('expires_at', '>', \Carbon\Carbon::now());
-                      });
-                }
+                        ->where('is_active', true)
+                        ->where(function ($query) {
+                            $query->whereNull('expires_at')
+                                ->orWhere('expires_at', '>', Carbon::now());
+                        });
+                },
             ])
-            ->withAvg('reviews', 'rating');
+                ->withAvg('reviews', 'rating');
 
             $type = $request->query('type', 'all');
             $minPrice = $request->query('min_price');
@@ -47,7 +55,7 @@ class AstrologerController extends Controller
             $user = Auth::guard('sanctum')->user();
 
             if ($type === 'favourite') {
-                if (!$user) {
+                if (! $user) {
                     return response()->json([
                         'status' => 'error',
                         'message' => 'Authentication is required to fetch favourite astrologers.',
@@ -70,7 +78,7 @@ class AstrologerController extends Controller
                 $query->where($priceColumn, '<=', (float) $maxPrice);
             }
 
-            if (!empty($skills)) {
+            if (! empty($skills)) {
                 $query->where(function ($query) use ($skills) {
                     foreach ($skills as $skill) {
                         $query->orWhereJsonContains('areas_of_expertise', $skill);
@@ -78,7 +86,7 @@ class AstrologerController extends Controller
                 });
             }
 
-            if (!empty($languages)) {
+            if (! empty($languages)) {
                 $query->where(function ($query) use ($languages) {
                     foreach ($languages as $language) {
                         $query->orWhereJsonContains('languages', $language);
@@ -97,14 +105,14 @@ class AstrologerController extends Controller
                 if ((int) $isOnline === 1) {
                     $query->where(function ($query) {
                         $query->where('is_chat_enabled', true)
-                              ->orWhere('is_call_enabled', true);
+                            ->orWhere('is_call_enabled', true);
                     });
                 }
             }
 
             if ($searchQuery) {
                 $query->whereHas('user', function ($query) use ($searchQuery) {
-                    $query->where('name', 'like', '%' . $searchQuery . '%');
+                    $query->where('name', 'like', '%'.$searchQuery.'%');
                 });
             }
 
@@ -130,20 +138,20 @@ class AstrologerController extends Controller
                     break;
             }
 
-            $activeChatProviders = \App\Models\ChatSession::whereIn('status', ['accepted', 'ongoing'])
+            $activeChatProviders = ChatSession::whereIn('status', ['accepted', 'ongoing'])
                 ->pluck('provider_id')
                 ->toArray();
-            $activeCallProviders = \App\Models\CallSession::whereIn('status', ['ringing', 'accepted', 'ongoing'])
+            $activeCallProviders = CallSession::whereIn('status', ['ringing', 'accepted', 'ongoing'])
                 ->pluck('provider_id')
                 ->toArray();
             $busyProviderIds = array_unique(array_merge($activeChatProviders, $activeCallProviders));
 
-            $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+            $pricingCalculator = app(PricingCalculatorService::class);
             $astrologers = $query->get()->map(function ($astrologer) use ($busyProviderIds, $pricingCalculator) {
                 // Eager loaded avg rating
                 $avgRating = $astrologer->reviews_avg_rating;
                 $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
-                
+
                 // Get availability flags from astrologers table
                 $astrologer->is_online = (bool) ($astrologer->is_chat_enabled || $astrologer->is_call_enabled);
                 $astrologer->is_chat_enabled = (bool) $astrologer->is_chat_enabled;
@@ -174,12 +182,12 @@ class AstrologerController extends Controller
                         'id' => $activeOffer->id,
                         'name' => $activeOffer->name,
                         'discount_percentage' => (float) $activeOffer->discount_percentage,
-                        'expires_at' => $activeOffer->expires_at ? $activeOffer->expires_at->toDateTimeString() : null
+                        'expires_at' => $activeOffer->expires_at ? $activeOffer->expires_at->toDateTimeString() : null,
                     ];
                 } else {
                     $astrologer->offer_details = null;
                 }
-                
+
                 return $astrologer;
             });
 
@@ -190,7 +198,7 @@ class AstrologerController extends Controller
                 ],
             ], 200);
         } catch (\Exception $e) {
-            Log::error('Astrologer index error: ' . $e->getMessage());
+            Log::error('Astrologer index error: '.$e->getMessage());
 
             return response()->json([
                 'status' => 'error',
@@ -225,11 +233,11 @@ class AstrologerController extends Controller
     private function normalizeArrayQueryParam(mixed $value): array
     {
         if (is_array($value)) {
-            return array_values(array_filter(array_map('trim', $value), fn($item) => $item !== ''));
+            return array_values(array_filter(array_map('trim', $value), fn ($item) => $item !== ''));
         }
 
         if (is_string($value)) {
-            return array_values(array_filter(array_map('trim', explode(',', $value)), fn($item) => $item !== ''));
+            return array_values(array_filter(array_map('trim', explode(',', $value)), fn ($item) => $item !== ''));
         }
 
         return [];
@@ -247,15 +255,15 @@ class AstrologerController extends Controller
                 'otherDetails',
                 'offers' => function ($q) {
                     $q->wherePivot('status', 'active')
-                      ->where('is_active', true)
-                      ->where(function ($query) {
-                          $query->whereNull('expires_at')
-                                ->orWhere('expires_at', '>', \Carbon\Carbon::now());
-                      });
-                }
+                        ->where('is_active', true)
+                        ->where(function ($query) {
+                            $query->whereNull('expires_at')
+                                ->orWhere('expires_at', '>', Carbon::now());
+                        });
+                },
             ])->find($id);
 
-            if (!$astrologer) {
+            if (! $astrologer) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Astrologer not found.',
@@ -263,7 +271,7 @@ class AstrologerController extends Controller
             }
 
             // Dynamic Pricing Calculation
-            $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+            $pricingCalculator = app(PricingCalculatorService::class);
             $chatPricing = $pricingCalculator->calculate($astrologer, 'chat');
             $callPricing = $pricingCalculator->calculate($astrologer, 'call');
 
@@ -281,22 +289,22 @@ class AstrologerController extends Controller
                     'id' => $activeOffer->id,
                     'name' => $activeOffer->name,
                     'discount_percentage' => (float) $activeOffer->discount_percentage,
-                    'expires_at' => $activeOffer->expires_at ? $activeOffer->expires_at->toDateTimeString() : null
+                    'expires_at' => $activeOffer->expires_at ? $activeOffer->expires_at->toDateTimeString() : null,
                 ];
             } else {
                 $astrologer->offer_details = null;
             }
 
             // Calculate dynamic average rating from reviews
-            $avgRating = \App\Models\AstrologerReview::where('astrologer_id', $astrologer->id)
+            $avgRating = AstrologerReview::where('astrologer_id', $astrologer->id)
                 ->avg('rating');
             $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
 
             // Calculate dynamic busy status
-            $isChatBusy = \App\Models\ChatSession::where('provider_id', $astrologer->user_id)
+            $isChatBusy = ChatSession::where('provider_id', $astrologer->user_id)
                 ->whereIn('status', ['accepted', 'ongoing'])
                 ->exists();
-            $isCallBusy = \App\Models\CallSession::where('provider_id', $astrologer->user_id)
+            $isCallBusy = CallSession::where('provider_id', $astrologer->user_id)
                 ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                 ->exists();
             $isBusy = $isChatBusy || $isCallBusy;
@@ -326,7 +334,8 @@ class AstrologerController extends Controller
                 ],
             ], 200);
         } catch (\Exception $e) {
-            Log::error('Astrologer show error: ' . $e->getMessage());
+            Log::error('Astrologer show error: '.$e->getMessage());
+
             return response()->json(['status' => 'error', 'message' => 'Failed to fetch astrologer details.'], 500);
         }
     }
@@ -338,7 +347,7 @@ class AstrologerController extends Controller
     {
         try {
             $user = Auth::user();
-            if (!$user || $user->user_type !== 'astrologer') {
+            if (! $user || $user->user_type !== 'astrologer') {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthorized access.',
@@ -349,7 +358,7 @@ class AstrologerController extends Controller
 
             $statusFilter = $request->query('status'); // e.g. waiting, pending, completed, rejected, cancelled
             $typeFilter = $request->query('type'); // e.g. chat, call
-            
+
             // Map common requested terms to db status
             $dbStatusMap = [
                 'waiting' => ['waiting', 'initiated'],
@@ -378,7 +387,7 @@ class AstrologerController extends Controller
                     'rate_per_minute',
                     'total_cost',
                     'created_at',
-                    'updated_at'
+                    'updated_at',
                 ])
                 ->where('provider_id', $astrologerUserId);
 
@@ -396,7 +405,7 @@ class AstrologerController extends Controller
                     'rate_per_minute',
                     'total_cost',
                     'created_at',
-                    'updated_at'
+                    'updated_at',
                 ])
                 ->where('provider_id', $astrologerUserId);
 
@@ -430,14 +439,14 @@ class AstrologerController extends Controller
 
             // Fetch Consumers in a single query
             $consumerIds = $results->pluck('consumer_id')->unique()->toArray();
-            $consumers = \App\Models\User::whereIn('id', $consumerIds)->get()->keyBy('id');
+            $consumers = User::whereIn('id', $consumerIds)->get()->keyBy('id');
 
             // Fetch Latest Message for Chat Sessions in a single query
             $chatSessionIds = $results->where('type', 'chat')->pluck('id')->toArray();
             $latestMessages = [];
-            if (!empty($chatSessionIds)) {
-                $latestMessages = \App\Models\Message::whereIn('chat_session_id', $chatSessionIds)
-                    ->whereIn('id', function($query) {
+            if (! empty($chatSessionIds)) {
+                $latestMessages = Message::whereIn('chat_session_id', $chatSessionIds)
+                    ->whereIn('id', function ($query) {
                         $query->select(\Illuminate\Support\Facades\DB::raw('MAX(id)'))
                             ->from('messages')
                             ->groupBy('chat_session_id');
@@ -465,18 +474,18 @@ class AstrologerController extends Controller
                     ->get();
 
                 foreach ($allWaiting as $index => $wItem) {
-                    $waitingPositions[$wItem->type . '_' . $wItem->id] = $index + 1;
+                    $waitingPositions[$wItem->type.'_'.$wItem->id] = $index + 1;
                 }
             }
 
             // Format order collection
             $formattedOrders = $results->map(function ($item) use ($consumers, $latestMessages, $waitingPositions) {
                 $consumer = $consumers->get($item->consumer_id);
-                
+
                 // Calculate queue priority dynamically if waiting
                 $queuePosition = null;
                 if ($item->status === 'waiting') {
-                    $key = $item->type . '_' . $item->id;
+                    $key = $item->type.'_'.$item->id;
                     $queuePosition = $waitingPositions[$key] ?? 1;
                 }
 
@@ -485,7 +494,7 @@ class AstrologerController extends Controller
                     'order_id' => $item->id,
                     'user_id' => $item->consumer_id,
                     'user_name' => $consumer->name ?? 'User',
-                    'user_profile_image' => $consumer ? \App\Helpers\MediaHelper::getUrl($consumer->profile_photo) : null,
+                    'user_profile_image' => $consumer ? MediaHelper::getUrl($consumer->profile_photo) : null,
                     'request_type' => $item->type,
                     'status' => $item->status,
                     'requested_at' => $item->created_at,
@@ -510,16 +519,247 @@ class AstrologerController extends Controller
                         'per_page' => (int) $perPage,
                         'current_page' => (int) $page,
                         'last_page' => (int) ceil($total / $perPage),
-                    ]
-                ]
+                    ],
+                ],
             ], 200);
 
         } catch (\Exception $e) {
-            Log::error('Astrologer getOrders error: ' . $e->getMessage());
+            Log::error('Astrologer getOrders error: '.$e->getMessage());
 
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to fetch order history.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Get dynamic performance metrics for the authenticated astrologer.
+     */
+    public function getPerformance(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+            $astrologer = $user->astrologer;
+
+            if (! $astrologer) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Astrologer profile not found.',
+                ], 404);
+            }
+
+            $astrologerId = $astrologer->id;
+            $userId = $user->id;
+
+            // 1. Profile Badge (Rising Star, Top Choice, Celebrity)
+            $totalBusyMinutes = $astrologer->total_busy_minutes;
+            if ($totalBusyMinutes < 1000) {
+                $badgeType = 'Rising Star';
+            } elseif ($totalBusyMinutes < 5000) {
+                $badgeType = 'Top Choice';
+            } else {
+                $badgeType = 'Celebrity';
+            }
+
+            // 2. Today's Profile Health (Stats for today)
+            $today = Carbon::today();
+
+            $todayCallsCount = CallSession::where('provider_id', $userId)
+                ->whereDate('created_at', $today)
+                ->count();
+            $todayChatsCount = ChatSession::where('provider_id', $userId)
+                ->whereDate('created_at', $today)
+                ->count();
+            $totalSessionsToday = $todayCallsCount + $todayChatsCount;
+
+            $missedCallsToday = CallSession::where('provider_id', $userId)
+                ->whereDate('created_at', $today)
+                ->whereIn('status', ['missed', 'failed', 'rejected'])
+                ->count();
+            $missedChatsToday = ChatSession::where('provider_id', $userId)
+                ->whereDate('created_at', $today)
+                ->whereIn('status', ['rejected'])
+                ->count();
+            $missedSessionsToday = $missedCallsToday + $missedChatsToday;
+
+            $callRate = (float) ($astrologer->call_rate_per_minute ?? 0);
+            $chatRate = (float) ($astrologer->chat_rate_per_minute ?? 0);
+            $revenueLossToday = ($missedCallsToday * $callRate * 5) + ($missedChatsToday * $chatRate * 5);
+
+            // 3. Availability and Busy Minutes
+            $busyMinsToday = (float) (CallSession::where('provider_id', $userId)
+                ->whereIn('status', ['completed', 'approved'])
+                ->whereDate('created_at', $today)
+                ->sum('duration_seconds') +
+                ChatSession::where('provider_id', $userId)
+                    ->whereIn('status', ['completed', 'approved'])
+                    ->whereDate('created_at', $today)
+                    ->sum('duration_seconds')) / 60;
+
+            $sevenDaysAgo = Carbon::today()->subDays(6);
+            $busyMins7Days = (float) (CallSession::where('provider_id', $userId)
+                ->whereIn('status', ['completed', 'approved'])
+                ->where('created_at', '>=', $sevenDaysAgo)
+                ->sum('duration_seconds') +
+                ChatSession::where('provider_id', $userId)
+                    ->whereIn('status', ['completed', 'approved'])
+                    ->where('created_at', '>=', $sevenDaysAgo)
+                    ->sum('duration_seconds')) / 60;
+
+            $thirtyDaysAgo = Carbon::today()->subDays(29);
+            $busyMins30Days = (float) (CallSession::where('provider_id', $userId)
+                ->whereIn('status', ['completed', 'approved'])
+                ->where('created_at', '>=', $thirtyDaysAgo)
+                ->sum('duration_seconds') +
+                ChatSession::where('provider_id', $userId)
+                    ->whereIn('status', ['completed', 'approved'])
+                    ->where('created_at', '>=', $thirtyDaysAgo)
+                    ->sum('duration_seconds')) / 60;
+
+            $availability = $astrologer->availability ?? [];
+
+            $getScheduledMinutesForDay = function ($dayName) use ($availability) {
+                $dayName = strtolower($dayName);
+                foreach ($availability as $entry) {
+                    if (isset($entry['day']) && strtolower($entry['day']) === $dayName && ! empty($entry['enabled'])) {
+                        $mins = 0;
+                        if (isset($entry['slots']) && is_array($entry['slots'])) {
+                            foreach ($entry['slots'] as $slot) {
+                                if (! empty($slot['start']) && ! empty($slot['end'])) {
+                                    try {
+                                        $start = Carbon::createFromFormat('H:i', $slot['start']);
+                                        $end = Carbon::createFromFormat('H:i', $slot['end']);
+                                        if ($end->greaterThan($start)) {
+                                            $mins += $end->diffInMinutes($start);
+                                        }
+                                    } catch (\Exception $e) {
+                                        // Ignore malformed time slots
+                                    }
+                                }
+                            }
+                        }
+
+                        return $mins;
+                    }
+                }
+
+                return 0;
+            };
+
+            $todayDayName = strtolower(Carbon::today()->format('l'));
+            $availableMinsToday = $getScheduledMinutesForDay($todayDayName);
+
+            $availableMins7Days = 0;
+            for ($i = 0; $i < 7; $i++) {
+                $dayName = strtolower(Carbon::today()->subDays($i)->format('l'));
+                $availableMins7Days += $getScheduledMinutesForDay($dayName);
+            }
+
+            $availableMins30Days = 0;
+            for ($i = 0; $i < 30; $i++) {
+                $dayName = strtolower(Carbon::today()->subDays($i)->format('l'));
+                $availableMins30Days += $getScheduledMinutesForDay($dayName);
+            }
+
+            // 4. Loyal User Conversion
+            $callUsers = CallSession::where('provider_id', $userId)
+                ->pluck('consumer_id')
+                ->toArray();
+            $chatUsers = ChatSession::where('provider_id', $userId)
+                ->pluck('consumer_id')
+                ->toArray();
+            $allUsers = array_unique(array_merge($callUsers, $chatUsers));
+            $totalUsersCount = count($allUsers);
+
+            $completedCalls = CallSession::where('provider_id', $userId)
+                ->whereIn('status', ['completed', 'approved'])
+                ->select('consumer_id', DB::raw('count(*) as total'))
+                ->groupBy('consumer_id')
+                ->get()
+                ->pluck('total', 'consumer_id')
+                ->toArray();
+
+            $completedChats = ChatSession::where('provider_id', $userId)
+                ->whereIn('status', ['completed', 'approved'])
+                ->select('consumer_id', \DB::raw('count(*) as total'))
+                ->groupBy('consumer_id')
+                ->get()
+                ->pluck('total', 'consumer_id')
+                ->toArray();
+
+            $userSessionCounts = [];
+            foreach ($completedCalls as $cId => $count) {
+                $userSessionCounts[$cId] = ($userSessionCounts[$cId] ?? 0) + $count;
+            }
+            foreach ($completedChats as $cId => $count) {
+                $userSessionCounts[$cId] = ($userSessionCounts[$cId] ?? 0) + $count;
+            }
+
+            $loyalUsersCount = 0;
+            foreach ($userSessionCounts as $cId => $count) {
+                if ($count >= 2) {
+                    $loyalUsersCount++;
+                }
+            }
+
+            $loyalUserConversionRate = $totalUsersCount > 0
+                ? round(($loyalUsersCount / $totalUsersCount) * 100, 1)
+                : 0.0;
+
+            if ($loyalUsersCount < 10) {
+                $loyalUserLevel = 1;
+            } elseif ($loyalUsersCount < 50) {
+                $loyalUserLevel = 2;
+            } elseif ($loyalUsersCount < 100) {
+                $loyalUserLevel = 3;
+            } else {
+                $loyalUserLevel = 4;
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Astrologer performance data retrieved successfully.',
+                'data' => [
+                    'badge_type' => $badgeType,
+                    'profile_health' => [
+                        'date' => Carbon::today()->format('d F Y'),
+                        'total_sessions' => $totalSessionsToday,
+                        'missed_sessions' => $missedSessionsToday,
+                        'revenue_loss' => round($revenueLossToday, 2),
+                        'missed_calls' => $missedCallsToday,
+                        'missed_chats' => $missedChatsToday,
+                        'loyal_users' => $loyalUsersCount,
+                    ],
+                    'availability' => [
+                        'available_mins' => [
+                            'today' => round($availableMinsToday, 0),
+                            'seven_days' => round($availableMins7Days, 0),
+                            'thirty_days' => round($availableMins30Days, 0),
+                        ],
+                        'busy_mins' => [
+                            'today' => round($busyMinsToday, 0),
+                            'seven_days' => round($busyMins7Days, 0),
+                            'thirty_days' => round($busyMins30Days, 0),
+                        ],
+                    ],
+                    'loyal_user_conversion' => [
+                        'conversion_percentage' => $loyalUserConversionRate,
+                        'total_users' => $totalUsersCount,
+                        'loyal_users' => $loyalUsersCount,
+                        'loyal_user_level' => $loyalUserLevel,
+                    ],
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            Log::error('Astrologer getPerformance error: '.$e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch performance data.',
             ], 500);
         }
     }
