@@ -19,6 +19,12 @@
         </p>
     </div>
     <div class="flex gap-2">
+        @if($page->is_active)
+            <a href="{{ route(str_replace('_', '-', 'page.' . $page->type)) }}" target="_blank"
+               class="px-4 py-2 bg-info text-white rounded-lg hover:bg-info-dark transition-all">
+                <i class="fas fa-external-link-alt mr-2"></i> View Live
+            </a>
+        @endif
         <a href="{{ route('admin.static_pages.edit', $page->id) }}" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-all">
             <i class="fas fa-edit mr-2"></i> Edit
         </a>
