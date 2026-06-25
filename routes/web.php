@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\GiftController;
 use App\Http\Controllers\Admin\GiftTransactionController;
 use App\Http\Controllers\Admin\FeedbackController;
 use App\Http\Controllers\Admin\RateLimitController;
+use App\Http\Controllers\StaticPageController;
 
 Route::get('/', function () {
     // return view('welcome');
@@ -17,6 +18,16 @@ Route::get('/', function () {
 
 Route::get('/admin', function () {
     return redirect()->route('admin.login');
+});
+
+// Public Static Pages
+Route::prefix('page')->group(function () {
+    Route::get('/faq',                [StaticPageController::class, 'faq'])->name('page.faq');
+    Route::get('/privacy-policy',     [StaticPageController::class, 'privacyPolicy'])->name('page.privacy-policy');
+    Route::get('/terms-and-conditions', [StaticPageController::class, 'termsConditions'])->name('page.terms-and-conditions');
+    Route::get('/payment-policy',     [StaticPageController::class, 'paymentPolicy'])->name('page.payment-policy');
+    Route::get('/about-us',           [StaticPageController::class, 'aboutUs'])->name('page.about-us');
+    Route::get('/customer-support',   [StaticPageController::class, 'customerSupport'])->name('page.customer-support');
 });
 // Admin Routes
 Route::prefix('admin')->group(function () {
