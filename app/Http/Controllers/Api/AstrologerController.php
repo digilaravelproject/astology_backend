@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
@@ -374,10 +375,10 @@ class AstrologerController extends Controller
             }
 
             // Chat subquery
-            $chats = \Illuminate\Support\Facades\DB::table('chat_sessions')
+            $chats = DB::table('chat_sessions')
                 ->select([
                     'id',
-                    \Illuminate\Support\Facades\DB::raw("'chat' as type"),
+                    DB::raw("'chat' as type"),
                     'consumer_id',
                     'provider_id',
                     'status',
@@ -392,10 +393,10 @@ class AstrologerController extends Controller
                 ->where('provider_id', $astrologerUserId);
 
             // Call subquery
-            $calls = \Illuminate\Support\Facades\DB::table('call_sessions')
+            $calls = DB::table('call_sessions')
                 ->select([
                     'id',
-                    \Illuminate\Support\Facades\DB::raw("'call' as type"),
+                    DB::raw("'call' as type"),
                     'consumer_id',
                     'provider_id',
                     'status',
@@ -423,7 +424,7 @@ class AstrologerController extends Controller
                 $unionQuery = $chats->unionAll($calls);
             }
 
-            $total = \Illuminate\Support\Facades\DB::table(\Illuminate\Support\Facades\DB::raw("({$unionQuery->toSql()}) as merged"))
+            $total = DB::table(DB::raw("({$unionQuery->toSql()}) as merged"))
                 ->mergeBindings($unionQuery)
                 ->count();
 
@@ -431,7 +432,7 @@ class AstrologerController extends Controller
             $page = $request->query('page', 1);
             $sortOrder = (strtolower($statusFilter) === 'waiting') ? 'asc' : 'desc';
 
-            $results = \Illuminate\Support\Facades\DB::table(\Illuminate\Support\Facades\DB::raw("({$unionQuery->toSql()}) as merged"))
+            $results = DB::table(DB::raw("({$unionQuery->toSql()}) as merged"))
                 ->mergeBindings($unionQuery)
                 ->orderBy('created_at', $sortOrder)
                 ->forPage($page, $perPage)
@@ -447,7 +448,7 @@ class AstrologerController extends Controller
             if (! empty($chatSessionIds)) {
                 $latestMessages = Message::whereIn('chat_session_id', $chatSessionIds)
                     ->whereIn('id', function ($query) {
-                        $query->select(\Illuminate\Support\Facades\DB::raw('MAX(id)'))
+                        $query->select(DB::raw('MAX(id)'))
                             ->from('messages')
                             ->groupBy('chat_session_id');
                     })
@@ -459,13 +460,13 @@ class AstrologerController extends Controller
             $waitingPositions = [];
             $hasWaiting = $results->contains('status', 'waiting');
             if ($hasWaiting) {
-                $waitingChats = \Illuminate\Support\Facades\DB::table('chat_sessions')
-                    ->select(['id', 'created_at', \Illuminate\Support\Facades\DB::raw("'chat' as type")])
+                $waitingChats = DB::table('chat_sessions')
+                    ->select(['id', 'created_at', DB::raw("'chat' as type")])
                     ->where('provider_id', $astrologerUserId)
                     ->where('status', 'waiting');
 
-                $waitingCalls = \Illuminate\Support\Facades\DB::table('call_sessions')
-                    ->select(['id', 'created_at', \Illuminate\Support\Facades\DB::raw("'call' as type")])
+                $waitingCalls = DB::table('call_sessions')
+                    ->select(['id', 'created_at', DB::raw("'call' as type")])
                     ->where('provider_id', $astrologerUserId)
                     ->where('status', 'waiting');
 
@@ -682,7 +683,7 @@ class AstrologerController extends Controller
 
             $completedChats = ChatSession::where('provider_id', $userId)
                 ->whereIn('status', ['completed', 'approved'])
-                ->select('consumer_id', \DB::raw('count(*) as total'))
+                ->select('consumer_id', DB::raw('count(*) as total'))
                 ->groupBy('consumer_id')
                 ->get()
                 ->pluck('total', 'consumer_id')
