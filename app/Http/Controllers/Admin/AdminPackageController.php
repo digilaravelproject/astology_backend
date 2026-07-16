@@ -23,8 +23,9 @@ class AdminPackageController extends Controller
         $astrologers = User::where('user_type', 'astrologer')->get();
         $astrologerPackages = AstrologerPackage::with('astrologer')->get();
         $purchases = PackagePurchase::with(['user', 'astrologer'])->latest()->paginate(15);
+        $globalPackageCommissionRate = \App\Models\Setting::get('global_package_commission_rate', 50.00);
 
-        return view('admin.packages.index', compact('packages', 'astrologers', 'astrologerPackages', 'purchases'));
+        return view('admin.packages.index', compact('packages', 'astrologers', 'astrologerPackages', 'purchases', 'globalPackageCommissionRate'));
     }
 
     /**

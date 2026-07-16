@@ -154,7 +154,7 @@
                                         @if(!is_null($ap->commission_percentage))
                                             <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold rounded-lg">{{ $ap->commission_percentage }}% (Astro Share)</span>
                                         @else
-                                            <span class="text-xs text-text-muted">Global Fallback (50%)</span>
+                                            <span class="text-xs text-text-muted">Global Fallback ({{ $globalPackageCommissionRate }}%)</span>
                                         @endif
                                     </td>
                                     <td class="py-4 px-4 text-right space-x-2">
