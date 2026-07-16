@@ -83,7 +83,16 @@ class CallService
 
                 // Check minimum balance (5 minutes minimum to start)
                 $balance = $this->walletService->getBalance($consumerId);
-                if ($balance < $rate * 5) {
+
+                // Skip minimum balance check if user has an active prepaid package with this astrologer.
+                // Package users have already pre-paid, so wallet check is not applicable.
+                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $consumerId)
+                    ->where('astrologer_id', $providerId)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
+
+                if (!$hasActivePackage && $balance < $rate * 5) {
                     throw new Exception("Insufficient balance. You need minimum " . ($rate * 5) . " in your wallet to start this call.");
                 }
 
@@ -150,8 +159,17 @@ class CallService
                 $this->presenceService->setBusy($session->consumer_id, $sessionId);
                 $this->presenceService->setBusy($providerId, $sessionId);
                 
-                // Start billing ticker (delayed by 1 minute)
-                CallBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
+                // Start billing ticker ONLY if consumer does NOT have an active prepaid package for this astrologer.
+                // If an active package purchase exists, billing is prepaid — no per-minute tick needed.
+                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
+                    ->where('astrologer_id', $session->provider_id)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
+
+                if (!$hasActivePackage) {
+                    CallBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
+                }
                 
                 $session->refresh();
                 return $session;

@@ -276,6 +276,13 @@ Route::prefix('v1')->group(function () {
             Route::post('/{sessionId}/sync-status', [ChatController::class, 'syncStatus']);
             Route::get('/{sessionId}/messages', [ChatController::class, 'getMessages']);
         });
+
+        Route::prefix('packages')->group(function () {
+            Route::post('/purchase', [\App\Http\Controllers\Api\PackageSessionController::class, 'purchase']);
+            Route::get('/active-status', [\App\Http\Controllers\Api\PackageSessionController::class, 'activeStatus']);
+            Route::post('/session/start', [\App\Http\Controllers\Api\PackageSessionController::class, 'startSession']);
+            Route::post('/session/end', [\App\Http\Controllers\Api\PackageSessionController::class, 'endSession']);
+        });
     });
 
     /*

@@ -31,5 +31,8 @@ class AppServiceProvider extends ServiceProvider
             \Illuminate\Broadcasting\Events\PresenceChannelMemberLeft::class,
             [\App\Services\PresenceService::class, 'handleMemberLeft']
         );
+
+        // Register Astrologer model observer
+        \App\Models\Astrologer::observe(\App\Observers\AstrologerObserver::class);
     }
 }

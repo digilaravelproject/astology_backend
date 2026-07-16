@@ -212,6 +212,14 @@ Route::prefix('admin')->group(function () {
         Route::resource('offers', \App\Http\Controllers\Admin\OfferController::class)->names('admin.offers');
         Route::post('offers/{offer}/toggle-status', [\App\Http\Controllers\Admin\OfferController::class, 'toggleStatus'])->name('admin.offers.toggle-status');
 
+        // Packages Management
+        Route::get('packages', [\App\Http\Controllers\Admin\AdminPackageController::class, 'index'])->name('admin.packages.index');
+        Route::post('packages', [\App\Http\Controllers\Admin\AdminPackageController::class, 'store'])->name('admin.packages.store');
+        Route::put('packages/{id}', [\App\Http\Controllers\Admin\AdminPackageController::class, 'update'])->name('admin.packages.update');
+        Route::delete('packages/{id}', [\App\Http\Controllers\Admin\AdminPackageController::class, 'destroy'])->name('admin.packages.destroy');
+        Route::post('packages/assign', [\App\Http\Controllers\Admin\AdminPackageController::class, 'assignToAstrologer'])->name('admin.packages.assign');
+        Route::delete('packages/override/{id}', [\App\Http\Controllers\Admin\AdminPackageController::class, 'removeOverride'])->name('admin.packages.remove-override');
+
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
     });
 });

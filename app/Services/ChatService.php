@@ -88,7 +88,16 @@ class ChatService
                 $rate = $pricing['customer_rate'];
                 
                 $balance = $this->walletService->getBalance($consumerId);
-                if ($balance < $rate * 5) {
+
+                // Skip minimum balance check if user has an active prepaid package with this astrologer.
+                // Package users have already pre-paid, so wallet check is not applicable.
+                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $consumerId)
+                    ->where('astrologer_id', $providerId)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
+
+                if (!$hasActivePackage && $balance < $rate * 5) {
                     throw new Exception("Insufficient balance. Minimum 5 minutes required (" . ($rate * 5) . ").");
                 }
 
@@ -200,8 +209,17 @@ class ChatService
 
                 }
                 
-                // Start billing ticker (delayed by 1 minute)
-                ChatBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
+                // Start billing ticker ONLY if consumer does NOT have an active prepaid package for this astrologer.
+                // If an active package purchase exists, billing is prepaid — no per-minute tick needed.
+                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
+                    ->where('astrologer_id', $session->provider_id)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
+
+                if (!$hasActivePackage) {
+                    ChatBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
+                }
                 
                 $session->refresh();
                 $session->setRelation('consumer', $consumer);
