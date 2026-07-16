@@ -43,7 +43,7 @@ class AdminPackageController extends Controller
             Package::create([
                 'name' => $data['name'],
                 'default_amount' => $data['default_amount'],
-                'default_duration' => $data['default_duration'],
+                'default_duration' => (int) ($data['default_duration_minutes'] * 60), // Convert to seconds
                 'is_default' => $request->boolean('is_default'),
             ]);
 
@@ -74,7 +74,7 @@ class AdminPackageController extends Controller
             $package->update([
                 'name' => $data['name'],
                 'default_amount' => $data['default_amount'],
-                'default_duration' => $data['default_duration'],
+                'default_duration' => (int) ($data['default_duration_minutes'] * 60), // Convert to seconds
                 'is_default' => $request->boolean('is_default'),
             ]);
 
@@ -122,7 +122,7 @@ class AdminPackageController extends Controller
                 ['astrologer_id' => $data['astrologer_id']],
                 [
                     'amount' => $data['amount'],
-                    'duration' => $data['duration'],
+                    'duration' => (int) ($data['duration_minutes'] * 60), // Convert to seconds
                     'commission_percentage' => $data['commission_percentage'],
                 ]
             );

@@ -25,7 +25,7 @@ class AdminAssignPackageRequest extends FormRequest
                 }
             ],
             'amount' => 'required|numeric|min:0',
-            'duration' => 'required|integer|min:1', // in seconds
+            'duration_minutes' => 'required|numeric|min:0.1', // duration in minutes
             'commission_percentage' => 'nullable|numeric|min:0|max:100',
         ];
     }

@@ -1,6 +1,6 @@
 # Package Session API — Flutter Integration Spec
 
-**Version**: 2.0 *(Updated after Chat/Call integration fix)*
+**Version**: 2.1 *(Updated after Chat/Call integration and unit updates)*
 **Base URL**: `https://your-domain.com/api/v1`
 **Authentication**: Bearer Token via `Authorization: Bearer <token>`
 **Content-Type**: `application/json`
@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Prepaid Package Session system allows a **user (consumer)** to purchase a fixed time block (in seconds) with a specific **astrologer**, then consume that time across multiple sequential sub-sessions of type `chat` or `call`. Billing is purely prepaid — **no per-minute wallet tick** occurs during an active package session.
+The Prepaid Package Session system allows a **user (consumer)** to purchase a fixed time block with a specific **astrologer**, then consume that time across multiple sequential sub-sessions of type `chat` or `call`. Billing is purely prepaid — **no per-minute wallet tick** occurs during an active package session.
 
 ```
 User purchases package
@@ -19,7 +19,7 @@ User purchases package
       → Astrologer calls existing POST /chat/{id}/accept
       → Chat messages work via existing endpoints (no billing tick)
   → POST /packages/session/end
-      → Deducts elapsed seconds from package
+      → Deducts elapsed duration from package
       → Ends the linked ChatSession automatically
   → POST /packages/session/start (mode=call)
       → Creates real CallSession internally
@@ -34,10 +34,10 @@ User purchases package
 
 | Concept | Description |
 |---|---|
-| `PackagePurchase` | Upfront purchase binding user ↔ astrologer with total/remaining seconds |
+| `PackagePurchase` | Upfront purchase binding user ↔ astrologer with total/remaining duration |
 | `PackageSubSession` | Timer record for one chat or call run under the package |
 | `ChatSession` / `CallSession` | Real chat/call session — created internally when sub-session starts |
-| `remaining_duration` | Seconds left in the package. Updated on every sub-session end |
+| `remaining_duration` | Time left in the package. Updated on every sub-session end |
 | `status: exhausted` | Package fully consumed. No further sub-sessions allowed |
 
 ---
@@ -481,6 +481,8 @@ class PackageSessionListener {
 
 ### 6.5 Countdown Timer Widget
 
+Shows minutes remaining in the UI but computes based on seconds internally.
+
 ```dart
 class PackageTimerWidget extends StatefulWidget {
   final int remainingSeconds;
@@ -518,10 +520,9 @@ class _PackageTimerWidgetState extends State<PackageTimerWidget> {
   }
 
   String get _formatted {
-    final h = _seconds ~/ 3600;
-    final m = (_seconds % 3600) ~/ 60;
+    final m = _seconds ~/ 60;
     final s = _seconds % 60;
-    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')} mins';
   }
 
   @override
@@ -545,8 +546,8 @@ class PackagePurchase {
   final int id;
   final int userId;
   final int astrologerId;
-  final int totalDuration;
-  final int remainingDuration;
+  final int totalDuration; // total seconds (API)
+  final int remainingDuration; // remaining seconds (API)
   final double purchasePrice;
   final String status; // 'active' | 'exhausted'
   final DateTime createdAt;
@@ -570,7 +571,7 @@ class PackageSubSession {
   final int? callSessionId; // linked CallSession.id — use for call/Agora token
   final DateTime startedAt;
   final DateTime? endedAt;
-  final int durationUsed;
+  final int durationUsed; // seconds used (API)
 
   PackageSubSession.fromJson(Map<String, dynamic> json)
       : id = json['id'],
@@ -622,7 +623,7 @@ class CallSession {
   ├─ POST /packages/purchase
   │
   ▼
-[PACKAGE ACTIVE — remaining_duration: 3600s]
+[PACKAGE ACTIVE — remaining_duration: 3600s / 60 mins]
   │
   ├─ POST /packages/session/start { mode: "chat", question: "..." }
   │     → Creates PackageSubSession (timer starts)
@@ -644,11 +645,11 @@ class CallSession {
   │  Read receipts via existing: POST /chat/{id}/read
   │
   ├─ POST /packages/session/end { sub_session_id: 4 }
-  │     → Deducts elapsed seconds from remaining_duration
+  │     → Deducts elapsed duration from remaining_duration
   │     → Auto-calls ChatService::endChat() internally
   │
   ▼
-[CHAT ENDED] ──── WS: PackageSubSessionEnded (remaining: 2400s)
+[CHAT ENDED] ──── WS: PackageSubSessionEnded (remaining: 2400s / 40 mins)
   │
   ├─ POST /packages/session/start { mode: "call" }
   │     → Creates CallSession internally (status: initiated)
@@ -688,4 +689,4 @@ class CallSession {
 
 ---
 
-*Updated: 2026-07-16 v2.0 · astology_backend — reflects Chat/Call integration fix*
+*Updated: 2026-07-16 v2.1 · astology_backend — reflects Chat/Call integration and currency/unit corrections*

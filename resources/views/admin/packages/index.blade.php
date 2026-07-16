@@ -81,8 +81,8 @@
                             @forelse($packages as $package)
                                 <tr class="border-b border-gray-50 hover:bg-light/10 transition-all">
                                     <td class="py-4 px-4 text-sm font-semibold text-text-primary">{{ $package->name }}</td>
-                                    <td class="py-4 px-4 text-sm text-text-secondary">${{ number_format($package->default_amount, 2) }}</td>
-                                    <td class="py-4 px-4 text-sm text-text-secondary">{{ number_format($package->default_duration / 60, 1) }} mins ({{ $package->default_duration }}s)</td>
+                                    <td class="py-4 px-4 text-sm text-text-secondary">{{ number_format($package->default_amount, 2) }}</td>
+                                    <td class="py-4 px-4 text-sm text-text-secondary">{{ number_format($package->default_duration / 60, 1) }} mins</td>
                                     <td class="py-4 px-4">
                                         @if($package->is_default)
                                             <span class="px-2.5 py-1 bg-green-50 text-green-700 text-xs font-bold rounded-lg border border-green-100">Default Package</span>
@@ -148,8 +148,8 @@
                             @forelse($astrologerPackages as $ap)
                                 <tr class="border-b border-gray-50 hover:bg-light/10 transition-all">
                                     <td class="py-4 px-4 text-sm font-semibold text-text-primary">{{ $ap->astrologer->name }}</td>
-                                    <td class="py-4 px-4 text-sm text-text-secondary">${{ number_format($ap->amount, 2) }}</td>
-                                    <td class="py-4 px-4 text-sm text-text-secondary">{{ number_format($ap->duration / 60, 1) }} mins ({{ $ap->duration }}s)</td>
+                                    <td class="py-4 px-4 text-sm text-text-secondary">{{ number_format($ap->amount, 2) }}</td>
+                                    <td class="py-4 px-4 text-sm text-text-secondary">{{ number_format($ap->duration / 60, 1) }} mins</td>
                                     <td class="py-4 px-4">
                                         @if(!is_null($ap->commission_percentage))
                                             <span class="px-2 py-0.5 bg-primary/10 text-primary text-xs font-bold rounded-lg">{{ $ap->commission_percentage }}% (Astro Share)</span>
@@ -210,9 +210,9 @@
                                 <tr class="border-b border-gray-50 hover:bg-light/10 transition-all">
                                     <td class="py-4 px-4 text-sm text-text-secondary">{{ $purchase->user->name ?? 'Deleted User' }}</td>
                                     <td class="py-4 px-4 text-sm font-semibold text-text-primary">{{ $purchase->astrologer->name ?? 'Deleted Astrologer' }}</td>
-                                    <td class="py-4 px-4 text-sm font-bold text-text-primary">${{ number_format($purchase->purchase_price, 2) }}</td>
-                                    <td class="py-4 px-4 text-sm text-green-600 font-semibold">${{ number_format($purchase->astrologer_earnings, 2) }} <span class="text-[10px] text-text-muted">({{ $purchase->commission_percentage }}%)</span></td>
-                                    <td class="py-4 px-4 text-sm text-primary font-semibold">${{ number_format($purchase->admin_earnings, 2) }} <span class="text-[10px] text-text-muted">({{ 100 - $purchase->commission_percentage }}%)</span></td>
+                                    <td class="py-4 px-4 text-sm font-bold text-text-primary">{{ number_format($purchase->purchase_price, 2) }}</td>
+                                    <td class="py-4 px-4 text-sm text-green-600 font-semibold">{{ number_format($purchase->astrologer_earnings, 2) }} <span class="text-[10px] text-text-muted">({{ $purchase->commission_percentage }}%)</span></td>
+                                    <td class="py-4 px-4 text-sm text-primary font-semibold">{{ number_format($purchase->admin_earnings, 2) }} <span class="text-[10px] text-text-muted">({{ 100 - $purchase->commission_percentage }}%)</span></td>
                                     <td class="py-4 px-4 text-sm">
                                         @if($purchase->status === 'exhausted')
                                             <span class="px-2 py-0.5 bg-gray-100 text-gray-500 text-xs font-bold rounded-lg border border-gray-200">Exhausted</span>
@@ -256,12 +256,12 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Price (USD)</label>
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Price</label>
                         <input type="number" step="0.01" name="default_amount" required placeholder="e.g. 50.00" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Duration (Seconds)</label>
-                        <input type="number" name="default_duration" required placeholder="e.g. 3600 for 1 hr" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Duration (Minutes)</label>
+                        <input type="number" name="default_duration_minutes" required placeholder="e.g. 60 for 1 hr" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     </div>
                 </div>
 
@@ -296,12 +296,12 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Price (USD)</label>
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Price</label>
                         <input type="number" step="0.01" name="default_amount" x-model="currentPackage.default_amount" required class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Duration (Seconds)</label>
-                        <input type="number" name="default_duration" x-model="currentPackage.default_duration" required class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Duration (Minutes)</label>
+                        <input type="number" name="default_duration_minutes" :value="currentPackage.default_duration / 60" required class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     </div>
                 </div>
 
@@ -340,12 +340,12 @@
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Override Price (USD)</label>
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Override Price</label>
                         <input type="number" step="0.01" name="amount" x-model="currentAssign.amount" required placeholder="e.g. 75.00" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Override Duration (Seconds)</label>
-                        <input type="number" name="duration" x-model="currentAssign.duration" required placeholder="e.g. 3600" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Override Duration (Minutes)</label>
+                        <input type="number" name="duration_minutes" :value="currentAssign.duration / 60" required placeholder="e.g. 60" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     </div>
                 </div>
 

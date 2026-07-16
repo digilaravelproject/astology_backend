@@ -16,7 +16,7 @@ class AdminUpsertPackageRequest extends FormRequest
         return [
             'name' => 'required|string|max:255',
             'default_amount' => 'required|numeric|min:0',
-            'default_duration' => 'required|integer|min:1', // in seconds
+            'default_duration_minutes' => 'required|numeric|min:0.1', // duration in minutes
             'is_default' => 'nullable|boolean',
         ];
     }
