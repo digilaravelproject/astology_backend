@@ -278,6 +278,43 @@
                             </div>
                         </div>
                     </div>
+
+                    @if(isset($user) && $user?->id)
+                        @php
+                            $astrologerPackage = \App\Models\AstrologerPackage::where('astrologer_id', $user->id)->first();
+                        @endphp
+                        <hr class="border-gray-lighter my-4">
+                        <div class="flex items-center gap-2 text-primary font-semibold text-sm mb-4">
+                            <i class="fas fa-box-open"></i>
+                            <span>Prepaid Package Override Parameters</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="space-y-2">
+                                <label for="package_amount" class="block text-xs font-semibold text-gray-dark">Custom Package Price</label>
+                                <input type="number" id="package_amount" name="package_amount" step="0.01" min="0"
+                                       value="{{ old('package_amount', $astrologerPackage?->amount ?? '') }}"
+                                       placeholder="Inherits default package if empty"
+                                       class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
+                                @error('package_amount') <span class="text-xs text-danger">{{ $message }}</span> @enderror
+                            </div>
+                            <div class="space-y-2">
+                                <label for="package_duration_minutes" class="block text-xs font-semibold text-gray-dark">Custom Duration (Minutes)</label>
+                                <input type="number" id="package_duration_minutes" name="package_duration_minutes" min="1"
+                                       value="{{ old('package_duration_minutes', $astrologerPackage?->duration ? $astrologerPackage->duration / 60 : '') }}"
+                                       placeholder="Inherits default package if empty"
+                                       class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
+                                @error('package_duration_minutes') <span class="text-xs text-danger">{{ $message }}</span> @enderror
+                            </div>
+                            <div class="space-y-2">
+                                <label for="package_commission_percentage" class="block text-xs font-semibold text-gray-dark">Astrologer Share (%) Override</label>
+                                <input type="number" id="package_commission_percentage" name="package_commission_percentage" min="0" max="100"
+                                       value="{{ old('package_commission_percentage', $astrologerPackage?->commission_percentage ?? '') }}"
+                                       placeholder="Inherits system split (50%)"
+                                       class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
+                                @error('package_commission_percentage') <span class="text-xs text-danger">{{ $message }}</span> @enderror
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
 

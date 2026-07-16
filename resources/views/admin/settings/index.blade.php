@@ -132,6 +132,17 @@
                         </div>
                     </div>
 
+                    <div class="p-6 bg-primary/5 rounded-2xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div>
+                            <h4 class="text-base font-bold text-text-primary mb-1">Prepaid Package - Default Astrologer Share</h4>
+                            <p class="text-xs text-text-muted">Fallback commission percentage credited to the astrologer for prepaid packages (if no custom override is set).</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="number" name="global_package_commission_rate" value="{{ $settings['global_package_commission_rate'] }}" min="0" max="100" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center text-base font-bold">
+                            <span class="text-lg font-bold text-text-secondary">%</span>
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="p-5 bg-light/20 border border-gray-200 rounded-2xl flex items-center justify-between">
                             <div>
