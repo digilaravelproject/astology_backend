@@ -13,6 +13,8 @@ use App\Events\PackageSessionTerminated;
 use App\Events\ChatInitiated;
 use App\Events\ChatQueueUpdated;
 use App\Events\CallInitiated;
+use App\Events\ChatEnded;
+use App\Events\CallEnded;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Exception;
@@ -201,13 +203,18 @@ class SessionTimerService
             // This handles presence reset, billing cleanup, and existing end events internally.
             if ($subSession->chat_session_id) {
                 try {
-                    $this->chatService->endChat($subSession->chat_session_id);
+                    $linkedChat = $this->chatService->endChat($subSession->chat_session_id);
+                    // Broadcast standard ChatEnded event so standard chat feeds close on both sides
+                    broadcast(new ChatEnded($linkedChat, $userId ?? $purchase->user_id));
+                    broadcast(new \App\Events\ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ended'));
                 } catch (Exception $e) {
                     // Session may already be ended — safe to swallow
                 }
             } elseif ($subSession->call_session_id) {
                 try {
-                    $this->callService->endCall($subSession->call_session_id);
+                    $linkedCall = $this->callService->endCall($subSession->call_session_id);
+                    // Broadcast standard CallEnded event so standard call screens close on both sides
+                    broadcast(new CallEnded($linkedCall, $userId ?? $purchase->user_id));
                 } catch (Exception $e) {
                     // Session may already be ended — safe to swallow
                 }
