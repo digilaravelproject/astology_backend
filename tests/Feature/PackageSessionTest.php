@@ -142,6 +142,16 @@ class PackageSessionTest extends TestCase
 
         $consumer = User::factory()->create(['user_type' => 'user']);
         $provider = User::factory()->create(['user_type' => 'astrologer']);
+        Astrologer::create([
+            'user_id' => $provider->id,
+            'years_of_experience' => 5,
+            'languages' => ['English'],
+            'id_proof_number' => '12345678',
+            'date_of_birth' => '1990-01-01',
+            'status' => 'approved',
+            'chat_enabled' => true,
+            'call_enabled' => true,
+        ]);
         
         $purchase = PackagePurchase::create([
             'user_id' => $consumer->id,
@@ -207,5 +217,62 @@ class PackageSessionTest extends TestCase
         // Verify presence reset to free
         $this->assertFalse(User::find($consumer->id)->is_busy);
         $this->assertFalse(User::find($provider->id)->is_busy);
+    }
+
+    public function test_astrologer_list_and_details_contain_package_parameters()
+    {
+        $consumer = User::factory()->create(['user_type' => 'user']);
+        $provider = User::factory()->create(['user_type' => 'astrologer']);
+        $astrologer = Astrologer::create([
+            'user_id' => $provider->id,
+            'years_of_experience' => 5,
+            'languages' => ['English'],
+            'id_proof_number' => '12345678',
+            'date_of_birth' => '1990-01-01',
+            'status' => 'approved',
+            'chat_enabled' => true,
+            'call_enabled' => true,
+        ]);
+
+        // Purchase a package first
+        $purchase = PackagePurchase::create([
+            'user_id' => $consumer->id,
+            'astrologer_id' => $provider->id,
+            'total_duration' => 1800,
+            'remaining_duration' => 1200, // 20 mins remaining, 10 mins used
+            'purchase_price' => 50.00,
+            'commission_percentage' => 50.00,
+            'astrologer_earnings' => 25.00,
+            'admin_earnings' => 25.00,
+            'status' => 'active',
+        ]);
+
+        // Request list as the authenticated consumer
+        $responseList = $this->actingAs($consumer)->getJson('/api/v1/user/astrologers');
+        $responseList->assertStatus(200);
+        
+        $listData = $responseList->json('data.astrologers.0');
+        $this->assertNotNull($listData);
+        $this->assertArrayHasKey('package_details', $listData);
+        $this->assertEquals('Default 30 Mins Pack', $listData['package_details']['name']);
+        $this->assertEquals(50.00, $listData['package_details']['price']);
+        $this->assertEquals(1800, $listData['package_details']['duration']);
+        $this->assertTrue($listData['package_details']['is_purchase']);
+        $this->assertEquals(1200, $listData['package_details']['remaining_time']);
+        $this->assertEquals(600, $listData['package_details']['used_time']);
+
+        // Request details as the authenticated consumer
+        $responseDetails = $this->actingAs($consumer)->getJson('/api/v1/user/astrologers/' . $astrologer->id);
+        $responseDetails->assertStatus(200);
+
+        $detailsData = $responseDetails->json('data.astrologer');
+        $this->assertNotNull($detailsData);
+        $this->assertArrayHasKey('package_details', $detailsData);
+        $this->assertEquals('Default 30 Mins Pack', $detailsData['package_details']['name']);
+        $this->assertEquals(50.00, $detailsData['package_details']['price']);
+        $this->assertEquals(1800, $detailsData['package_details']['duration']);
+        $this->assertTrue($detailsData['package_details']['is_purchase']);
+        $this->assertEquals(1200, $detailsData['package_details']['remaining_time']);
+        $this->assertEquals(600, $detailsData['package_details']['used_time']);
     }
 }

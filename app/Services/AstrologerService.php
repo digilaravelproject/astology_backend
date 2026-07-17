@@ -11,6 +11,9 @@ use App\Models\ChatSession;
 use App\Models\Message;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\Package;
+use App\Models\AstrologerPackage;
+use App\Models\PackagePurchase;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -141,7 +144,21 @@ class AstrologerService
             ->toArray();
         $busyProviderIds = array_unique(array_merge($activeChatProviders, $activeCallProviders));
 
-        $astrologers = $query->get()->map(function ($astrologer) use ($busyProviderIds) {
+        $rawAstrologers = $query->get();
+        $astrologerUserIds = $rawAstrologers->pluck('user_id')->toArray();
+        $customPackages = AstrologerPackage::whereIn('astrologer_id', $astrologerUserIds)->get()->keyBy('astrologer_id');
+        $defaultPackage = Package::where('is_default', true)->first();
+
+        $activePurchases = collect();
+        if ($currentUser) {
+            $activePurchases = PackagePurchase::where('user_id', $currentUser->id)
+                ->whereIn('astrologer_id', $astrologerUserIds)
+                ->where('status', 'active')
+                ->get()
+                ->keyBy('astrologer_id');
+        }
+
+        $astrologers = $rawAstrologers->map(function ($astrologer) use ($busyProviderIds, $customPackages, $defaultPackage, $activePurchases, $currentUser) {
             $avgRating = $astrologer->reviews_avg_rating;
             $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
 
@@ -176,6 +193,23 @@ class AstrologerService
             } else {
                 $astrologer->offer_details = null;
             }
+
+            // Package details
+            $astroPackage = $customPackages->get($astrologer->user_id);
+            $purchase = $currentUser ? $activePurchases->get($astrologer->user_id) : null;
+
+            $packageAmount = $astroPackage ? (float) $astroPackage->amount : ($defaultPackage ? (float) $defaultPackage->default_amount : 0.00);
+            $packageDuration = $astroPackage ? (int) $astroPackage->duration : ($defaultPackage ? (int) $defaultPackage->default_duration : 0);
+            $packageName = $defaultPackage ? $defaultPackage->name : 'Astrology Package';
+
+            $astrologer->package_details = [
+                'name' => $packageName,
+                'price' => $packageAmount,
+                'duration' => $packageDuration,
+                'is_purchase' => $purchase ? true : false,
+                'used_time' => $purchase ? (int) ($purchase->total_duration - $purchase->remaining_duration) : 0,
+                'remaining_time' => $purchase ? (int) $purchase->remaining_duration : 0
+            ];
 
             return $astrologer;
         });
@@ -254,6 +288,31 @@ class AstrologerService
             $astrologer->is_followed = false;
             $astrologer->is_blocked = false;
         }
+
+        // Package details
+        $astroPackage = AstrologerPackage::where('astrologer_id', $astrologer->user_id)->first();
+        $defaultPackage = Package::where('is_default', true)->first();
+
+        $purchase = null;
+        if ($currentUser) {
+            $purchase = PackagePurchase::where('user_id', $currentUser->id)
+                ->where('astrologer_id', $astrologer->user_id)
+                ->where('status', 'active')
+                ->first();
+        }
+
+        $packageAmount = $astroPackage ? (float) $astroPackage->amount : ($defaultPackage ? (float) $defaultPackage->default_amount : 0.00);
+        $packageDuration = $astroPackage ? (int) $astroPackage->duration : ($defaultPackage ? (int) $defaultPackage->default_duration : 0);
+        $packageName = $defaultPackage ? $defaultPackage->name : 'Astrology Package';
+
+        $astrologer->package_details = [
+            'name' => $packageName,
+            'price' => $packageAmount,
+            'duration' => $packageDuration,
+            'is_purchase' => $purchase ? true : false,
+            'used_time' => $purchase ? (int) ($purchase->total_duration - $purchase->remaining_duration) : 0,
+            'remaining_time' => $purchase ? (int) $purchase->remaining_duration : 0
+        ];
 
         return $astrologer;
     }
