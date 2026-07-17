@@ -395,6 +395,41 @@ class ChatService
                     $this->walletService->logCreditOnly($session->provider_id, $totalCreditAmount, 'chat_credit', 'App\Models\ChatSession', $session->id);
                 }
 
+                // Update package sub-session if this is a prepaid package session
+                if ($isPackageSession) {
+                    $subSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                        ->whereNull('ended_at')
+                        ->first();
+                    if ($subSession) {
+                        $purchase = \App\Models\PackagePurchase::where('id', $subSession->package_purchase_id)
+                            ->lockForUpdate()
+                            ->first();
+                        if ($purchase) {
+                            $durationUsed = (int) min($durationSeconds, $purchase->remaining_duration);
+                            
+                            $subSession->update([
+                                'ended_at' => $endTime,
+                                'duration_used' => $durationUsed
+                            ]);
+                            
+                            $purchase->remaining_duration -= $durationUsed;
+                            if ($purchase->remaining_duration <= 0) {
+                                $purchase->remaining_duration = 0;
+                                $purchase->status = 'exhausted';
+                            }
+                            $purchase->save();
+                            
+                            // Broadcast package sub-session ended event
+                            broadcast(new \App\Events\PackageSubSessionEnded($subSession, $purchase->remaining_duration, $userId));
+                            
+                            // Broadcast termination if exhausted
+                            if ($purchase->status === 'exhausted') {
+                                broadcast(new \App\Events\PackageSessionTerminated($purchase, "Your package session has exhausted all remaining balance.", 'chat'));
+                            }
+                        }
+                    }
+                }
+
                 $this->chatRepo->update($sessionId, [
                     'status' => 'completed',
                     'ended_at' => $endTime,

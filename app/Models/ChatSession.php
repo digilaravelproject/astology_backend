@@ -9,24 +9,6 @@ class ChatSession extends Model
 {
     use HasLocalTimezoneSerialization;
 
-    protected static function booted()
-    {
-        static::updated(function ($session) {
-            if (in_array($session->status, ['missed', 'rejected', 'completed', 'timeout'])) {
-                $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
-                    ->whereNull('ended_at')
-                    ->first();
-                if ($subSession) {
-                    try {
-                        app(\App\Services\SessionTimerService::class)->endSubSession($subSession->id);
-                    } catch (\Exception $e) {
-                        // Swallow to avoid breaking standard transaction flow
-                    }
-                }
-            }
-        });
-    }
-
     protected $fillable = [
         'consumer_id',
         'provider_id',
