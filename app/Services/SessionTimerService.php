@@ -151,7 +151,9 @@ class SessionTimerService
      */
     public function endSubSession(int $subSessionId, ?int $userId = null, bool $isForceTerminated = false): PackageSubSession
     {
-        return DB::transaction(function () use ($subSessionId, $userId, $isForceTerminated) {
+        $eventsToBroadcast = [];
+
+        $subSession = DB::transaction(function () use ($subSessionId, $userId, $isForceTerminated, &$eventsToBroadcast) {
             $subSession = PackageSubSession::where('id', $subSessionId)
                 ->lockForUpdate()
                 ->first();
@@ -204,17 +206,17 @@ class SessionTimerService
             if ($subSession->chat_session_id) {
                 try {
                     $linkedChat = $this->chatService->endChat($subSession->chat_session_id);
-                    // Broadcast standard ChatEnded event so standard chat feeds close on both sides
-                    broadcast(new ChatEnded($linkedChat, $userId ?? $purchase->user_id));
-                    broadcast(new \App\Events\ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ended'));
+                    // Queue standard ChatEnded event so standard chat feeds close on both sides
+                    $eventsToBroadcast[] = new ChatEnded($linkedChat, $userId ?? $purchase->user_id);
+                    $eventsToBroadcast[] = new \App\Events\ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ended');
                 } catch (Exception $e) {
                     // Session may already be ended — safe to swallow
                 }
             } elseif ($subSession->call_session_id) {
                 try {
                     $linkedCall = $this->callService->endCall($subSession->call_session_id);
-                    // Broadcast standard CallEnded event so standard call screens close on both sides
-                    broadcast(new CallEnded($linkedCall, $userId ?? $purchase->user_id));
+                    // Queue standard CallEnded event so standard call screens close on both sides
+                    $eventsToBroadcast[] = new CallEnded($linkedCall, $userId ?? $purchase->user_id);
                 } catch (Exception $e) {
                     // Session may already be ended — safe to swallow
                 }
@@ -224,20 +226,27 @@ class SessionTimerService
                 $this->presenceService->setFree($purchase->astrologer_id);
             }
 
-            // Broadcast package-specific WebSocket event
-            broadcast(new PackageSubSessionEnded($subSession, $purchase->remaining_duration, $userId));
+            // Queue package-specific WebSocket event
+            $eventsToBroadcast[] = new PackageSubSessionEnded($subSession, $purchase->remaining_duration, $userId);
 
-            // Broadcast force termination if time ran out
+            // Queue force termination if time ran out
             if ($isForceTerminated || $purchase->status === 'exhausted') {
                 $msg = $isForceTerminated
                     ? "Your package session was forcefully terminated due to time expiration."
                     : "Your package session has exhausted all remaining balance.";
 
-                broadcast(new PackageSessionTerminated($purchase, $msg, $subSession->mode));
+                $eventsToBroadcast[] = new PackageSessionTerminated($purchase, $msg, $subSession->mode);
             }
 
             return $subSession;
         });
+
+        // Broadcast all queued events OUTSIDE of the transaction
+        foreach ($eventsToBroadcast as $event) {
+            broadcast($event);
+        }
+
+        return $subSession;
     }
 
     /**
