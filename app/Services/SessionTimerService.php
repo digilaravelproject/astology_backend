@@ -10,6 +10,9 @@ use App\Jobs\TerminatePackageSessionJob;
 use App\Events\PackageSubSessionStarted;
 use App\Events\PackageSubSessionEnded;
 use App\Events\PackageSessionTerminated;
+use App\Events\ChatInitiated;
+use App\Events\ChatQueueUpdated;
+use App\Events\CallInitiated;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 use Exception;
@@ -71,8 +74,26 @@ class SessionTimerService
         // Wallet balance check is bypassed inside these services when an active package exists.
         if ($mode === 'chat') {
             $linkedSession = $this->chatService->initiateChat($userId, $astrologerId, $question);
+            
+            // Broadcast ChatInitiated with full consumer details
+            $user = \App\Models\User::find($userId);
+            if ($user) {
+                broadcast(new ChatInitiated($linkedSession, $user));
+                broadcast(new ChatQueueUpdated($linkedSession->provider_id, $linkedSession, 'initiated'));
+            }
         } else {
             $linkedSession = $this->callService->initiateCall($userId, $astrologerId);
+            
+            // Broadcast CallInitiated with full consumer details
+            $user = \App\Models\User::find($userId);
+            if ($user) {
+                broadcast(new CallInitiated($linkedSession, [
+                    'id'            => $user->id,
+                    'name'          => $user->name,
+                    'profile_photo' => \App\Helpers\MediaHelper::getFullUrl($user->profile_photo),
+                    'offer'         => 'audio',
+                ]));
+            }
         }
 
         // Step 4: Create PackageSubSession record and link to the real session
