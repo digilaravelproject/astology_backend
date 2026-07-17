@@ -354,7 +354,10 @@ class ChatService
 
                 $endTime = now();
                 $durationSeconds = $session->started_at ? (int) $session->started_at->diffInSeconds($endTime) : 0;
-                $finalCost = ceil($durationSeconds / 60) * $session->rate_per_minute;
+                
+                // Skip charging if this is a prepaid package session
+                $isPackageSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists();
+                $finalCost = $isPackageSession ? 0.00 : (ceil($durationSeconds / 60) * $session->rate_per_minute);
                 
                 // Calculate unbilled amount
                 $alreadyBilled = $session->total_cost ?? 0;

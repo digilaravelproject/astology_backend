@@ -251,7 +251,10 @@ class CallService
 
                 $endTime = now();
                 $durationSeconds = $session->started_at ? $session->started_at->diffInSeconds($endTime) : 0;
-                $finalCost = $this->calculateCost($durationSeconds, $session->rate_per_minute);
+                
+                // Skip charging if this is a prepaid package session
+                $isPackageSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists();
+                $finalCost = $isPackageSession ? 0.00 : $this->calculateCost($durationSeconds, $session->rate_per_minute);
                 
                 // Calculate unbilled amount
                 $alreadyBilled = $session->total_cost ?? 0;
