@@ -37,7 +37,7 @@ User purchases package
   
   → POST /packages/session/start (mode=call)
       → Creates real CallSession internally (status = initiated)
-      → Astrologer accepts via existing POST /call/{id}/accept (Agora token issued)
+      → Astrologer accepts via existing POST /call/{id}/accept (LiveKit token/room credentials issued)
       → WebSocket event "PackageSubSessionStarted" broadcasts (countdown begins)
       → Call runs (no wallet billing ticks)
   
@@ -46,7 +46,7 @@ User purchases package
       → WebSocket event "PackageSessionTerminated" broadcasts (forced exit)
 ```
 
-> **Critical for Flutter**: After calling `POST /packages/session/start`, the response payload contains **both** the `sub_session` record AND the actual initialized `chat_session` or `call_session`. You **MUST** extract the `chat_session.id` or `call_session.id` and use it for all subsequent messaging or Agora calling signaling using existing endpoints.
+> **Critical for Flutter**: After calling `POST /packages/session/start`, the response payload contains **both** the `sub_session` record AND the actual initialized `chat_session` or `call_session`. You **MUST** extract the `chat_session.id` or `call_session.id` and use it for all subsequent messaging or LiveKit calling signaling using existing endpoints.
 
 ### 1.2 Key Concepts
 
@@ -336,7 +336,7 @@ Dispatched to both user and astrologer when a sub-session is ended normally (eit
 
 ### 3.3 `PackageSessionTerminated` ⚠️ Critical
 Dispatched by the backend server to both user and astrologer when the total package duration is fully depleted (`remaining_duration` hits `0`), or if the session is forcefully terminated by a system job.
-*   **Action**: Immediately close any active chat feed/Agora call screen, dismiss active overlays, show a "Time expired" dialog, and redirect the user back to the main app dashboard.
+*   **Action**: Immediately close any active chat feed/LiveKit call screen, dismiss active overlays, show a "Time expired" dialog, and redirect the user back to the main app dashboard.
 
 ```json
 {
@@ -401,7 +401,7 @@ class PackageSubSession {
   final int packagePurchaseId;
   final String mode; // 'chat' | 'call'
   final int? chatSessionId; // Use this ID for chat API calls
-  final int? callSessionId; // Use this ID for call/Agora signaling
+  final int? callSessionId; // Use this ID for call/LiveKit signaling
   final DateTime startedAt;
   final DateTime? endedAt;
   final int durationUsed;
@@ -631,7 +631,7 @@ class PackageSessionListener {
       .listen('PackageSubSessionStarted', onStarted)
       .listen('PackageSubSessionEnded', onEnded)
       .listen('PackageSessionTerminated', (data) {
-        // CRITICAL: immediately close chat/call UI and Agora streams
+        // CRITICAL: immediately close chat/call UI and LiveKit streams
         onTerminated(data);
       });
   }
@@ -790,3 +790,42 @@ When the user reopens the app or loads the screen, call `GET /packages/active-st
 *   The timer **does not** start ticking down when the Consumer calls `POST /packages/session/start`.
 *   The timer **only** starts when the Astrologer accepts the call or chat session (causing the backend to fire `PackageSubSessionStarted` event).
 *   If the Astrologer rejects or doesn't answer, the session is cancelled without deducting any seconds from the package balance.
+
+---
+
+## 8. Astrologer (Provider) Side Flow & Events
+
+To keep integration simple, the Astrologer's application uses the **existing** communication endpoints for accepting, rejecting, and handling chats or calls. The package session wrapper operates silently in the background on the server.
+
+### 8.1 How requests arrive at the Astrologer app
+When the consumer starts a sub-session (`POST /packages/session/start`), the server automatically triggers the standard session initialization.
+*   **For Chat**: The astrologer receives the standard **`chat_initiated`** notification/event.
+*   **For Call**: The astrologer receives the standard **`call_initiated`** notification/event.
+
+The incoming request UI (Accept/Reject dialog) is **identical** to standard calls and chats. The astrologer can identify that it is a package session by checking if the session's `rate_per_minute` is `0.00` (or they can show a "Prepaid Package" badge in the UI).
+
+### 8.2 Accepting / Rejecting a Session
+The astrologer uses the **standard endpoints** to accept or reject the session:
+*   **Accept Chat**: `POST /chat/{chat_session_id}/accept`
+*   **Reject Chat**: `POST /chat/{chat_session_id}/reject`
+*   **Accept Call**: `POST /call/{call_session_id}/accept` (returns LiveKit Token)
+*   **Reject Call**: `POST /call/{call_session_id}/reject`
+
+*There are no custom endpoints for accepting package sub-sessions on the astrologer's side.*
+
+### 8.3 Listening to WebSocket Events (Astrologer Side)
+Like the consumer, the astrologer must subscribe to their own private channel:
+*   `private-user.{astrologerId}`
+
+They will receive the same real-time events to sync the timer and handle force-quits:
+
+1.  **`PackageSubSessionStarted`**:
+    *   **When**: Fired immediately after the astrologer accepts.
+    *   **Action**: Start the visual countdown timer on the astrologer's screen.
+2.  **`PackageSubSessionEnded`**:
+    *   **When**: Fired when the consumer manually ends the chat/call session.
+    *   **Action**: Stop the timer, close the chat/call screen, and show the session summary.
+3.  **`PackageSessionTerminated`**:
+    *   **When**: Fired when the package runs out of time (reaches `0`).
+    *   **Action**: **Forcefully close** the active chat screen or disconnect from the LiveKit call. Show a dialog: *"The package session has expired. Conversation has ended."*
+
