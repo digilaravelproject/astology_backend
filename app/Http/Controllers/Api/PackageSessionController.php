@@ -114,7 +114,8 @@ class PackageSessionController extends Controller
                 $userId,
                 $request->astrologer_id,
                 $request->mode,
-                $question
+                $question,
+                $request->input('offer')
             );
 
             $subSession = $result['sub_session'];

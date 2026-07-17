@@ -25,6 +25,7 @@ class StartPackageSubSessionRequest extends FormRequest
                 }
             ],
             'mode' => 'required|in:chat,call',
+            'offer' => 'required_if:mode,call|string',
         ];
     }
 }

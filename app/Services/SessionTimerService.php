@@ -43,10 +43,11 @@ class SessionTimerService
      * @param int $astrologerId
      * @param string $mode  'chat' | 'call'
      * @param string|null $question  Optional question for chat
+     * @param string|null $offer  Optional WebRTC SDP offer for call
      * @return array{ sub_session: PackageSubSession, chat_session?: mixed, call_session?: mixed }
      * @throws Exception
      */
-    public function startSubSession(int $userId, int $astrologerId, string $mode, ?string $question = null): array
+    public function startSubSession(int $userId, int $astrologerId, string $mode, ?string $question = null, ?string $offer = null): array
     {
         // Step 1: Validate active package purchase (outside main transaction — avoids nested tx issues)
         $purchase = PackagePurchase::where('user_id', $userId)
@@ -93,7 +94,7 @@ class SessionTimerService
                     'id'            => $user->id,
                     'name'          => $user->name,
                     'profile_photo' => \App\Helpers\MediaHelper::getFullUrl($user->profile_photo),
-                    'offer'         => 'audio',
+                    'offer'         => $offer ?? 'audio',
                 ]));
             }
         }
