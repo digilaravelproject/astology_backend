@@ -310,6 +310,9 @@ class AstrologerAuthController extends Controller
             ['phone' => $phone]
         );
 
+        // Revoke all existing tokens for single device constraint
+        $user->tokens()->delete();
+
         // Issue Sanctum token
         $token = $user->createToken('auth_token')->plainTextToken;
 
