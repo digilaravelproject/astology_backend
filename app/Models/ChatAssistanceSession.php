@@ -29,6 +29,11 @@ class ChatAssistanceSession extends Model
         return $this->hasMany(ChatAssistanceMessage::class);
     }
 
+    public function latestMessage()
+    {
+        return $this->hasOne(ChatAssistanceMessage::class, 'chat_assistance_session_id')->latestOfMany();
+    }
+
     public function events()
     {
         return $this->hasMany(ChatAssistanceEvent::class);

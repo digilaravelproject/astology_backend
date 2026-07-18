@@ -255,4 +255,20 @@ class ChatAssistanceService
             Log::error("Failed to log chat assistance event: " . $e->getMessage());
         }
     }
+
+    /**
+     * Get chat assistance sessions for a user (either consumer or provider).
+     */
+    public function getSessions($userId, $perPage = 15)
+    {
+        return ChatAssistanceSession::with([
+                'consumer:id,name,profile_photo',
+                'provider:id,name,profile_photo',
+                'latestMessage'
+            ])
+            ->where('consumer_id', $userId)
+            ->orWhere('provider_id', $userId)
+            ->latest('updated_at')
+            ->paginate($perPage);
+    }
 }

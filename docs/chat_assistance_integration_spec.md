@@ -226,6 +226,72 @@ Gets the remaining and total daily message limits for the logged-in astrologer.
 
 ---
 
+### 2.6 Retrieve Chat Assistance Sessions List (History)
+Retrieves a paginated list of chat assistance sessions for the logged-in user (astrologer or consumer). This provides the chat list screen on the astrologer's side, showing last message preview, name, and profile photos. Clicking any item routes the astrologer directly to the selected chat room.
+
+*   **URL**: `/api/v1/chat-assistance/sessions`
+*   **Method**: `GET`
+*   **Query Parameters**:
+    *   `per_page=15` (Optional, default is 15, max 50)
+    *   `page=1` (Optional)
+*   **Headers**:
+    *   `Authorization: Bearer <token>`
+    *   `Accept: application/json`
+*   **Success Response (`200 OK`)**:
+    ```json
+    {
+      "success": true,
+      "status": "success",
+      "message": "Chat assistance sessions retrieved successfully",
+      "data": {
+        "current_page": 1,
+        "data": [
+          {
+            "id": 15,
+            "consumer_id": 12,
+            "provider_id": 42,
+            "created_at": "2026-07-18T17:00:00.000000Z",
+            "updated_at": "2026-07-18T17:01:00.000000Z",
+            "consumer": {
+              "id": 12,
+              "name": "Amit Kumar",
+              "profile_photo": "http://localhost/storage/profiles/12.png"
+            },
+            "provider": {
+              "id": 42,
+              "name": "Astrologer Firoz",
+              "profile_photo": "http://localhost/storage/profiles/42.png"
+            },
+            "latest_message": {
+              "id": 182,
+              "chat_assistance_session_id": 15,
+              "sender_id": 12,
+              "receiver_id": 42,
+              "message": "Can you check my birth chart details?",
+              "attachment_url": null,
+              "type": "text",
+              "is_read": true,
+              "is_delivered": true,
+              "created_at": "2026-07-18T17:01:00.000000Z"
+            }
+          }
+        ],
+        "first_page_url": "http://localhost/api/v1/chat-assistance/sessions?page=1",
+        "from": 1,
+        "last_page": 1,
+        "last_page_url": "http://localhost/api/v1/chat-assistance/sessions?page=1",
+        "next_page_url": null,
+        "path": "http://localhost/api/v1/chat-assistance/sessions",
+        "per_page": 15,
+        "prev_page_url": null,
+        "to": 1,
+        "total": 1
+      }
+    }
+    ```
+
+---
+
 ## 3. WebSocket Real-Time Events Specification
 
 All WebSocket events broadcast on private channels using Laravel Echo. The channel name format is `private-user.<user_id>` (representing the private channel of the recipient).

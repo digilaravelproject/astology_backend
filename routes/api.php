@@ -291,6 +291,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/{sessionId}/messages', [ChatAssistanceController::class, 'getMessages']);
             Route::post('/{sessionId}/sync-status', [ChatAssistanceController::class, 'syncStatus']);
             Route::get('/astrologer/status', [ChatAssistanceController::class, 'getAstrologerStatus']);
+            Route::get('/sessions', [ChatAssistanceController::class, 'getSessions']);
         });
 
     });

@@ -126,4 +126,17 @@ class ChatAssistanceController extends Controller
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
+
+    public function getSessions(Request $request)
+    {
+        try {
+            $userId = $request->user()->id;
+            $perPage = min((int) $request->query('per_page', 15), 50);
+
+            $sessions = $this->chatAssistanceService->getSessions($userId, $perPage);
+            return ApiResponse::success($sessions, 'Chat assistance sessions retrieved successfully');
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
 }
