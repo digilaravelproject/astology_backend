@@ -47,4 +47,33 @@ class ChatAssistanceTest extends TestCase
         $response->assertStatus(400);
         $response->assertJsonPath('status', 'error');
     }
+
+    public function test_initiate_reuses_existing_session()
+    {
+        $consumer = User::factory()->create(['user_type' => 'user']);
+        $astrologer = User::factory()->create(['user_type' => 'astrologer']);
+
+        // 1. Initiate from consumer first
+        $response1 = $this->actingAs($consumer)->postJson('/api/v1/chat-assistance/initiate', [
+            'provider_id' => $astrologer->id,
+        ]);
+        $response1->assertStatus(200);
+        $sessionId1 = $response1->json('data.session.id');
+
+        // 2. Initiate from consumer again
+        $response2 = $this->actingAs($consumer)->postJson('/api/v1/chat-assistance/initiate', [
+            'provider_id' => $astrologer->id,
+        ]);
+        $response2->assertStatus(200);
+        $sessionId2 = $response2->json('data.session.id');
+        $this->assertEquals($sessionId1, $sessionId2);
+
+        // 3. Initiate from astrologer to consumer
+        $response3 = $this->actingAs($astrologer)->postJson('/api/v1/chat-assistance/initiate', [
+            'provider_id' => $consumer->id,
+        ]);
+        $response3->assertStatus(200);
+        $sessionId3 = $response3->json('data.session.id');
+        $this->assertEquals($sessionId1, $sessionId3);
+    }
 }

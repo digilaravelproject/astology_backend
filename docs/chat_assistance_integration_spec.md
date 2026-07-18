@@ -48,6 +48,8 @@ Creates or retrieves an active chat assistance session between a user and an ast
     }
     ```
 *   **Success Response (`200 OK`)**:
+    > [!NOTE]
+    > **Session Reuse Behavior:** If a chat assistance session already exists between the authenticated user and the target provider (regardless of who initiated it first), the API will NOT create a new session. Instead, it will return the existing session details (reusing the same `id`).
     ```json
     {
       "success": true,

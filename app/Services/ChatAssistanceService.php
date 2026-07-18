@@ -30,10 +30,33 @@ class ChatAssistanceService
         }
 
         return DB::transaction(function () use ($consumerId, $providerId, $callSessionId) {
-            $session = ChatAssistanceSession::firstOrCreate([
-                'consumer_id' => $consumerId,
-                'provider_id' => $providerId,
-            ]);
+            $session = ChatAssistanceSession::where(function ($query) use ($consumerId, $providerId) {
+                $query->where('consumer_id', $consumerId)
+                      ->where('provider_id', $providerId);
+            })->orWhere(function ($query) use ($consumerId, $providerId) {
+                $query->where('consumer_id', $providerId)
+                      ->where('provider_id', $consumerId);
+            })->first();
+
+            if (!$session) {
+                $user1 = User::find($consumerId);
+                $user2 = User::find($providerId);
+
+                $finalConsumerId = $consumerId;
+                $finalProviderId = $providerId;
+
+                if ($user1 && $user2) {
+                    if ($user1->user_type === 'astrologer' && $user2->user_type === 'user') {
+                        $finalConsumerId = $providerId;
+                        $finalProviderId = $consumerId;
+                    }
+                }
+
+                $session = ChatAssistanceSession::create([
+                    'consumer_id' => $finalConsumerId,
+                    'provider_id' => $finalProviderId,
+                ]);
+            }
 
             // Track session initiation event
             $this->logEvent($session->id, 'chat_initiated', [
