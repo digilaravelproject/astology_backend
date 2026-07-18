@@ -57,7 +57,7 @@ class ChatAssistanceController extends Controller
         $request->validate([
             'message' => 'required_without:attachment_url|string',
             'attachment_url' => 'nullable|string',
-            'type' => 'in:text,image',
+            'type' => 'in:text,image,document,file,audio,video',
             'call_session_id' => 'nullable|exists:call_sessions,id',
         ]);
 

@@ -145,7 +145,7 @@ class ChatController extends Controller
         $request->validate([
             'message' => 'required_without:attachment_url|string',
             'attachment_url' => 'nullable|string',
-            'type' => 'in:text,image,system'
+            'type' => 'in:text,image,system,document,file,audio,video'
         ]);
 
         try {
