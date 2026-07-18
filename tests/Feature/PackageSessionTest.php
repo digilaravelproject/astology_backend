@@ -68,7 +68,7 @@ class PackageSessionTest extends TestCase
             'status' => 'approved',
         ]);
 
-        $response = $this->actingAs($consumer)->postJson('/api/v1/packages/purchase', [
+        $response = $this->actingAs($consumer)->postJson('/api/v1/user/packages/purchase', [
             'astrologer_id' => $provider->id,
         ]);
 
@@ -97,7 +97,7 @@ class PackageSessionTest extends TestCase
             'commission_percentage' => 60.00 // 60% goes to astrologer (30.00), 40% to admin (20.00)
         ]);
 
-        $response = $this->actingAs($consumer)->postJson('/api/v1/packages/purchase', [
+        $response = $this->actingAs($consumer)->postJson('/api/v1/user/packages/purchase', [
             'astrologer_id' => $provider->id,
         ]);
 
@@ -166,20 +166,24 @@ class PackageSessionTest extends TestCase
         ]);
 
         // 1. Start Sub-Session (Chat)
-        $response = $this->actingAs($consumer)->postJson('/api/v1/packages/session/start', [
+        $response = $this->actingAs($consumer)->postJson('/api/v1/user/packages/session/start', [
             'astrologer_id' => $provider->id,
             'mode' => 'chat',
         ]);
-
         $response->assertStatus(200);
         $response->assertJsonPath('success', true);
         $subSessionId = $response->json('data.sub_session.id');
+        $chatSessionId = $response->json('data.chat_session.id');
 
         $this->assertDatabaseHas('package_sub_sessions', [
             'id' => $subSessionId,
             'mode' => 'chat',
             'ended_at' => null,
         ]);
+
+        // Accept the chat as the astrologer (activates timer & marks busy)
+        $acceptResponse = $this->actingAs($provider)->postJson("/api/v1/chat/{$chatSessionId}/accept");
+        $acceptResponse->assertStatus(200);
 
         // Verify users marked as busy
         $this->assertTrue(User::find($consumer->id)->is_busy);
@@ -189,7 +193,7 @@ class PackageSessionTest extends TestCase
         Queue::assertPushed(TerminatePackageSessionJob::class);
 
         // 2. Prevent concurrent sub-session
-        $response2 = $this->actingAs($consumer)->postJson('/api/v1/packages/session/start', [
+        $response2 = $this->actingAs($consumer)->postJson('/api/v1/user/packages/session/start', [
             'astrologer_id' => $provider->id,
             'mode' => 'call',
         ]);
@@ -200,7 +204,7 @@ class PackageSessionTest extends TestCase
         $subSession = PackageSubSession::find($subSessionId);
         $subSession->update(['started_at' => now()->subMinutes(10)]); // Simulate 10 minutes (600 seconds) chat session
 
-        $responseEnd = $this->actingAs($consumer)->postJson('/api/v1/packages/session/end', [
+        $responseEnd = $this->actingAs($consumer)->postJson('/api/v1/user/packages/session/end', [
             'sub_session_id' => $subSessionId,
         ]);
 

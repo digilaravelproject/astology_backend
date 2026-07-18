@@ -56,6 +56,10 @@ class SettingController extends Controller
             'rate_limit_tiered' => Setting::get('rate_limit_tiered', 30),
             'rate_limit_live_watch' => Setting::get('rate_limit_live_watch', 100),
             'rate_limit_api' => Setting::get('rate_limit_api', 120),
+
+            // Chat Assistance
+            'chat_assistance_enabled' => Setting::get('chat_assistance_enabled', true, 'boolean'),
+            'chat_assistance_daily_limit' => Setting::get('chat_assistance_daily_limit', 5),
         ];
 
         // Fetch real admins for Team / RBAC management
@@ -108,6 +112,10 @@ class SettingController extends Controller
             'rate_limit_tiered' => 'nullable|integer|min:0',
             'rate_limit_live_watch' => 'nullable|integer|min:0',
             'rate_limit_api' => 'nullable|integer|min:0',
+
+            // Chat Assistance
+            'chat_assistance_enabled' => 'nullable|boolean',
+            'chat_assistance_daily_limit' => 'nullable|integer|min:0',
         ]);
 
         // Save text settings
@@ -138,6 +146,8 @@ class SettingController extends Controller
             'rate_limit_tiered' => 'rate_limit',
             'rate_limit_live_watch' => 'rate_limit',
             'rate_limit_api' => 'rate_limit',
+            'chat_assistance_enabled' => 'chat_assistance',
+            'chat_assistance_daily_limit' => 'chat_assistance',
         ];
 
         foreach ($keys as $key => $group) {
@@ -146,10 +156,10 @@ class SettingController extends Controller
                 $type = 'string';
                 if (str_contains($key, 'percentage') || str_contains($key, 'rate') || str_contains($key, 'amount') || str_contains($key, 'recharge') || str_contains($key, 'balance')) {
                     $type = 'decimal';
-                } elseif (str_contains($key, 'limit_enabled')) {
+                } elseif (str_contains($key, 'limit_enabled') || $key === 'chat_assistance_enabled') {
                     $type = 'boolean';
                     $value = $request->boolean($key);
-                } elseif (str_contains($key, 'limit_')) {
+                } elseif (str_contains($key, 'limit_') || $key === 'chat_assistance_daily_limit') {
                     $type = 'integer';
                 }
                 Setting::set($key, $value, $type, $group);

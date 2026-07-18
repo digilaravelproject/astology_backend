@@ -10,3 +10,5 @@ Artisan::command('inspire', function () {
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('app:expire-offers')->everyMinute();
+Schedule::command('app:cleanup-chat-assistance')->daily();
+

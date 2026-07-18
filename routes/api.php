@@ -27,7 +27,8 @@ use App\Http\Controllers\Api\{
     GiftController,
     TurnCredentialsController,
     UserAuthController,
-    WalletController
+    WalletController,
+    ChatAssistanceController
 };
 
 /*
@@ -282,6 +283,14 @@ Route::prefix('v1')->group(function () {
             Route::post('/{sessionId}/read', [ChatController::class, 'markAsRead']);
             Route::post('/{sessionId}/sync-status', [ChatController::class, 'syncStatus']);
             Route::get('/{sessionId}/messages', [ChatController::class, 'getMessages']);
+        });
+
+        Route::prefix('chat-assistance')->group(function () {
+            Route::post('/initiate', [ChatAssistanceController::class, 'initiate']);
+            Route::post('/{sessionId}/message', [ChatAssistanceController::class, 'sendMessage']);
+            Route::get('/{sessionId}/messages', [ChatAssistanceController::class, 'getMessages']);
+            Route::post('/{sessionId}/sync-status', [ChatAssistanceController::class, 'syncStatus']);
+            Route::get('/astrologer/status', [ChatAssistanceController::class, 'getAstrologerStatus']);
         });
 
     });

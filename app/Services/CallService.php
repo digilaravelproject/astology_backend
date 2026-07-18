@@ -167,7 +167,14 @@ class CallService
                     ->where('remaining_duration', '>', 0)
                     ->exists();
 
-                if (!$hasActivePackage) {
+                if ($hasActivePackage) {
+                    $subSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)
+                        ->whereNull('started_at')
+                        ->first();
+                    if ($subSession) {
+                        app(\App\Services\SessionTimerService::class)->activateSubSessionTimer($subSession->id);
+                    }
+                } else {
                     CallBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
                 }
                 

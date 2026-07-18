@@ -106,7 +106,7 @@ class SessionTimerService
             $subSessionData = [
                 'package_purchase_id' => $purchase->id,
                 'mode'                => $mode,
-                'started_at'          => now(),
+                'started_at'          => null,
                 'ended_at'            => null,
                 'duration_used'       => 0,
             ];
@@ -118,13 +118,6 @@ class SessionTimerService
             }
 
             $subSession = PackageSubSession::create($subSessionData);
-
-            // Dispatch auto-terminate job after remaining_duration seconds
-            TerminatePackageSessionJob::dispatch($subSession->id)
-                ->delay(now()->addSeconds($purchase->remaining_duration));
-
-            // Broadcast package-specific WebSocket event (countdown timer for Flutter)
-            broadcast(new PackageSubSessionStarted($subSession, $purchase->remaining_duration));
 
             return $subSession;
         });
@@ -138,6 +131,50 @@ class SessionTimerService
         }
 
         return $result;
+    }
+
+    /**
+     * Activate the sub-session timer when the astrologer accepts the chat/call.
+     *
+     * @param int $subSessionId
+     * @return PackageSubSession
+     * @throws Exception
+     */
+    public function activateSubSessionTimer(int $subSessionId): PackageSubSession
+    {
+        return DB::transaction(function () use ($subSessionId) {
+            $subSession = PackageSubSession::where('id', $subSessionId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$subSession) {
+                throw new Exception("Sub-session not found.", 404);
+            }
+
+            if (!is_null($subSession->started_at)) {
+                return $subSession; // Already activated — idempotent
+            }
+
+            $purchase = PackagePurchase::where('id', $subSession->package_purchase_id)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$purchase) {
+                throw new Exception("Parent package purchase not found.", 404);
+            }
+
+            $subSession->started_at = now();
+            $subSession->save();
+
+            // Dispatch auto-terminate job after remaining_duration seconds
+            TerminatePackageSessionJob::dispatch($subSession->id)
+                ->delay(now()->addSeconds($purchase->remaining_duration));
+
+            // Broadcast package-specific WebSocket event (countdown timer for Flutter)
+            broadcast(new PackageSubSessionStarted($subSession, $purchase->remaining_duration));
+
+            return $subSession;
+        });
     }
 
     /**
@@ -181,7 +218,7 @@ class SessionTimerService
             }
 
             $endTime = now();
-            $durationSeconds = (int) $subSession->started_at->diffInSeconds($endTime);
+            $durationSeconds = $subSession->started_at ? (int) $subSession->started_at->diffInSeconds($endTime) : 0;
             if ($durationSeconds < 0) {
                 $durationSeconds = 0;
             }

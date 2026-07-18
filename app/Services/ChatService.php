@@ -217,7 +217,14 @@ class ChatService
                     ->where('remaining_duration', '>', 0)
                     ->exists();
 
-                if (!$hasActivePackage) {
+                if ($hasActivePackage) {
+                    $subSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                        ->whereNull('started_at')
+                        ->first();
+                    if ($subSession) {
+                        app(\App\Services\SessionTimerService::class)->activateSubSessionTimer($subSession->id);
+                    }
+                } else {
                     ChatBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
                 }
                 

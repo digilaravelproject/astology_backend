@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Events;
+
+use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\InteractsWithSockets;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class ChatAssistanceInitiated implements ShouldBroadcastNow
+{
+    use Dispatchable, InteractsWithSockets, SerializesModels;
+
+    public $session;
+    public $senderData;
+
+    public function __construct($session, $senderData)
+    {
+        $this->session = $session;
+        $this->senderData = $senderData;
+    }
+
+    public function broadcastOn(): array
+    {
+        return [
+            new PrivateChannel('user.' . $this->session->provider_id),
+        ];
+    }
+
+    public function broadcastAs()
+    {
+        return 'ChatAssistanceInitiated';
+    }
+}
