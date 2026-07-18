@@ -357,9 +357,33 @@ class ChatController extends Controller
         try {
             $userId = $request->user()->id;
             $session = $this->chatService->getActiveSession($userId);
+
+            $isPackageSession = false;
+            $remainingDurationSeconds = null;
+
+            if ($session) {
+                $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
+                    ->whereNull('ended_at')
+                    ->first();
+
+                if ($subSession) {
+                    $isPackageSession = true;
+                    $purchase = $subSession->purchase;
+                    if ($purchase) {
+                        $remainingDurationSeconds = (int) $purchase->remaining_duration;
+                        if ($subSession->started_at) {
+                            $elapsed = now()->diffInSeconds($subSession->started_at);
+                            $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
+                        }
+                    }
+                }
+            }
             
             return ApiResponse::success([
-                'session' => $session
+                'session' => $session,
+                'is_package_session' => $isPackageSession,
+                'session_type' => 'chat',
+                'remaining_duration_seconds' => $remainingDurationSeconds,
             ], 'Current active session retrieved successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
@@ -398,11 +422,35 @@ class ChatController extends Controller
                 ], 200);
             }
 
+            $isPackageSession = false;
+            $remainingDurationSeconds = null;
+
+            $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
+                ->whereNull('ended_at')
+                ->first();
+
+            if ($subSession) {
+                $isPackageSession = true;
+                $purchase = $subSession->purchase;
+                if ($purchase) {
+                    $remainingDurationSeconds = (int) $purchase->remaining_duration;
+                    if ($subSession->started_at) {
+                        $elapsed = now()->diffInSeconds($subSession->started_at);
+                        $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
+                    }
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'status' => 'success',
                 'message' => 'Current chat session retrieved successfully',
-                'data' => $session
+                'data' => [
+                    'session' => $session,
+                    'is_package_session' => $isPackageSession,
+                    'session_type' => 'chat',
+                    'remaining_duration_seconds' => $remainingDurationSeconds,
+                ]
             ], 200);
 
         } catch (Exception $e) {

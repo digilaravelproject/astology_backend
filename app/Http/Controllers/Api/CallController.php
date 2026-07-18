@@ -283,8 +283,34 @@ class CallController extends Controller
             ->latest()
             ->first();
 
+            $isPackageSession = false;
+            $remainingDurationSeconds = null;
+
+            if ($session) {
+                $subSession = \App\Models\PackageSubSession::where('call_session_id', $session->id)
+                    ->whereNull('ended_at')
+                    ->first();
+
+                if ($subSession) {
+                    $isPackageSession = true;
+                    $purchase = $subSession->purchase;
+                    if ($purchase) {
+                        $remainingDurationSeconds = (int) $purchase->remaining_duration;
+                        if ($subSession->started_at) {
+                            $elapsed = now()->diffInSeconds($subSession->started_at);
+                            $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
+                        }
+                    }
+                }
+            }
+
             return ApiResponse::success(
-                ['session' => $session],
+                [
+                    'session' => $session,
+                    'is_package_session' => $isPackageSession,
+                    'session_type' => 'call',
+                    'remaining_duration_seconds' => $remainingDurationSeconds,
+                ],
                 'Current active call session retrieved successfully'
             );
 

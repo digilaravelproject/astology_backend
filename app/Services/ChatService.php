@@ -51,7 +51,11 @@ class ChatService
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
                     ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->exists();
+                // Cross-channel waiting queue check: considers BOTH chat and call waiting rows
                 $hasWaitingQueue = \App\Models\ChatSession::where('provider_id', $providerId)
+                    ->where('status', 'waiting')
+                    ->exists()
+                    || \App\Models\CallSession::where('provider_id', $providerId)
                     ->where('status', 'waiting')
                     ->exists();
                 $isBusy = $isChatBusy || $isCallBusy || $hasWaitingQueue;
@@ -321,6 +325,13 @@ class ChatService
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
 
+                // Close any orphaned PackageSubSession linked to this rejected chat.
+                // Without this, the sub-session stays open (started_at=null, ended_at=null)
+                // and blocks the user from starting a new package session.
+                \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now()]);
+
                 $session->refresh();
                 return $session;
 
@@ -582,6 +593,12 @@ class ChatService
                 // Reset busy status for both consumer and provider
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
+
+                // Close any orphaned PackageSubSession linked to this timed-out chat.
+                // This prevents the user from being locked out of starting new package sessions.
+                \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now()]);
 
                 $session->refresh();
                 return $session;

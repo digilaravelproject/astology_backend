@@ -49,22 +49,26 @@ class CallService
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
-                    ->whereIn('status', ['accepted', 'ongoing'], 'and', false)
+                    ->whereIn('status', ['accepted', 'ongoing'])
                     ->exists();
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
-                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'], 'and', false)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->exists();
+                // Cross-channel waiting queue check: considers BOTH chat and call waiting rows
                 $hasWaitingQueue = \App\Models\CallSession::where('provider_id', $providerId)
+                    ->where('status', 'waiting')
+                    ->exists()
+                    || \App\Models\ChatSession::where('provider_id', $providerId)
                     ->where('status', 'waiting')
                     ->exists();
                 $isBusy = $isChatBusy || $isCallBusy || $hasWaitingQueue;
 
                 // Dynamic check for consumer
                 $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['accepted', 'ongoing'], 'and', false)
+                    ->whereIn('status', ['accepted', 'ongoing'])
                     ->exists();
                 $isConsumerCallBusy = \App\Models\CallSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'], 'and', false)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->exists();
                 if ($isConsumerChatBusy || $isConsumerCallBusy) {
                     throw new Exception("You are already in an active session.");
@@ -72,10 +76,10 @@ class CallService
 
                 // Prevent duplicate pending or waiting requests
                 $existingChatPending = \App\Models\ChatSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['initiated', 'waiting'], 'and', false)
+                    ->whereIn('status', ['initiated', 'waiting'])
                     ->exists();
                 $existingCallPending = \App\Models\CallSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['initiated', 'ringing', 'waiting'], 'and', false)
+                    ->whereIn('status', ['initiated', 'ringing', 'waiting'])
                     ->exists();
                 if ($existingChatPending || $existingCallPending) {
                     throw new Exception("You already have a pending or waiting request.");
@@ -139,10 +143,10 @@ class CallService
 
                 // Check dynamic busy check under lock to prevent double booking
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
-                    ->whereIn('status', ['accepted', 'ongoing'], 'and', false)
+                    ->whereIn('status', ['accepted', 'ongoing'])
                     ->exists();
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
-                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'], 'and', false)
+                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->where('id', '!=', $sessionId)
                     ->exists();
                 if ($isChatBusy || $isCallBusy) {
@@ -216,6 +220,13 @@ class CallService
                 // Reset presence status for both users
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
+
+                // Close any orphaned PackageSubSession linked to this rejected call.
+                // Without this, the sub-session stays open (started_at=null, ended_at=null)
+                // and blocks the user from starting a new package session.
+                \App\Models\PackageSubSession::where('call_session_id', $sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now()]);
 
                 $session->refresh();
                 return $session;

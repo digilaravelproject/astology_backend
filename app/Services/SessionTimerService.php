@@ -54,8 +54,12 @@ class SessionTimerService
             $hasActiveSubSession = PackageSubSession::whereNotNull('started_at')
                 ->whereNull('ended_at')
                 ->whereHas('purchase', function ($q) use ($userId, $astrologerId) {
-                    $q->whereIn('user_id', [$userId, $astrologerId])
-                        ->orWhereIn('astrologer_id', [$userId, $astrologerId]);
+                    $q->where(function ($subQ) use ($userId, $astrologerId) {
+                        $subQ->where('user_id', $userId)
+                             ->orWhere('astrologer_id', $userId)
+                             ->orWhere('user_id', $astrologerId)
+                             ->orWhere('astrologer_id', $astrologerId);
+                    });
                 })
                 ->exists();
 
