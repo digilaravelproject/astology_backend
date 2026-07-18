@@ -380,6 +380,31 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Chat Assistance Configurations -->
+                    <div class="mt-8 border-t border-gray-100 pt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <h4 class="text-sm font-bold text-text-primary">Chat Assistance Feature Rules</h4>
+                                <p class="text-xs text-text-muted mt-0.5">Toggle and configure the daily limitations for astrologer chat assistance replies.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <input type="hidden" name="chat_assistance_enabled" value="0">
+                                <input type="checkbox" name="chat_assistance_enabled" value="1" {{ $settings['chat_assistance_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-primary border-2 border-transparent">
+                                <span class="text-xs font-bold text-text-secondary uppercase">Enable System</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                                <label class="block text-xs font-bold text-text-secondary mb-2">Daily Astrologer Message Limit</label>
+                                <div class="flex items-center gap-3">
+                                    <input type="number" name="chat_assistance_daily_limit" value="{{ $settings['chat_assistance_daily_limit'] }}" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                    <span class="text-xs text-text-muted">free outgoing messages allowed per day per astrologer</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Action Button for Settings Form -->
