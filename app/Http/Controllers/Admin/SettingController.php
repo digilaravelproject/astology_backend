@@ -35,9 +35,9 @@ class SettingController extends Controller
             'min_withdrawal_amount' => Setting::get('min_withdrawal_amount', 500.00),
             
             'razorpay_key' => Setting::get('razorpay_key', ''),
-            'razorpay_secret' => $this->decryptSecret(Setting::get('razorpay_secret', '')),
+            'razorpay_secret' => Setting::get('razorpay_secret') ? '••••••••••••••••' : '',
             'stripe_key' => Setting::get('stripe_key', ''),
-            'stripe_secret' => Setting::get('stripe_secret', ''),
+            'stripe_secret' => Setting::get('stripe_secret') ? '••••••••••••••••' : '',
             'payment_gateway_mode' => Setting::get('payment_gateway_mode', 'sandbox'),
             'active_gateways' => Setting::get('active_gateways', ['razorpay']),
 
@@ -152,9 +152,15 @@ class SettingController extends Controller
         foreach ($keys as $key => $group) {
             if ($request->has($key)) {
                 $value = $request->input($key);
-                if ($key === 'razorpay_secret' && !empty($value)) {
+                
+                // Secure secrets by masking and encrypting
+                if (str_ends_with($key, '_secret')) {
+                    if (empty($value) || $value === '••••••••••••••••') {
+                        continue;
+                    }
                     $value = \Illuminate\Support\Facades\Crypt::encryptString($value);
                 }
+                
                 $type = 'string';
                 if (str_contains($key, 'percentage') || str_contains($key, 'rate') || str_contains($key, 'amount') || str_contains($key, 'recharge') || str_contains($key, 'balance')) {
                     $type = 'decimal';
@@ -268,17 +274,5 @@ class SettingController extends Controller
         $operator->delete();
 
         return redirect()->back()->with('success', 'Operator deleted successfully.');
-    }
-
-    private function decryptSecret($value)
-    {
-        if (empty($value)) {
-            return '';
-        }
-        try {
-            return \Illuminate\Support\Facades\Crypt::decryptString($value);
-        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
-            return $value;
-        }
     }
 }
