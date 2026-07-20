@@ -16,8 +16,8 @@ class RazorpayService
 
     public function __construct()
     {
-        $this->keyId = config('razorpay.key_id');
-        $this->keySecret = config('razorpay.key_secret');
+        $this->keyId = \App\Models\Setting::get('razorpay_key') ?: config('razorpay.key_id');
+        $this->keySecret = \App\Models\Setting::get('razorpay_secret') ?: config('razorpay.key_secret');
 
         try {
             $this->api = new Api($this->keyId, $this->keySecret);

@@ -28,11 +28,9 @@
             <button @click="tab = 'wallet'" :class="tab === 'wallet' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
                 <i class="fas fa-wallet w-5 text-center"></i> Wallet & Money Rules
             </button>
-            {{--
             <button @click="tab = 'payment'" :class="tab === 'payment' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
                 <i class="fas fa-credit-card w-5 text-center"></i> Payment Gateway
             </button>
-            --}}
             <button @click="tab = 'astro'" :class="tab === 'astro' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
                 <i class="fas fa-user-tie w-5 text-center"></i> Astrologer Pricing
             </button>
@@ -205,7 +203,6 @@
                     </div>
                 </div>
 
-                {{--
                 <!-- Payment Gateway -->
                 <div x-show="tab === 'payment'" class="space-y-6">
                     <h3 class="text-lg font-bold text-text-primary border-b pb-3">Payment Gateways</h3>
@@ -280,7 +277,6 @@
                         </div>
                     </div>
                 </div>
-                --}}
 
                 <!-- Astrologer Default Pricing -->
                 <div x-show="tab === 'astro'" class="space-y-6">

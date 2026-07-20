@@ -34,7 +34,6 @@ class SettingController extends Controller
             'max_wallet_balance' => Setting::get('max_wallet_balance', 10000.00),
             'min_withdrawal_amount' => Setting::get('min_withdrawal_amount', 500.00),
             
-            // Payment Gateway
             'razorpay_key' => Setting::get('razorpay_key', ''),
             'razorpay_secret' => Setting::get('razorpay_secret', ''),
             'stripe_key' => Setting::get('stripe_key', ''),
