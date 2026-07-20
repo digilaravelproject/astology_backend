@@ -33,4 +33,12 @@ class ChatAssistanceLimitReached implements ShouldBroadcastNow
     {
         return 'ChatAssistanceLimitReached';
     }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'astrologerId' => (int) $this->astrologerId,
+            'message' => $this->message,
+        ];
+    }
 }

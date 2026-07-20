@@ -112,7 +112,7 @@ class ChatAssistanceService
         $sender = User::findOrFail($senderId);
         $isAstrologer = ($session->provider_id == $senderId);
 
-        return DB::transaction(function () use ($session, $senderId, $receiverId, $isAstrologer, $data, $callSessionId) {
+        $message = DB::transaction(function () use ($session, $senderId, $receiverId, $isAstrologer, $data, $callSessionId) {
             if ($isAstrologer) {
                 // Astrologer outgoing reply check
                 $limitConfig = Setting::get('chat_assistance_daily_limit', 5);
@@ -141,7 +141,7 @@ class ChatAssistanceService
                         'limit_configured' => $limitConfig
                     ]);
 
-                    broadcast(new ChatAssistanceLimitReached($senderId))->toOthers();
+                    broadcast(new ChatAssistanceLimitReached($senderId));
 
                     throw new Exception("Daily message reply limit reached. You cannot send more replies today.");
                 }
@@ -171,11 +171,13 @@ class ChatAssistanceService
             }
             $this->logEvent($session->id, $eventName, $eventMetadata);
 
-            // Broadcast real-time message
-            broadcast(new ChatAssistanceMessageSent($message, $receiverId));
-
             return $message;
         });
+
+        // Broadcast real-time message OUTSIDE transaction
+        event(new ChatAssistanceMessageSent($message, $receiverId));
+
+        return $message;
     }
 
     /**

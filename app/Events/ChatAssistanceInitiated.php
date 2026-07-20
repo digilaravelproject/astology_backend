@@ -33,4 +33,22 @@ class ChatAssistanceInitiated implements ShouldBroadcastNow
     {
         return 'ChatAssistanceInitiated';
     }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'session' => [
+                'id' => $this->session->id,
+                'consumer_id' => $this->session->consumer_id,
+                'provider_id' => $this->session->provider_id,
+                'created_at' => $this->session->created_at ? $this->session->created_at->toIso8601String() : null,
+                'updated_at' => $this->session->updated_at ? $this->session->updated_at->toIso8601String() : null,
+            ],
+            'senderData' => [
+                'id' => $this->senderData->id,
+                'name' => $this->senderData->name,
+                'profile_photo' => $this->senderData->profile_photo ? \App\Helpers\MediaHelper::getUrl($this->senderData->profile_photo) : null,
+            ],
+        ];
+    }
 }

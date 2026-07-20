@@ -41,4 +41,16 @@ class ChatAssistanceMessageStatusUpdated implements ShouldBroadcastNow
     {
         return 'ChatAssistanceMessageStatusUpdated';
     }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'messageIds' => $this->messageIds,
+            'status' => $this->status,
+            'receiverId' => (int) $this->receiverId,
+            'sessionId' => (int) $this->sessionId,
+            'updatedBy' => (int) $this->updatedBy,
+            'timestamp' => $this->timestamp,
+        ];
+    }
 }

@@ -105,4 +105,36 @@ class ChatAssistanceTest extends TestCase
         $this->assertEquals('users/1/profile.png', $consumerPhoto);
         $this->assertEquals('astrologers/2/profile.png', $providerPhoto);
     }
+
+    public function test_chat_assistance_events_dispatch_with_correct_payloads()
+    {
+        \Illuminate\Support\Facades\Event::fake();
+
+        $consumer = User::factory()->create(['user_type' => 'user']);
+        $astrologer = User::factory()->create(['user_type' => 'astrologer']);
+
+        // Test ChatAssistanceInitiated
+        $response = $this->actingAs($consumer)->postJson('/api/v1/chat-assistance/initiate', [
+            'provider_id' => $astrologer->id,
+        ]);
+        $response->assertStatus(200);
+
+        \Illuminate\Support\Facades\Event::assertDispatched(\App\Events\ChatAssistanceInitiated::class, function ($event) use ($consumer) {
+            $payload = $event->broadcastWith();
+            return isset($payload['session']) && $payload['senderData']['id'] === $consumer->id;
+        });
+
+        $sessionId = $response->json('data.session.id');
+
+        // Test ChatAssistanceMessageSent
+        $responseMessage = $this->actingAs($consumer)->postJson("/api/v1/chat-assistance/{$sessionId}/message", [
+            'message' => 'Hello',
+        ]);
+        $responseMessage->assertStatus(200);
+
+        \Illuminate\Support\Facades\Event::assertDispatched(\App\Events\ChatAssistanceMessageSent::class, function ($event) use ($astrologer) {
+            $payload = $event->broadcastWith();
+            return $payload['messageData']['message'] === 'Hello' && $payload['receiverId'] === $astrologer->id;
+        });
+    }
 }
