@@ -362,9 +362,19 @@ class CallController extends Controller
             ->paginate($perPage);
 
             $consumerIds = $sessions->pluck('consumer_id')->unique()->toArray();
-            $assistanceSessions = \App\Models\ChatAssistanceSession::where('provider_id', $userId)
-                ->whereIn('consumer_id', $consumerIds)
-                ->pluck('id', 'consumer_id');
+            $assistanceSessions = \App\Models\ChatAssistanceSession::where(function($query) use ($userId, $consumerIds) {
+                    $query->where('provider_id', $userId)
+                          ->whereIn('consumer_id', $consumerIds);
+                })
+                ->orWhere(function($query) use ($userId, $consumerIds) {
+                    $query->where('consumer_id', $userId)
+                          ->whereIn('provider_id', $consumerIds);
+                })
+                ->get()
+                ->mapWithKeys(function ($session) use ($userId) {
+                    $otherId = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
+                    return [$otherId => $session->id];
+                });
 
             $sessions->getCollection()->transform(function ($session) use ($assistanceSessions) {
                 $assistanceSessionId = $assistanceSessions[$session->consumer_id] ?? null;
