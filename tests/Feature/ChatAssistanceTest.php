@@ -102,7 +102,7 @@ class ChatAssistanceTest extends TestCase
         $consumerPhoto = $sessions[0]['consumer']['profile_photo'];
         $providerPhoto = $sessions[0]['provider']['profile_photo'];
 
-        $this->assertEquals('storage/users/1/profile.png', $consumerPhoto);
-        $this->assertEquals('storage/astrologers/2/profile.png', $providerPhoto);
+        $this->assertEquals('users/1/profile.png', $consumerPhoto);
+        $this->assertEquals('astrologers/2/profile.png', $providerPhoto);
     }
 }
