@@ -307,6 +307,7 @@ class ChatAssistanceService
             ->paginate($perPage);
 
         $sessions->getCollection()->transform(function ($session) {
+            $session->chat_assistance_session_id = $session->id;
             if ($session->consumer) {
                 $session->consumer->profile_photo = MediaHelper::getUrl($session->consumer->profile_photo);
             }

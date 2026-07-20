@@ -136,6 +136,11 @@ class ChatAssistanceTest extends TestCase
             $payload = $event->broadcastWith();
             return $payload['messageData']['message'] === 'Hello' && $payload['receiverId'] === $astrologer->id;
         });
+
+        // Test ChatAssistance GetMessages contains chat_assistance_session_id at root
+        $responseGetMessages = $this->actingAs($consumer)->getJson("/api/v1/chat-assistance/{$sessionId}/messages");
+        $responseGetMessages->assertStatus(200);
+        $this->assertEquals($sessionId, $responseGetMessages->json('data.chat_assistance_session_id'));
     }
 
     public function test_get_astrologer_sessions_includes_chat_assistance_session_id()

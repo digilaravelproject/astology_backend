@@ -85,7 +85,11 @@ class ChatAssistanceController extends Controller
         try {
             $userId = $request->user()->id;
             $messages = $this->chatAssistanceService->getMessagesForSession($sessionId, $userId);
-            return ApiResponse::success($messages, 'Messages retrieved successfully');
+            
+            $responseData = $messages->toArray();
+            $responseData['chat_assistance_session_id'] = (int) $sessionId;
+
+            return ApiResponse::success($responseData, 'Messages retrieved successfully');
         } catch (Exception $e) {
             $code = $e->getCode() == 403 ? 403 : 500;
             return ApiResponse::error($e->getMessage(), $code);
