@@ -76,4 +76,33 @@ class ChatAssistanceTest extends TestCase
         $sessionId3 = $response3->json('data.session.id');
         $this->assertEquals($sessionId1, $sessionId3);
     }
+
+    public function test_get_sessions_returns_formatted_profile_photos()
+    {
+        $consumer = User::factory()->create([
+            'user_type' => 'user',
+            'profile_photo' => 'users/1/profile.png'
+        ]);
+        $astrologer = User::factory()->create([
+            'user_type' => 'astrologer',
+            'profile_photo' => 'astrologers/2/profile.png'
+        ]);
+
+        ChatAssistanceSession::create([
+            'consumer_id' => $consumer->id,
+            'provider_id' => $astrologer->id,
+        ]);
+
+        $response = $this->actingAs($consumer)->getJson('/api/v1/chat-assistance/sessions');
+
+        $response->assertStatus(200);
+        $sessions = $response->json('data.data');
+        $this->assertCount(1, $sessions);
+
+        $consumerPhoto = $sessions[0]['consumer']['profile_photo'];
+        $providerPhoto = $sessions[0]['provider']['profile_photo'];
+
+        $this->assertStringContainsString('users/1/profile.png', $consumerPhoto);
+        $this->assertStringContainsString('astrologers/2/profile.png', $providerPhoto);
+    }
 }

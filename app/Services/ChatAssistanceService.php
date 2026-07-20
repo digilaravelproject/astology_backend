@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Exception;
+use App\Helpers\MediaHelper;
 
 class ChatAssistanceService
 {
@@ -284,7 +285,7 @@ class ChatAssistanceService
      */
     public function getSessions($userId, $perPage = 15)
     {
-        return ChatAssistanceSession::with([
+        $sessions = ChatAssistanceSession::with([
                 'consumer:id,name,profile_photo',
                 'provider:id,name,profile_photo',
                 'latestMessage'
@@ -293,5 +294,17 @@ class ChatAssistanceService
             ->orWhere('provider_id', $userId)
             ->latest('updated_at')
             ->paginate($perPage);
+
+        $sessions->getCollection()->transform(function ($session) {
+            if ($session->consumer) {
+                $session->consumer->profile_photo = MediaHelper::getFullUrl($session->consumer->profile_photo);
+            }
+            if ($session->provider) {
+                $session->provider->profile_photo = MediaHelper::getFullUrl($session->provider->profile_photo);
+            }
+            return $session;
+        });
+
+        return $sessions;
     }
 }
