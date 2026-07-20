@@ -480,14 +480,38 @@ class ChatService
             throw new Exception("You are not authorized to access this chat history.", 403);
         }
 
-        return \App\Models\Message::where('chat_session_id', $sessionId)
+        // Fetch all chat session IDs between this consumer and provider
+        $sessionIds = \App\Models\ChatSession::where(function($q) use ($session) {
+                $q->where('consumer_id', $session->consumer_id)
+                  ->where('provider_id', $session->provider_id);
+            })
+            ->orWhere(function($q) use ($session) {
+                $q->where('consumer_id', $session->provider_id)
+                  ->where('provider_id', $session->consumer_id);
+            })
+            ->pluck('id');
+
+        return \App\Models\Message::whereIn('chat_session_id', $sessionIds)
             ->oldest()
             ->paginate(30);
     }
 
     public function getMessages($sessionId)
     {
-        return \App\Models\Message::where('chat_session_id', $sessionId)
+        $session = \App\Models\ChatSession::findOrFail($sessionId);
+
+        // Fetch all chat session IDs between this consumer and provider
+        $sessionIds = \App\Models\ChatSession::where(function($q) use ($session) {
+                $q->where('consumer_id', $session->consumer_id)
+                  ->where('provider_id', $session->provider_id);
+            })
+            ->orWhere(function($q) use ($session) {
+                $q->where('consumer_id', $session->provider_id)
+                  ->where('provider_id', $session->consumer_id);
+            })
+            ->pluck('id');
+
+        return \App\Models\Message::whereIn('chat_session_id', $sessionIds)
             ->oldest()
             ->paginate(30);
     }
