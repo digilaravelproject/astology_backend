@@ -205,8 +205,9 @@
 
                 <!-- Payment Gateway -->
                 <div x-show="tab === 'payment'" class="space-y-6">
-                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">Payment Gateways</h3>
+                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">Payment Gateway Settings</h3>
                     
+                    {{--
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl">
                             <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Gateway Mode</label>
@@ -240,42 +241,43 @@
                             </div>
                         </div>
                     </div>
+                    --}}
 
-                    <div class="space-y-6 pt-4">
-                        <div class="p-6 border border-gray-200 rounded-2xl space-y-4">
-                            <div class="flex items-center gap-3 border-b pb-2">
-                                <i class="fab fa-cc-amazon-pay text-primary text-xl"></i>
-                                <h4 class="text-sm font-extrabold text-text-primary uppercase">Razorpay Credentials</h4>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label class="block text-xs font-bold text-text-secondary mb-1">Razorpay Key</label>
-                                    <input type="text" name="razorpay_key" value="{{ $settings['razorpay_key'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-text-secondary mb-1">Razorpay Secret</label>
-                                    <input type="password" name="razorpay_secret" value="{{ $settings['razorpay_secret'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
-                                </div>
-                            </div>
+                    <div class="p-6 border border-gray-200 rounded-2xl space-y-4">
+                        <div class="flex items-center gap-3 border-b pb-2">
+                            <i class="fab fa-cc-amazon-pay text-primary text-xl"></i>
+                            <h4 class="text-sm font-extrabold text-text-primary uppercase">Razorpay Credentials</h4>
                         </div>
-
-                        <div class="p-6 border border-gray-200 rounded-2xl space-y-4">
-                            <div class="flex items-center gap-3 border-b pb-2">
-                                <i class="fab fa-stripe text-indigo-600 text-xl"></i>
-                                <h4 class="text-sm font-extrabold text-text-primary uppercase">Stripe Credentials</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Razorpay Key</label>
+                                <input type="text" name="razorpay_key" value="{{ $settings['razorpay_key'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label class="block text-xs font-bold text-text-secondary mb-1">Stripe Key</label>
-                                    <input type="text" name="stripe_key" value="{{ $settings['stripe_key'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-bold text-text-secondary mb-1">Stripe Secret</label>
-                                    <input type="password" name="stripe_secret" value="{{ $settings['stripe_secret'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
-                                </div>
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Razorpay Secret</label>
+                                <input type="password" name="razorpay_secret" value="{{ $settings['razorpay_secret'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
                             </div>
                         </div>
                     </div>
+
+                    {{--
+                    <div class="p-6 border border-gray-200 rounded-2xl space-y-4">
+                        <div class="flex items-center gap-3 border-b pb-2">
+                            <i class="fab fa-stripe text-indigo-600 text-xl"></i>
+                            <h4 class="text-sm font-extrabold text-text-primary uppercase">Stripe Credentials</h4>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Stripe Key</label>
+                                <input type="text" name="stripe_key" value="{{ $settings['stripe_key'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Stripe Secret</label>
+                                <input type="password" name="stripe_secret" value="{{ $settings['stripe_secret'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
+                            </div>
+                        </div>
+                    </div>
+                    --}}
                 </div>
 
                 <!-- Astrologer Default Pricing -->
