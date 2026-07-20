@@ -17,7 +17,12 @@ class RazorpayService
     public function __construct()
     {
         $this->keyId = \App\Models\Setting::get('razorpay_key') ?: config('razorpay.key_id');
-        $this->keySecret = \App\Models\Setting::get('razorpay_secret') ?: config('razorpay.key_secret');
+        $rawSecret = \App\Models\Setting::get('razorpay_secret') ?: config('razorpay.key_secret');
+        try {
+            $this->keySecret = $rawSecret ? \Illuminate\Support\Facades\Crypt::decryptString($rawSecret) : $rawSecret;
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            $this->keySecret = $rawSecret;
+        }
 
         try {
             $this->api = new Api($this->keyId, $this->keySecret);
