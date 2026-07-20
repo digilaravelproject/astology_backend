@@ -14,15 +14,18 @@ class ChatService
     protected $chatRepo;
     protected $walletService;
     protected $presenceService;
+    protected $pricingCalculator;
 
     public function __construct(
         ChatSessionRepository $chatRepo,
         WalletService $walletService,
-        PresenceService $presenceService
+        PresenceService $presenceService,
+        \App\Services\PricingCalculatorService $pricingCalculator
     ) {
         $this->chatRepo = $chatRepo;
         $this->walletService = $walletService;
         $this->presenceService = $presenceService;
+        $this->pricingCalculator = $pricingCalculator;
     }
 
     public function getSession($sessionId)
@@ -82,13 +85,7 @@ class ChatService
                     throw new Exception("You already have a pending or waiting request.");
                 }
                 
-                $astrologer = $provider->astrologer;
-                if (!$astrologer || !$astrologer->is_chat_enabled) {
-                    throw new Exception("Astrologer is not available for chat.");
-                }
-
-                $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
-                $pricing = $pricingCalculator->calculate($astrologer, 'chat');
+                $pricing = $this->pricingCalculator->calculate($astrologer, 'chat');
                 $rate = $pricing['customer_rate'];
                 
                 $balance = $this->walletService->getBalance($consumerId);
@@ -480,33 +477,20 @@ class ChatService
             throw new Exception("You are not authorized to access this chat history.", 403);
         }
 
-        // Fetch all chat session IDs between this consumer and provider
-        $sessionIds = \App\Models\ChatSession::where(function($q) use ($session) {
-                $q->where('consumer_id', $session->consumer_id)
-                  ->where('provider_id', $session->provider_id);
-            })
-            ->orWhere(function($q) use ($session) {
-                $q->where('consumer_id', $session->provider_id)
-                  ->where('provider_id', $session->consumer_id);
-            })
-            ->pluck('id');
-
-        $messages = \App\Models\Message::whereIn('chat_session_id', $sessionIds)
-            ->oldest()
-            ->paginate(30);
-
-        $messages->getCollection()->transform(function ($message) use ($sessionId) {
-            $message->chat_session_id = (int) $sessionId;
-            return $message;
-        });
-
-        return $messages;
+        return $this->fetchMessagesForSessionPair($session, $sessionId);
     }
 
     public function getMessages($sessionId)
     {
         $session = \App\Models\ChatSession::findOrFail($sessionId);
+        return $this->fetchMessagesForSessionPair($session, $sessionId);
+    }
 
+    /**
+     * Helper method to fetch and force sessionId on historical messages (DRY).
+     */
+    private function fetchMessagesForSessionPair($session, $sessionId)
+    {
         // Fetch all chat session IDs between this consumer and provider
         $sessionIds = \App\Models\ChatSession::where(function($q) use ($session) {
                 $q->where('consumer_id', $session->consumer_id)
