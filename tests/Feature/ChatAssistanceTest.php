@@ -137,4 +137,50 @@ class ChatAssistanceTest extends TestCase
             return $payload['messageData']['message'] === 'Hello' && $payload['receiverId'] === $astrologer->id;
         });
     }
+
+    public function test_get_astrologer_sessions_includes_chat_assistance_session_id()
+    {
+        $consumer = User::factory()->create(['user_type' => 'user']);
+        $astrologer = User::factory()->create(['user_type' => 'astrologer']);
+
+        // Create Chat Assistance session
+        $assistanceSession = ChatAssistanceSession::create([
+            'consumer_id' => $consumer->id,
+            'provider_id' => $astrologer->id,
+        ]);
+
+        // Create a Call Session
+        \App\Models\CallSession::create([
+            'consumer_id' => $consumer->id,
+            'provider_id' => $astrologer->id,
+            'status' => 'completed',
+            'started_at' => now(),
+            'ended_at' => now()->addMinutes(5),
+        ]);
+
+        // Create a Chat Session
+        \App\Models\ChatSession::create([
+            'consumer_id' => $consumer->id,
+            'provider_id' => $astrologer->id,
+            'status' => 'completed',
+            'started_at' => now(),
+            'ended_at' => now()->addMinutes(5),
+        ]);
+
+        // Test Call history endpoint
+        $responseCall = $this->actingAs($astrologer)->getJson('/api/v1/call/sessions/astrologer');
+        $responseCall->assertStatus(200);
+        $callData = $responseCall->json('data.data');
+        $this->assertCount(1, $callData);
+        $this->assertEquals($assistanceSession->id, $callData[0]['chat_assistance_session_id']);
+        $this->assertEquals($assistanceSession->id, $callData[0]['consumer']['chat_assistance_session_id']);
+
+        // Test Chat history endpoint
+        $responseChat = $this->actingAs($astrologer)->getJson('/api/v1/chat/sessions/astrologer');
+        $responseChat->assertStatus(200);
+        $chatData = $responseChat->json('data.data');
+        $this->assertCount(1, $chatData);
+        $this->assertEquals($assistanceSession->id, $chatData[0]['chat_assistance_session_id']);
+        $this->assertEquals($assistanceSession->id, $chatData[0]['consumer']['chat_assistance_session_id']);
+    }
 }

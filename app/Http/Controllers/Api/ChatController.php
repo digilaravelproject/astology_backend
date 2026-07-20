@@ -308,6 +308,21 @@ class ChatController extends Controller
         try {
             $userId = $request->user()->id;
             $sessions = $this->chatService->getAstrologerSessions($userId);
+
+            $consumerIds = $sessions->pluck('consumer_id')->unique()->toArray();
+            $assistanceSessions = \App\Models\ChatAssistanceSession::where('provider_id', $userId)
+                ->whereIn('consumer_id', $consumerIds)
+                ->pluck('id', 'consumer_id');
+
+            $sessions->getCollection()->transform(function ($session) use ($assistanceSessions) {
+                $assistanceSessionId = $assistanceSessions[$session->consumer_id] ?? null;
+                $session->chat_assistance_session_id = $assistanceSessionId;
+                if ($session->consumer) {
+                    $session->consumer->chat_assistance_session_id = $assistanceSessionId;
+                }
+                return $session;
+            });
+
             return ApiResponse::success($sessions, 'Astrologer sessions retrieved successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);

@@ -30,33 +30,42 @@ class ChatAssistanceService
             throw new Exception("Chat Assistance feature is currently disabled by Admin.");
         }
 
-        return DB::transaction(function () use ($consumerId, $providerId, $callSessionId) {
-            $session = ChatAssistanceSession::where(function ($query) use ($consumerId, $providerId) {
-                $query->where('consumer_id', $consumerId)
-                      ->where('provider_id', $providerId);
-            })->orWhere(function ($query) use ($consumerId, $providerId) {
-                $query->where('consumer_id', $providerId)
-                      ->where('provider_id', $consumerId);
-            })->first();
+        // Determine canonical consumer & provider IDs
+        $user1 = User::find($consumerId);
+        $user2 = User::find($providerId);
+
+        $finalConsumerId = $consumerId;
+        $finalProviderId = $providerId;
+
+        if ($user1 && $user2) {
+            if ($user1->user_type === 'astrologer' && $user2->user_type === 'user') {
+                $finalConsumerId = $providerId;
+                $finalProviderId = $consumerId;
+            }
+        }
+
+        return DB::transaction(function () use ($finalConsumerId, $finalProviderId, $consumerId, $callSessionId) {
+            $session = ChatAssistanceSession::where('consumer_id', $finalConsumerId)
+                ->where('provider_id', $finalProviderId)
+                ->lockForUpdate()
+                ->first();
 
             if (!$session) {
-                $user1 = User::find($consumerId);
-                $user2 = User::find($providerId);
+                try {
+                    $session = ChatAssistanceSession::create([
+                        'consumer_id' => $finalConsumerId,
+                        'provider_id' => $finalProviderId,
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    $session = ChatAssistanceSession::where('consumer_id', $finalConsumerId)
+                        ->where('provider_id', $finalProviderId)
+                        ->lockForUpdate()
+                        ->first();
 
-                $finalConsumerId = $consumerId;
-                $finalProviderId = $providerId;
-
-                if ($user1 && $user2) {
-                    if ($user1->user_type === 'astrologer' && $user2->user_type === 'user') {
-                        $finalConsumerId = $providerId;
-                        $finalProviderId = $consumerId;
+                    if (!$session) {
+                        throw $e;
                     }
                 }
-
-                $session = ChatAssistanceSession::create([
-                    'consumer_id' => $finalConsumerId,
-                    'provider_id' => $finalProviderId,
-                ]);
             }
 
             // Track session initiation event
