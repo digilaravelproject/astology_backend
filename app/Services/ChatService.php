@@ -491,9 +491,16 @@ class ChatService
             })
             ->pluck('id');
 
-        return \App\Models\Message::whereIn('chat_session_id', $sessionIds)
+        $messages = \App\Models\Message::whereIn('chat_session_id', $sessionIds)
             ->oldest()
             ->paginate(30);
+
+        $messages->getCollection()->transform(function ($message) use ($sessionId) {
+            $message->chat_session_id = (int) $sessionId;
+            return $message;
+        });
+
+        return $messages;
     }
 
     public function getMessages($sessionId)
@@ -511,9 +518,16 @@ class ChatService
             })
             ->pluck('id');
 
-        return \App\Models\Message::whereIn('chat_session_id', $sessionIds)
+        $messages = \App\Models\Message::whereIn('chat_session_id', $sessionIds)
             ->oldest()
             ->paginate(30);
+
+        $messages->getCollection()->transform(function ($message) use ($sessionId) {
+            $message->chat_session_id = (int) $sessionId;
+            return $message;
+        });
+
+        return $messages;
     }
 
     /**
