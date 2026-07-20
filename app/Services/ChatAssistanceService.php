@@ -297,10 +297,10 @@ class ChatAssistanceService
 
         $sessions->getCollection()->transform(function ($session) {
             if ($session->consumer) {
-                $session->consumer->profile_photo = MediaHelper::getFullUrl($session->consumer->profile_photo);
+                $session->consumer->profile_photo = $session->consumer->profile_photo ? 'storage/' . MediaHelper::getUrl($session->consumer->profile_photo) : null;
             }
             if ($session->provider) {
-                $session->provider->profile_photo = MediaHelper::getFullUrl($session->provider->profile_photo);
+                $session->provider->profile_photo = $session->provider->profile_photo ? 'storage/' . MediaHelper::getUrl($session->provider->profile_photo) : null;
             }
             return $session;
         });
