@@ -119,13 +119,13 @@ class ChatAssistanceService
         }
 
         $sender = User::findOrFail($senderId);
-        $isAstrologer = ($session->provider_id == $senderId);
+        $isAstrologer = ($sender->user_type === 'astrologer');
 
         $message = DB::transaction(function () use ($session, $senderId, $receiverId, $isAstrologer, $data, $callSessionId) {
             if ($isAstrologer) {
                 // Astrologer outgoing reply check
                 $limitConfig = Setting::get('chat_assistance_daily_limit', 5);
-                $today = Carbon::today();
+                $today = Carbon::today()->toDateString();
 
                 $limitRecord = ChatAssistanceAstrologerLimit::where('astrologer_id', $senderId)
                     ->where('date', $today)
@@ -215,7 +215,7 @@ class ChatAssistanceService
     public function getAstrologerLimitStatus($astrologerId)
     {
         $limitConfig = Setting::get('chat_assistance_daily_limit', 5);
-        $today = Carbon::today();
+        $today = Carbon::today()->toDateString();
 
         $limitRecord = ChatAssistanceAstrologerLimit::where('astrologer_id', $astrologerId)
             ->where('date', $today)
