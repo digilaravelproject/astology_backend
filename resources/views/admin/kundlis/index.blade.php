@@ -116,7 +116,7 @@
                             {{ $kundli->birth_date ? \Carbon\Carbon::parse($kundli->birth_date)->format('M d, Y') : 'N/A' }}
                         </td>
                         <td class="px-6 py-5 text-sm text-gray">
-                            {{ $kundli->birth_location ?? 'N/A' }}
+                            {{ $kundli->birth_place ?? 'N/A' }}
                         </td>
                         <td class="px-6 py-5 text-sm text-gray">
                             {{ $kundli->created_at->format('M d, Y') }}

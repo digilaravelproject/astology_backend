@@ -12,6 +12,7 @@ class Kundli extends Model
         'gender',
         'birth_date',
         'birth_time',
+        'birth_place',
         'latitude',
         'longitude',
         'datetime',

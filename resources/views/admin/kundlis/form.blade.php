@@ -76,9 +76,9 @@
                     </div>
 
                     <div class="group">
-                        <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Birth Location</label>
-                        <input type="text" name="birth_location" value="{{ old('birth_location', $kundli->birth_location ?? '') }}" placeholder="City, Country..." class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-sm font-bold text-dark placeholder:text-gray-light focus:bg-white focus:border-info/20 focus:ring-0 transition-all">
-                        @error('birth_location') <span class="text-xs text-danger">{{ $message }}</span> @enderror
+                        <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Birth Place / Location</label>
+                        <input type="text" name="birth_place" value="{{ old('birth_place', $kundli->birth_place ?? '') }}" placeholder="City, Country..." class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-sm font-bold text-dark placeholder:text-gray-light focus:bg-white focus:border-info/20 focus:ring-0 transition-all">
+                        @error('birth_place') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                     </div>
                 </div>
             </div>
