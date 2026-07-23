@@ -16,16 +16,30 @@ class UpdateUserProfileRequest extends FormRequest
     }
 
     /**
+     * Prepare data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('gender')) {
+            $this->merge([
+                'gender' => strtolower((string) $this->input('gender')),
+            ]);
+        }
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      */
     public function rules(): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'gender' => ['required', Rule::in('male', 'female')],
+            'gender' => ['required', Rule::in(['male', 'female', 'other'])],
             'date_of_birth' => ['required', 'date', 'before:today'],
             'time_of_birth' => ['required', 'date_format:H:i'],
             'place_of_birth' => ['required', 'string', 'max:255'],
+            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
             'relationship_status' => ['nullable', 'string', 'max:255'],
             'occupation' => ['nullable', 'string', 'max:255'],
             'languages' => ['required', 'array', 'min:1'],
@@ -60,6 +74,12 @@ class UpdateUserProfileRequest extends FormRequest
             'place_of_birth.required' => 'Place of birth is required.',
             'place_of_birth.string' => 'Place of birth must be a string.',
             'place_of_birth.max' => 'Place of birth cannot exceed 255 characters.',
+
+            'latitude.numeric' => 'Latitude must be a numeric value.',
+            'latitude.between' => 'Latitude must be between -90 and 90 degrees.',
+
+            'longitude.numeric' => 'Longitude must be a numeric value.',
+            'longitude.between' => 'Longitude must be between -180 and 180 degrees.',
 
             'languages.required' => 'Languages are required. Select at least one language.',
             'languages.array' => 'Languages must be an array.',

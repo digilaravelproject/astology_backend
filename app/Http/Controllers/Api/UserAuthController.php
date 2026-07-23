@@ -262,17 +262,19 @@ class UserAuthController extends Controller
             DB::beginTransaction();
 
             // Update user profile fields
-            $user->update([
+            $user->update(array_filter([
                 'name' => $request->input('name'),
                 'gender' => $request->input('gender'),
                 'date_of_birth' => $request->input('date_of_birth'),
                 'time_of_birth' => $request->input('time_of_birth'),
                 'place_of_birth' => $request->input('place_of_birth'),
+                'latitude' => $request->input('latitude'),
+                'longitude' => $request->input('longitude'),
                 'relationship_status' => $request->input('relationship_status'),
                 'occupation' => $request->input('occupation'),
                 'languages' => $request->input('languages'),
                 'profile_completed' => true,
-            ]);
+            ], fn($val) => !is_null($val)));
 
             DB::commit();
 
@@ -372,18 +374,20 @@ class UserAuthController extends Controller
         DB::beginTransaction();
 
         try {
-            $user->update([
+            $user->update(array_filter([
                 'name' => $request->input('name'),
                 'phone' => $request->input('phone'),
                 'gender' => $request->input('gender'),
                 'date_of_birth' => $request->input('date_of_birth'),
                 'time_of_birth' => $request->input('time_of_birth'),
                 'place_of_birth' => $request->input('place_of_birth'),
+                'latitude' => $request->input('latitude'),
+                'longitude' => $request->input('longitude'),
                 'relationship_status' => $request->input('relationship_status'),
                 'occupation' => $request->input('occupation'),
                 'languages' => $request->input('languages'),
                 'profile_completed' => true,
-            ]);
+            ], fn($val) => !is_null($val)));
 
             DB::commit();
 
