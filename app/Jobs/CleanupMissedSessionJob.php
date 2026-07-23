@@ -38,7 +38,14 @@ class CleanupMissedSessionJob implements ShouldQueue
                 $callService->missedCall($this->sessionId);
                 // CallDismissed (not CallEnded) — this was a missed/timed-out ring
                 broadcast(new \App\Events\CallDismissed($session->refresh(), null, 'timeout'));
-                Log::info("Call session {$this->sessionId} timed out (missed).");
+
+                // Close any orphaned PackageSubSession linked to this timed-out call.
+                // Prevents the user from being locked out of starting a new package session.
+                \App\Models\PackageSubSession::where('call_session_id', $this->sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now()]);
+
+                Log::info("Call session {$this->sessionId} timed out (missed). Orphaned PackageSubSession closed.");
             }
         } else {
             $session = ChatSession::find($this->sessionId);
@@ -47,7 +54,16 @@ class CleanupMissedSessionJob implements ShouldQueue
                 $timedOutSession = $chatService->systemTimeoutChat($this->sessionId);
                 broadcast(new \App\Events\ChatDismissed($timedOutSession, null, 'timeout'));
                 broadcast(new \App\Events\ChatQueueUpdated($timedOutSession->provider_id, $timedOutSession, 'timeout'));
-                Log::info("Chat session {$this->sessionId} timed out (missed).");
+
+                // Close any orphaned PackageSubSession linked to this timed-out chat.
+                // Prevents the user from being locked out of starting a new package session.
+                // Note: systemTimeoutChat() above also performs this cleanup, but we guard
+                // here as a double-safety net in case the session was not in 'initiated' state.
+                \App\Models\PackageSubSession::where('chat_session_id', $this->sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now()]);
+
+                Log::info("Chat session {$this->sessionId} timed out (missed). Orphaned PackageSubSession closed.");
             }
         }
     }

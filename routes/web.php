@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\GiftController;
 use App\Http\Controllers\Admin\GiftTransactionController;
 use App\Http\Controllers\Admin\FeedbackController;
 use App\Http\Controllers\Admin\RateLimitController;
+use App\Http\Controllers\StaticPageController;
 
 Route::get('/', function () {
     $faq = \App\Models\StaticPage::where('type', 'faq')->where('is_active', true)->first();
@@ -20,6 +21,17 @@ Route::get('/', function () {
 
 Route::get('/admin', function () {
     return redirect()->route('admin.login');
+});
+
+// Public Static Pages
+Route::prefix('page')->group(function () {
+    Route::get('/faq',                [StaticPageController::class, 'faq'])->name('page.faq');
+    Route::get('/privacy-policy',     [StaticPageController::class, 'privacyPolicy'])->name('page.privacy-policy');
+    Route::get('/terms-and-conditions', [StaticPageController::class, 'termsConditions'])->name('page.terms-and-conditions');
+    Route::get('/payment-policy',     [StaticPageController::class, 'paymentPolicy'])->name('page.payment-policy');
+    Route::get('/about-us',           [StaticPageController::class, 'aboutUs'])->name('page.about-us');
+    Route::get('/customer-support',   [StaticPageController::class, 'customerSupport'])->name('page.customer-support');
+    Route::get('/contact-us',         [StaticPageController::class, 'contactUs'])->name('page.contact-us');
 });
 // Admin Routes
 Route::prefix('admin')->group(function () {
@@ -189,11 +201,27 @@ Route::prefix('admin')->group(function () {
         Route::get('reports', function() { return view('admin.reports.index'); })->name('admin.reports.index');
 
         // Settings
-        Route::get('settings', function() { return view('admin.settings.index'); })->name('admin.settings.index');
+        Route::get('settings', [\App\Http\Controllers\Admin\SettingController::class, 'index'])->name('admin.settings.index');
+        Route::post('settings', [\App\Http\Controllers\Admin\SettingController::class, 'update'])->name('admin.settings.update');
         Route::prefix('settings')->group(function () {
+            Route::post('operators', [\App\Http\Controllers\Admin\SettingController::class, 'storeOperator'])->name('admin.settings.operators.store');
+            Route::put('operators/{id}', [\App\Http\Controllers\Admin\SettingController::class, 'updateOperator'])->name('admin.settings.operators.update');
+            Route::delete('operators/{id}', [\App\Http\Controllers\Admin\SettingController::class, 'destroyOperator'])->name('admin.settings.operators.destroy');
             Route::get('rate-limits', [RateLimitController::class, 'index'])->name('admin.settings.rate-limits');
             Route::post('rate-limits', [RateLimitController::class, 'update'])->name('admin.settings.rate-limits.update');
         });
+
+        // Offers Management
+        Route::resource('offers', \App\Http\Controllers\Admin\OfferController::class)->names('admin.offers');
+        Route::post('offers/{offer}/toggle-status', [\App\Http\Controllers\Admin\OfferController::class, 'toggleStatus'])->name('admin.offers.toggle-status');
+
+        // Packages Management
+        Route::get('packages', [\App\Http\Controllers\Admin\AdminPackageController::class, 'index'])->name('admin.packages.index');
+        Route::post('packages', [\App\Http\Controllers\Admin\AdminPackageController::class, 'store'])->name('admin.packages.store');
+        Route::put('packages/{id}', [\App\Http\Controllers\Admin\AdminPackageController::class, 'update'])->name('admin.packages.update');
+        Route::delete('packages/{id}', [\App\Http\Controllers\Admin\AdminPackageController::class, 'destroy'])->name('admin.packages.destroy');
+        Route::post('packages/assign', [\App\Http\Controllers\Admin\AdminPackageController::class, 'assignToAstrologer'])->name('admin.packages.assign');
+        Route::delete('packages/override/{id}', [\App\Http\Controllers\Admin\AdminPackageController::class, 'removeOverride'])->name('admin.packages.remove-override');
 
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
     });

@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Astrology</title>
+    <title>{{ \App\Models\Setting::get('app_name', 'Astology Premium') }} - Admin</title>
+    <link rel="shortcut icon" href="{{ \App\Models\Setting::get('favicon_path', '/favicon.ico') }}" type="image/x-icon">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -16,8 +17,12 @@
             <button @click="sidebarOpen = !sidebarOpen" class="md:hidden text-gray text-xl">
                 <i class="fas fa-bars"></i>
             </button>
-            <span class="text-xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent">
-                ☉ Astrology Admin
+            <span class="text-xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent flex items-center gap-2">
+                @if($logoPath = \App\Models\Setting::get('logo_path'))
+                    <img src="{{ $logoPath }}" class="h-8 object-contain">
+                @else
+                    ☉ {{ \App\Models\Setting::get('app_name', 'Astology Premium') }}
+                @endif
             </span>
         </div>
 
@@ -191,6 +196,30 @@
                                 </a>
                             </li>
                         </ul>
+                    </li>
+
+                    <!-- Offers & Splits -->
+                    <li>
+                        <a href="{{ route('admin.offers.index') }}"
+                           class="flex items-center gap-4 px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                  {{ request()->routeIs('admin.offers.*')
+                                     ? 'bg-sidebar-hover text-primary border-r-[3px] border-primary'
+                                     : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <i class="fas fa-percentage w-5 text-center text-base"></i>
+                            <span>Offers & Splits</span>
+                        </a>
+                    </li>
+
+                    <!-- Prepaid Packages -->
+                    <li>
+                        <a href="{{ route('admin.packages.index') }}"
+                           class="flex items-center gap-4 px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                  {{ request()->routeIs('admin.packages.*')
+                                     ? 'bg-sidebar-hover text-primary border-r-[3px] border-primary'
+                                     : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <i class="fas fa-box w-5 text-center text-base"></i>
+                            <span>Prepaid Packages</span>
+                        </a>
                     </li>
 
                     <!-- Order Management -->

@@ -25,8 +25,10 @@ use App\Http\Controllers\Api\{
     SuperChatController,
     TrainingVideoController,
     GiftController,
+    TurnCredentialsController,
     UserAuthController,
-    WalletController
+    WalletController,
+    ChatAssistanceController
 };
 
 /*
@@ -56,6 +58,7 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
             Route::get('/orders', [AstrologerController::class, 'getOrders']);
+            Route::get('/performance', [AstrologerController::class, 'getPerformance']);
             
             Route::prefix('default-messages')->group(function () {
                 Route::get('/', [\App\Http\Controllers\Api\AstrologerDefaultMessageController::class, 'index']);
@@ -101,6 +104,8 @@ Route::prefix('v1')->group(function () {
                 Route::get('/withdrawals', [AstrologerWalletController::class, 'withdrawals']);
                 Route::post('/withdraw', [AstrologerWalletController::class, 'withdraw']);
                 Route::get('/weekly-rankings', [AstrologerWalletController::class, 'weeklyRankings']);
+                Route::get('/invoices', [AstrologerWalletController::class, 'invoices']);
+                Route::get('/invoices/{year}/{month}/download', [AstrologerWalletController::class, 'downloadInvoice']);
             });
 
             // Gallery routes
@@ -133,6 +138,13 @@ Route::prefix('v1')->group(function () {
                 Route::get('/status', [\App\Http\Controllers\Api\AstrologerPriceIncreaseController::class, 'status']);
                 Route::post('/request', [\App\Http\Controllers\Api\AstrologerPriceIncreaseController::class, 'requestIncrease']);
                 Route::get('/history', [\App\Http\Controllers\Api\AstrologerPriceIncreaseController::class, 'history']);
+            });
+
+            // Offers & Commission routes
+            Route::prefix('offers')->group(function () {
+                Route::get('/', [\App\Http\Controllers\Api\AstrologerOfferController::class, 'index']);
+                Route::post('/{id}/activate', [\App\Http\Controllers\Api\AstrologerOfferController::class, 'activate']);
+                Route::get('/history', [\App\Http\Controllers\Api\AstrologerOfferController::class, 'history']);
             });
 
             Route::post('/logout', [AstrologerAuthController::class, 'logout']);
@@ -213,6 +225,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/matrimony/search', [MatrimonyController::class, 'searchProfiles']);
             Route::post('/logout', [UserAuthController::class, 'logout']);
             Route::delete('/delete-account', [UserAuthController::class, 'deleteAccount']);
+
+            Route::prefix('packages')->group(function () {
+                Route::post('/purchase', [\App\Http\Controllers\Api\PackageSessionController::class, 'purchase']);
+                Route::get('/active-status', [\App\Http\Controllers\Api\PackageSessionController::class, 'activeStatus']);
+                Route::post('/session/start', [\App\Http\Controllers\Api\PackageSessionController::class, 'startSession']);
+                Route::post('/session/end', [\App\Http\Controllers\Api\PackageSessionController::class, 'endSession']);
+            });
         });
     });
 
@@ -265,6 +284,16 @@ Route::prefix('v1')->group(function () {
             Route::post('/{sessionId}/sync-status', [ChatController::class, 'syncStatus']);
             Route::get('/{sessionId}/messages', [ChatController::class, 'getMessages']);
         });
+
+        Route::prefix('chat-assistance')->group(function () {
+            Route::post('/initiate', [ChatAssistanceController::class, 'initiate']);
+            Route::post('/{sessionId}/message', [ChatAssistanceController::class, 'sendMessage']);
+            Route::get('/{sessionId}/messages', [ChatAssistanceController::class, 'getMessages']);
+            Route::post('/{sessionId}/sync-status', [ChatAssistanceController::class, 'syncStatus']);
+            Route::get('/astrologer/status', [ChatAssistanceController::class, 'getAstrologerStatus']);
+            Route::get('/sessions', [ChatAssistanceController::class, 'getSessions']);
+        });
+
     });
 
     /*

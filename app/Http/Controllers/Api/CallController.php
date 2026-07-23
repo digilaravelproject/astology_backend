@@ -283,8 +283,34 @@ class CallController extends Controller
             ->latest()
             ->first();
 
+            $isPackageSession = false;
+            $remainingDurationSeconds = null;
+
+            if ($session) {
+                $subSession = \App\Models\PackageSubSession::where('call_session_id', $session->id)
+                    ->whereNull('ended_at')
+                    ->first();
+
+                if ($subSession) {
+                    $isPackageSession = true;
+                    $purchase = $subSession->purchase;
+                    if ($purchase) {
+                        $remainingDurationSeconds = (int) $purchase->remaining_duration;
+                        if ($subSession->started_at) {
+                            $elapsed = now()->diffInSeconds($subSession->started_at);
+                            $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
+                        }
+                    }
+                }
+            }
+
             return ApiResponse::success(
-                ['session' => $session],
+                [
+                    'session' => $session,
+                    'is_package_session' => $isPackageSession,
+                    'session_type' => 'call',
+                    'remaining_duration_seconds' => $remainingDurationSeconds,
+                ],
                 'Current active call session retrieved successfully'
             );
 
@@ -334,6 +360,30 @@ class CallController extends Controller
             ->where('provider_id', $userId)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
+
+            $consumerIds = $sessions->pluck('consumer_id')->unique()->toArray();
+            $assistanceSessions = \App\Models\ChatAssistanceSession::where(function($query) use ($userId, $consumerIds) {
+                    $query->where('provider_id', $userId)
+                          ->whereIn('consumer_id', $consumerIds);
+                })
+                ->orWhere(function($query) use ($userId, $consumerIds) {
+                    $query->where('consumer_id', $userId)
+                          ->whereIn('provider_id', $consumerIds);
+                })
+                ->get()
+                ->mapWithKeys(function ($session) use ($userId) {
+                    $otherId = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
+                    return [$otherId => $session->id];
+                });
+
+            $sessions->getCollection()->transform(function ($session) use ($assistanceSessions) {
+                $assistanceSessionId = $assistanceSessions[$session->consumer_id] ?? null;
+                $session->chat_assistance_session_id = $assistanceSessionId;
+                if ($session->consumer) {
+                    $session->consumer->chat_assistance_session_id = $assistanceSessionId;
+                }
+                return $session;
+            });
 
             return ApiResponse::success($sessions, 'Call sessions retrieved successfully');
 

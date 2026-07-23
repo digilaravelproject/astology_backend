@@ -12,6 +12,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('live_sessions', function (Blueprint $table) {
+            try {
+                if (config('database.default') === 'sqlite') {
+                    // SQLite requires dropping the unique index specifically first
+                    $table->dropUnique('live_sessions_stream_key_unique');
+                } else {
+                    $table->dropUnique(['stream_key']);
+                }
+            } catch (\Exception $e) {
+                // Ignore if it doesn't exist
+            }
+
             $table->dropColumn([
                 'live_url',
                 'stream_key',

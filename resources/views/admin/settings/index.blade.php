@@ -1,159 +1,490 @@
 @extends('admin.layouts.app')
 
 @section('content')
-<div x-data="{ tab: 'general' }">
+<div x-data="{ 
+    tab: 'general',
+    showAddModal: false,
+    showEditModal: false,
+    currentOperator: { id: '', name: '', email: '', phone: '', role: 'admin', is_active: 1 }
+}">
     <!-- Page Header -->
-    <div class="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-lighter pb-8">
+    <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-lighter pb-6">
         <div>
-            <h1 class="text-3xl md:text-4xl font-black text-dark tracking-tighter uppercase">Command Center</h1>
-            <p class="text-sm text-gray font-medium mt-2 italic">Governing platform logic, financial protocols, and administrative access.</p>
-        </div>
-        <div class="flex gap-4">
-            <button class="px-8 py-4 bg-white border-2 border-gray-lighter text-dark text-[11px] font-black uppercase rounded-2xl hover:bg-light transition-all">Audit Logs</button>
-            <button class="px-10 py-4 bg-dark text-white text-[11px] font-black uppercase rounded-2xl hover:bg-primary transition-all shadow-xl shadow-dark/20 flex items-center gap-3">
-                <i class="fas fa-save"></i> Commit Changes
-            </button>
+            <h1 class="text-2xl md:text-3xl font-extrabold text-text-primary tracking-tight">Website Settings & Control</h1>
+            <p class="text-sm text-text-muted mt-1">Manage website settings, payment gateways, commission logic, protection controls, and team accounts.</p>
         </div>
     </div>
 
-    <!-- Governance Tabs -->
-    <div class="bg-white rounded-[48px] border border-gray-lighter shadow-sm overflow-hidden min-h-[600px] flex flex-col lg:flex-row">
+    <!-- Main Grid -->
+    <div class="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden min-h-[600px] flex flex-col lg:flex-row">
         <!-- Sidebar Navigation -->
-        <div class="lg:w-80 bg-light/30 border-r border-gray-lighter p-8 space-y-2">
-            <button @click="tab = 'general'" :class="tab === 'general' ? 'bg-white text-primary shadow-sm border-gray-lighter' : 'text-gray hover:bg-white/50 border-transparent'" class="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border">
-                <i class="fas fa-cog w-5 text-center"></i> Platform Core
+        <div class="lg:w-72 bg-light/20 border-r border-gray-200 p-6 space-y-1">
+            <button @click="tab = 'general'" :class="tab === 'general' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
+                <i class="fas fa-desktop w-5 text-center"></i> General Settings
             </button>
-            <button @click="tab = 'commission'" :class="tab === 'commission' ? 'bg-white text-primary shadow-sm border-gray-lighter' : 'text-gray hover:bg-white/50 border-transparent'" class="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border">
-                <i class="fas fa-percentage w-5 text-center"></i> Commission Logic
+            <button @click="tab = 'commission'" :class="tab === 'commission' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
+                <i class="fas fa-percentage w-5 text-center"></i> Commission Rates
             </button>
-            <button @click="tab = 'wallet'" :class="tab === 'wallet' ? 'bg-white text-primary shadow-sm border-gray-lighter' : 'text-gray hover:bg-white/50 border-transparent'" class="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border">
-                <i class="fas fa-wallet w-5 text-center"></i> Financial Rules
+            <button @click="tab = 'wallet'" :class="tab === 'wallet' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
+                <i class="fas fa-wallet w-5 text-center"></i> Wallet & Money Rules
             </button>
-            <button @click="tab = 'payment'" :class="tab === 'payment' ? 'bg-white text-primary shadow-sm border-gray-lighter' : 'text-gray hover:bg-white/50 border-transparent'" class="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border">
+            <button @click="tab = 'payment'" :class="tab === 'payment' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
                 <i class="fas fa-credit-card w-5 text-center"></i> Payment Gateway
             </button>
-            <button @click="tab = 'astro'" :class="tab === 'astro' ? 'bg-white text-primary shadow-sm border-gray-lighter' : 'text-gray hover:bg-white/50 border-transparent'" class="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border">
-                <i class="fas fa-star w-5 text-center"></i> Astro Governance
+            <button @click="tab = 'astro'" :class="tab === 'astro' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
+                <i class="fas fa-user-tie w-5 text-center"></i> Astrologer Pricing
             </button>
-            <button @click="tab = 'security'" :class="tab === 'security' ? 'bg-white text-primary shadow-sm border-gray-lighter' : 'text-gray hover:bg-white/50 border-transparent'" class="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border">
-                <i class="fas fa-shield-alt w-5 text-center"></i> Platform Guard
+            <button @click="tab = 'security'" :class="tab === 'security' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
+                <i class="fas fa-shield-alt w-5 text-center"></i> Website Protection
             </button>
-            <button @click="tab = 'admin'" :class="tab === 'admin' ? 'bg-white text-primary shadow-sm border-gray-lighter' : 'text-gray hover:bg-white/50 border-transparent'" class="w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border">
-                <i class="fas fa-users-cog w-5 text-center"></i> RBAC Management
+            <button @click="tab = 'chat_assistance'" :class="tab === 'chat_assistance' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
+                <i class="fas fa-comments w-5 text-center"></i> Chat Assistance
+            </button>
+            <button @click="tab = 'admin'" :class="tab === 'admin' ? 'bg-primary/10 text-primary border-primary' : 'text-text-secondary hover:bg-light border-transparent'" class="w-full flex items-center gap-3 px-5 py-3.5 rounded-xl text-sm font-semibold transition-all border-l-4">
+                <i class="fas fa-users-cog w-5 text-center"></i> Team & Admins (RBAC)
             </button>
         </div>
 
         <!-- Content Area -->
-        <div class="flex-1 p-12">
-            <!-- General Settings -->
-            <div x-show="tab === 'general'" class="space-y-10">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    <div>
-                        <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Application Identity</label>
-                        <input type="text" value="Astology Premium" class="w-full bg-light/30 border-2 border-transparent px-6 py-4 rounded-2xl text-xs font-black text-dark focus:bg-white focus:border-primary/20 transition-all">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Support Ecosystem</label>
-                        <input type="email" value="ops@astologyapp.com" class="w-full bg-light/30 border-2 border-transparent px-6 py-4 rounded-2xl text-xs font-black text-dark focus:bg-white focus:border-primary/20 transition-all">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">SEO Meta Base</label>
-                    <textarea rows="3" class="w-full bg-light/30 border-2 border-transparent px-6 py-4 rounded-2xl text-xs font-bold text-dark focus:bg-white focus:border-primary/20 transition-all">Connect with India's top astrologers for personalized readings, daily horoscopes, and spiritual guidance.</textarea>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="p-6 bg-light/30 rounded-3xl border border-gray-lighter text-center">
-                        <div class="w-12 h-12 bg-white rounded-xl mx-auto mb-3 flex items-center justify-center shadow-sm text-primary"><i class="fas fa-image"></i></div>
-                        <div class="text-[9px] font-black text-dark uppercase tracking-widest">Favicon Asset</div>
-                        <button class="mt-2 text-[8px] font-black text-primary uppercase underline">Replace</button>
-                    </div>
-                    <div class="p-6 bg-light/30 rounded-3xl border border-gray-lighter text-center">
-                        <div class="w-12 h-12 bg-white rounded-xl mx-auto mb-3 flex items-center justify-center shadow-sm text-primary"><i class="fas fa-signature"></i></div>
-                        <div class="text-[9px] font-black text-dark uppercase tracking-widest">Logo Branding</div>
-                        <button class="mt-2 text-[8px] font-black text-primary uppercase underline">Replace</button>
-                    </div>
-                    <div class="p-6 bg-light/30 rounded-3xl border border-gray-lighter text-center">
-                        <div class="w-12 h-12 bg-white rounded-xl mx-auto mb-3 flex items-center justify-center shadow-sm text-primary"><i class="fas fa-share-alt"></i></div>
-                        <div class="text-[9px] font-black text-dark uppercase tracking-widest">Social Preview</div>
-                        <button class="mt-2 text-[8px] font-black text-primary uppercase underline">Replace</button>
-                    </div>
-                </div>
-            </div>
+        <div class="flex-1 p-8 lg:p-10">
+            <form action="{{ route('admin.settings.update') }}" method="POST" enctype="multipart/form-data" class="space-y-8">
+                @csrf
 
-            <!-- Commission Logic -->
-            <div x-show="tab === 'commission'" class="space-y-10">
-                <div class="p-10 bg-primary/5 rounded-[40px] border border-primary/10 flex flex-col items-center text-center">
-                    <div class="w-20 h-20 bg-white rounded-full flex items-center justify-center text-3xl text-primary shadow-xl mb-6"><i class="fas fa-percentage"></i></div>
-                    <h3 class="text-xl font-black text-dark uppercase tracking-tighter mb-2">Global Commission Intake</h3>
-                    <p class="text-xs text-gray font-medium max-w-[400px] mb-8">Set the baseline percentage the platform retains from every spiritual transaction.</p>
-                    <div class="flex items-center gap-4">
-                        <div class="text-5xl font-black text-dark tracking-tighter">20<span class="text-primary">%</span></div>
-                        <div class="flex flex-col gap-1">
-                            <button class="w-8 h-8 bg-white border border-gray-lighter rounded-lg text-[10px] hover:bg-primary hover:text-white transition-all"><i class="fas fa-chevron-up"></i></button>
-                            <button class="w-8 h-8 bg-white border border-gray-lighter rounded-lg text-[10px] hover:bg-primary hover:text-white transition-all"><i class="fas fa-chevron-down"></i></button>
+                <!-- General Settings -->
+                <div x-show="tab === 'general'" class="space-y-6">
+                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">General Settings</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Website / App Name</label>
+                            <input type="text" name="app_name" value="{{ $settings['app_name'] }}" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Support Email Address</label>
+                            <input type="email" name="support_email" value="{{ $settings['support_email'] }}" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                         </div>
                     </div>
-                </div>
-                <div class="space-y-4">
-                    <h4 class="text-[10px] font-black text-gray uppercase tracking-widest px-4">Segment Based overrides</h4>
-                    <div class="bg-light/30 p-6 rounded-3xl border border-gray-lighter flex justify-between items-center">
-                        <span class="text-xs font-black text-dark uppercase tracking-widest">E-commerce Marketplace</span>
-                        <div class="flex items-center gap-3">
-                            <input type="number" value="15" class="w-16 bg-white border border-gray-lighter rounded-xl px-2 py-2 text-center font-black text-xs">
-                            <span class="text-xs font-bold text-gray">%</span>
-                        </div>
-                    </div>
-                    <div class="bg-light/30 p-6 rounded-3xl border border-gray-lighter flex justify-between items-center">
-                        <span class="text-xs font-black text-dark uppercase tracking-widest">Premium Yearly Plans</span>
-                        <div class="flex items-center gap-3">
-                            <input type="number" value="10" class="w-16 bg-white border border-gray-lighter rounded-xl px-2 py-2 text-center font-black text-xs">
-                            <span class="text-xs font-bold text-gray">%</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- RBAC Management -->
-            <div x-show="tab === 'admin'" class="space-y-8">
-                <div class="flex items-center justify-between">
+                    
                     <div>
-                        <h3 class="text-xl font-black text-dark uppercase tracking-tighter">System Governance</h3>
-                        <p class="text-[10px] text-gray font-bold uppercase tracking-widest mt-1">Administrative Role Based Access Control</p>
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Website Description for Google (SEO Description)</label>
+                        <textarea name="seo_meta_description" rows="3" class="w-full border border-gray-300 px-4 py-3 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">{{ $settings['seo_meta_description'] }}</textarea>
                     </div>
-                    <button class="px-6 py-3 bg-dark text-white text-[10px] font-black uppercase rounded-2xl hover:bg-primary transition-all shadow-lg flex items-center gap-2">
-                        <i class="fas fa-user-shield"></i> Invite Operator
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+                        <!-- Favicon -->
+                        <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl flex flex-col items-center text-center">
+                            <div class="w-16 h-16 bg-white rounded-xl mb-4 flex items-center justify-center border shadow-xs overflow-hidden">
+                                @if($settings['favicon_path'])
+                                    <img src="{{ $settings['favicon_path'] }}" class="object-contain max-h-full max-w-full">
+                                @else
+                                    <i class="fas fa-image text-2xl text-gray-400"></i>
+                                @endif
+                            </div>
+                            <div class="text-xs font-bold text-text-primary uppercase mb-1">Tab Icon (Favicon)</div>
+                            <div class="text-[10px] text-text-muted mb-3">Small icon on browser tab (ICO/PNG)</div>
+                            <input type="file" name="favicon" class="hidden" id="favicon_input">
+                            <button type="button" onclick="document.getElementById('favicon_input').click()" class="px-4 py-2 bg-light border text-xs font-bold text-text-secondary rounded-lg hover:bg-gray-100 transition-all">Upload Icon</button>
+                        </div>
+
+                        <!-- Logo -->
+                        <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl flex flex-col items-center text-center">
+                            <div class="w-16 h-16 bg-white rounded-xl mb-4 flex items-center justify-center border shadow-xs overflow-hidden">
+                                @if($settings['logo_path'])
+                                    <img src="{{ $settings['logo_path'] }}" class="object-contain max-h-full max-w-full">
+                                @else
+                                    <i class="fas fa-signature text-2xl text-gray-400"></i>
+                                @endif
+                            </div>
+                            <div class="text-xs font-bold text-text-primary uppercase mb-1">Website Logo</div>
+                            <div class="text-[10px] text-text-muted mb-3">Main logo image (PNG/SVG)</div>
+                            <input type="file" name="logo" class="hidden" id="logo_input">
+                            <button type="button" onclick="document.getElementById('logo_input').click()" class="px-4 py-2 bg-light border text-xs font-bold text-text-secondary rounded-lg hover:bg-gray-100 transition-all">Upload Logo</button>
+                        </div>
+
+                        <!-- Social Preview -->
+                        <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl flex flex-col items-center text-center">
+                            <div class="w-16 h-16 bg-white rounded-xl mb-4 flex items-center justify-center border shadow-xs overflow-hidden">
+                                @if($settings['social_preview_path'])
+                                    <img src="{{ $settings['social_preview_path'] }}" class="object-contain max-h-full max-w-full">
+                                @else
+                                    <i class="fas fa-share-alt text-2xl text-gray-400"></i>
+                                @endif
+                            </div>
+                            <div class="text-xs font-bold text-text-primary uppercase mb-1">Share Preview Image</div>
+                            <div class="text-[10px] text-text-muted mb-3">Preview image shown when link shared</div>
+                            <input type="file" name="social_preview" class="hidden" id="social_preview_input">
+                            <button type="button" onclick="document.getElementById('social_preview_input').click()" class="px-4 py-2 bg-light border text-xs font-bold text-text-secondary rounded-lg hover:bg-gray-100 transition-all">Upload Image</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Commission Rates -->
+                <div x-show="tab === 'commission'" class="space-y-6">
+                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">Commission Rules</h3>
+                    
+                    <div class="p-6 bg-primary/5 rounded-2xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div>
+                            <h4 class="text-base font-bold text-text-primary mb-1">Standard Platform Fee</h4>
+                            <p class="text-xs text-text-muted">The percentage the platform keeps from chat, call, and video session earnings.</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="number" name="global_commission_percentage" value="{{ $settings['global_commission_percentage'] }}" min="0" max="100" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center text-base font-bold">
+                            <span class="text-lg font-bold text-text-secondary">%</span>
+                        </div>
+                    </div>
+
+                    <div class="p-6 bg-primary/5 rounded-2xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div>
+                            <h4 class="text-base font-bold text-text-primary mb-1">Prepaid Package - Default Astrologer Share</h4>
+                            <p class="text-xs text-text-muted">Fallback commission percentage credited to the astrologer for prepaid packages (if no custom override is set).</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="number" name="global_package_commission_rate" value="{{ $settings['global_package_commission_rate'] }}" min="0" max="100" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center text-base font-bold">
+                            <span class="text-lg font-bold text-text-secondary">%</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 bg-light/20 border border-gray-200 rounded-2xl flex items-center justify-between">
+                            <div>
+                                <span class="block text-sm font-bold text-text-primary">Shop/Marketplace Sales Commission</span>
+                                <span class="block text-xs text-text-muted mt-0.5">Platform share for Selling physical items</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="number" name="ecommerce_commission_percentage" value="{{ $settings['ecommerce_commission_percentage'] }}" min="0" max="100" class="w-20 border border-gray-300 px-2 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-sm font-bold text-text-secondary">%</span>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/20 border border-gray-200 rounded-2xl flex items-center justify-between">
+                            <div>
+                                <span class="block text-sm font-bold text-text-primary">Premium Subscription Plan Commission</span>
+                                <span class="block text-xs text-text-muted mt-0.5">Platform share for yearly subscription packages</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="number" name="premium_yearly_commission_percentage" value="{{ $settings['premium_yearly_commission_percentage'] }}" min="0" max="100" class="w-20 border border-gray-300 px-2 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-sm font-bold text-text-secondary">%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wallet Rules -->
+                <div x-show="tab === 'wallet'" class="space-y-6">
+                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">Wallet & Money Rules</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Min. Wallet Deposit</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                <input type="number" name="min_wallet_recharge" value="{{ $settings['min_wallet_recharge'] }}" min="1" class="w-full border border-gray-300 pl-8 pr-4 py-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            </div>
+                            <span class="block text-[10px] text-text-muted mt-2">Minimum amount user can add to wallet</span>
+                        </div>
+
+                        <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Max. Wallet Balance</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                <input type="number" name="max_wallet_balance" value="{{ $settings['max_wallet_balance'] }}" min="1" class="w-full border border-gray-300 pl-8 pr-4 py-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            </div>
+                            <span class="block text-[10px] text-text-muted mt-2">Maximum balance user wallet can hold</span>
+                        </div>
+
+                        <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Min. Withdrawal Limit</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                <input type="number" name="min_withdrawal_amount" value="{{ $settings['min_withdrawal_amount'] }}" min="1" class="w-full border border-gray-300 pl-8 pr-4 py-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            </div>
+                            <span class="block text-[10px] text-text-muted mt-2">Minimum wallet amount required to request payout</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payment Gateway -->
+                <div x-show="tab === 'payment'" class="space-y-6">
+                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">Payment Gateway Settings</h3>
+                    
+                    {{--
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Gateway Mode</label>
+                            <div class="flex gap-4 mt-2">
+                                <label class="flex items-center gap-2 text-sm font-bold text-text-secondary cursor-pointer">
+                                    <input type="radio" name="payment_gateway_mode" value="sandbox" {{ $settings['payment_gateway_mode'] === 'sandbox' ? 'checked' : '' }} class="text-primary focus:ring-primary">
+                                    Test/Sandbox
+                                </label>
+                                <label class="flex items-center gap-2 text-sm font-bold text-text-secondary cursor-pointer">
+                                    <input type="radio" name="payment_gateway_mode" value="live" {{ $settings['payment_gateway_mode'] === 'live' ? 'checked' : '' }} class="text-primary focus:ring-primary">
+                                    Live/Production
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Active Gateways</label>
+                            <div class="flex gap-6 mt-2">
+                                @php
+                                    $activeGateways = is_string($settings['active_gateways']) ? json_decode($settings['active_gateways'], true) : $settings['active_gateways'];
+                                    if(!is_array($activeGateways)) $activeGateways = [];
+                                @endphp
+                                <label class="flex items-center gap-2 text-sm font-bold text-text-secondary cursor-pointer">
+                                    <input type="checkbox" name="active_gateways[]" value="razorpay" {{ in_array('razorpay', $activeGateways) ? 'checked' : '' }} class="rounded text-primary focus:ring-primary">
+                                    Razorpay
+                                </label>
+                                <label class="flex items-center gap-2 text-sm font-bold text-text-secondary cursor-pointer">
+                                    <input type="checkbox" name="active_gateways[]" value="stripe" {{ in_array('stripe', $activeGateways) ? 'checked' : '' }} class="rounded text-primary focus:ring-primary">
+                                    Stripe
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    --}}
+
+                    <div class="p-6 border border-gray-200 rounded-2xl space-y-4">
+                        <div class="flex items-center gap-3 border-b pb-2">
+                            <i class="fab fa-cc-amazon-pay text-primary text-xl"></i>
+                            <h4 class="text-sm font-extrabold text-text-primary uppercase">Razorpay Credentials</h4>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Razorpay Key</label>
+                                <input type="text" name="razorpay_key" value="{{ $settings['razorpay_key'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Razorpay Secret</label>
+                                <input type="password" name="razorpay_secret" value="{{ $settings['razorpay_secret'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
+                            </div>
+                        </div>
+                    </div>
+
+                    {{--
+                    <div class="p-6 border border-gray-200 rounded-2xl space-y-4">
+                        <div class="flex items-center gap-3 border-b pb-2">
+                            <i class="fab fa-stripe text-indigo-600 text-xl"></i>
+                            <h4 class="text-sm font-extrabold text-text-primary uppercase">Stripe Credentials</h4>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Stripe Key</label>
+                                <input type="text" name="stripe_key" value="{{ $settings['stripe_key'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Stripe Secret</label>
+                                <input type="password" name="stripe_secret" value="{{ $settings['stripe_secret'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
+                            </div>
+                        </div>
+                    </div>
+                    --}}
+                </div>
+
+                <!-- Astrologer Default Pricing -->
+                <div x-show="tab === 'astro'" class="space-y-6">
+                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">Astrologer Default Rates</h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase mb-2">Default Chat Rate</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                <input type="number" step="0.01" name="default_chat_rate_per_minute" value="{{ $settings['default_chat_rate_per_minute'] }}" class="w-full border border-gray-300 pl-8 pr-4 py-3 rounded-xl text-sm font-bold">
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase mb-2">Default Voice Call Rate</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                <input type="number" step="0.01" name="default_call_rate_per_minute" value="{{ $settings['default_call_rate_per_minute'] }}" class="w-full border border-gray-300 pl-8 pr-4 py-3 rounded-xl text-sm font-bold">
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase mb-2">Default Video Call Rate</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                <input type="number" step="0.01" name="default_video_call_rate_per_minute" value="{{ $settings['default_video_call_rate_per_minute'] }}" class="w-full border border-gray-300 pl-8 pr-4 py-3 rounded-xl text-sm font-bold">
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary uppercase mb-2">Default Promo Rate</label>
+                            <div class="relative">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                <input type="number" step="0.01" name="default_po_at_5_rate_per_minute" value="{{ $settings['default_po_at_5_rate_per_minute'] }}" class="w-full border border-gray-300 pl-8 pr-4 py-3 rounded-xl text-sm font-bold">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Website Protection (Rate Limits) -->
+                <div x-show="tab === 'security'" class="space-y-6">
+                    <div class="flex items-center justify-between border-b pb-3">
+                        <h3 class="text-lg font-bold text-text-primary">Website Throttling & Protection</h3>
+                        <div class="flex items-center gap-3">
+                            <input type="hidden" name="rate_limit_enabled" value="0">
+                            <input type="checkbox" name="rate_limit_enabled" value="1" {{ $settings['rate_limit_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-primary border-2 border-transparent">
+                            <span class="text-xs font-bold text-text-secondary uppercase">Master Switch</span>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-text-muted mt-1">Specify request limits to block bot attacks. Set value to 0 to disable throttling.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary mb-2">OTP Limits</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" name="rate_limit_otp" value="{{ $settings['rate_limit_otp'] }}" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-xs text-text-muted">requests per minute per IP</span>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary mb-2">Login / Register Attempts</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" name="rate_limit_auth" value="{{ $settings['rate_limit_auth'] }}" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-xs text-text-muted">attempts per minute per IP</span>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary mb-2">Public Pages</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" name="rate_limit_general" value="{{ $settings['rate_limit_general'] }}" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-xs text-text-muted">requests per minute per user/IP</span>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary mb-2">Transactions & Mutations</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" name="rate_limit_tiered" value="{{ $settings['rate_limit_tiered'] }}" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-xs text-text-muted">requests per minute per user/IP</span>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary mb-2">Live Streams</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" name="rate_limit_live_watch" value="{{ $settings['rate_limit_live_watch'] }}" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-xs text-text-muted">requests per minute per user/IP</span>
+                            </div>
+                        </div>
+
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary mb-2">General API Requests</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" name="rate_limit_api" value="{{ $settings['rate_limit_api'] }}" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-xs text-text-muted">requests per minute per user/IP</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Assistance Configurations Tab -->
+                <div x-show="tab === 'chat_assistance'" class="space-y-6">
+                    <div class="flex items-center justify-between border-b pb-3">
+                        <div>
+                            <h3 class="text-lg font-bold text-text-primary">Chat Assistance Setup</h3>
+                            <p class="text-xs text-text-muted mt-0.5">Toggle and configure daily free message reply limits for astrologers.</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="hidden" name="chat_assistance_enabled" value="0">
+                            <input type="checkbox" name="chat_assistance_enabled" value="1" {{ $settings['chat_assistance_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-primary border-2 border-transparent">
+                            <span class="text-xs font-bold text-text-secondary uppercase">Master Toggle Switch</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="p-5 bg-light/10 border border-gray-200 rounded-2xl">
+                            <label class="block text-xs font-bold text-text-secondary mb-2">Daily Message Reply Limit</label>
+                            <div class="flex items-center gap-3">
+                                <input type="number" name="chat_assistance_daily_limit" value="{{ $settings['chat_assistance_daily_limit'] }}" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                <span class="text-xs text-text-muted">free outgoing messages allowed per day per astrologer</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Button for Settings Form -->
+                <div x-show="tab !== 'admin'" class="pt-4 border-t border-gray-200 flex justify-end">
+                    <button type="submit" class="px-8 py-3.5 bg-primary text-white text-sm font-bold uppercase rounded-xl hover:bg-primary-dark transition-all shadow-md flex items-center gap-2">
+                        <i class="fas fa-save"></i> Save Settings
                     </button>
                 </div>
-                <div class="bg-light/20 rounded-[32px] border border-gray-lighter overflow-hidden">
-                    <table class="w-full">
-                        <thead class="bg-light/50 border-b border-gray-lighter">
+            </form>
+
+            <!-- Team & Admins (RBAC) -->
+            <div x-show="tab === 'admin'" class="space-y-6">
+                <div class="flex items-center justify-between border-b pb-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-text-primary">Admin Accounts & Team Members</h3>
+                        <p class="text-xs text-text-muted mt-0.5">Manage operator profiles and their access roles.</p>
+                    </div>
+                    <button @click="showAddModal = true" class="px-5 py-2.5 bg-primary text-white text-xs font-bold uppercase rounded-xl hover:bg-primary-dark transition-all shadow-sm flex items-center gap-2">
+                        <i class="fas fa-user-plus"></i> Add Team Member
+                    </button>
+                </div>
+
+                <div class="border border-gray-200 rounded-2xl overflow-hidden shadow-xs">
+                    <table class="w-full text-left">
+                        <thead class="bg-light/40 border-b">
                             <tr>
-                                <th class="px-6 py-4 text-[9px] font-black text-gray uppercase tracking-widest text-left">Operator Identity</th>
-                                <th class="px-6 py-4 text-[9px] font-black text-gray uppercase tracking-widest text-left">Clearance Level</th>
-                                <th class="px-6 py-4 text-[9px] font-black text-gray uppercase tracking-widest text-right">Ops</th>
+                                <th class="px-6 py-3.5 text-xs font-bold text-text-secondary uppercase">Member Profile</th>
+                                <th class="px-6 py-3.5 text-xs font-bold text-text-secondary uppercase">Access Role</th>
+                                <th class="px-6 py-3.5 text-xs font-bold text-text-secondary uppercase">Status</th>
+                                <th class="px-6 py-3.5 text-xs font-bold text-text-secondary uppercase text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-lighter">
-                            @php
-                                $admins = [
-                                    ['name' => 'Super Admin', 'email' => 'master@astology.com', 'role' => 'System Architect'],
-                                    ['name' => 'Rahul Sharma', 'email' => 'rahul.ops@astology.com', 'role' => 'Financial Auditor'],
-                                    ['name' => 'Meena Iyer', 'email' => 'meena.content@astology.com', 'role' => 'Editorial Lead'],
-                                    ['name' => 'Vikram Goel', 'email' => 'vikram.support@astology.com', 'role' => 'Escalation Mgr'],
-                                ];
-                            @endphp
-                            @foreach($admins as $admin)
-                            <tr class="hover:bg-white transition-all">
+                        <tbody class="divide-y bg-white">
+                            @foreach($operators as $operator)
+                            <tr class="hover:bg-light/10 transition-all">
                                 <td class="px-6 py-4">
-                                    <div class="text-xs font-black text-dark">{{ $admin['name'] }}</div>
-                                    <div class="text-[8px] font-bold text-gray mt-0.5">{{ $admin['email'] }}</div>
+                                    <div class="text-sm font-bold text-text-primary">{{ $operator->name }}</div>
+                                    <div class="text-xs text-text-muted">{{ $operator->email }}</div>
+                                    @if($operator->phone)
+                                        <div class="text-[10px] text-text-muted mt-0.5">{{ $operator->phone }}</div>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4">
-                                    <span class="px-3 py-1 bg-dark text-white text-[8px] font-black uppercase rounded-full tracking-widest">{{ $admin['role'] }}</span>
+                                    @if($operator->role === 'super_admin')
+                                        <span class="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold uppercase rounded-full">Super Admin</span>
+                                    @else
+                                        <span class="px-3 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-bold uppercase rounded-full">Standard Admin</span>
+                                    @endif
+                                </td>
+                                <td class="px-6 py-4">
+                                    @if($operator->is_active)
+                                        <span class="px-2.5 py-0.5 bg-success/10 text-success-dark text-[10px] font-semibold rounded-md">Active</span>
+                                    @else
+                                        <span class="px-2.5 py-0.5 bg-danger/10 text-danger-dark text-[10px] font-semibold rounded-md">Inactive</span>
+                                    @endif
                                 </td>
                                 <td class="px-6 py-4 text-right">
-                                    <button class="w-8 h-8 rounded-lg border border-gray-lighter text-gray hover:text-dark hover:border-dark transition-all"><i class="fas fa-edit text-[10px]"></i></button>
-                                    <button class="w-8 h-8 rounded-lg border border-gray-lighter text-gray hover:text-danger hover:border-danger transition-all ml-1"><i class="fas fa-trash-alt text-[10px]"></i></button>
+                                    <button @click="
+                                        currentOperator = {
+                                            id: '{{ $operator->id }}',
+                                            name: '{{ addslashes($operator->name) }}',
+                                            email: '{{ addslashes($operator->email) }}',
+                                            phone: '{{ addslashes($operator->phone ?? '') }}',
+                                            role: '{{ $operator->role }}',
+                                            is_active: {{ $operator->is_active ? 1 : 0 }}
+                                        };
+                                        showEditModal = true;
+                                    " class="w-8 h-8 rounded-lg border text-text-secondary hover:text-primary hover:border-primary transition-all inline-flex items-center justify-center mr-1">
+                                        <i class="fas fa-edit text-xs"></i>
+                                    </button>
+                                    @if(Auth::guard('admin')->id() !== $operator->id)
+                                    <form action="{{ route('admin.settings.operators.destroy', $operator->id) }}" method="POST" class="inline-block" onsubmit="return confirm('Are you sure you want to remove this team member?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="w-8 h-8 rounded-lg border text-text-secondary hover:text-danger hover:border-danger transition-all inline-flex items-center justify-center">
+                                            <i class="fas fa-trash-alt text-xs"></i>
+                                        </button>
+                                    </form>
+                                    @endif
                                 </td>
                             </tr>
                             @endforeach
@@ -161,16 +492,104 @@
                     </table>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Placeholder for other tabs -->
-            <div x-show="['wallet', 'payment', 'astro', 'security'].includes(tab)" class="py-20 text-center flex flex-col items-center justify-center">
-                <div class="w-24 h-24 bg-light rounded-full flex items-center justify-center mb-6 text-gray-lighter text-4xl">
-                    <i class="fas fa-microchip"></i>
-                </div>
-                <h3 class="text-xl font-black text-dark uppercase tracking-tighter italic">Logic Cluster Active</h3>
-                <p class="text-sm text-gray font-medium max-w-[360px] leading-relaxed mt-2 opacity-60">High-sensitivity configuration parameters are currently in read-only audit mode for the active session.</p>
-                <button class="mt-8 px-8 py-3.5 bg-light border border-gray-lighter text-dark text-[10px] font-black uppercase rounded-2xl hover:bg-dark hover:text-white transition-all">Request Write Access</button>
+    <!-- Modals (Add / Edit Operators) -->
+    <!-- Add Modal -->
+    <div x-show="showAddModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="fixed inset-0 bg-black/40 backdrop-blur-xs" @click="showAddModal = false"></div>
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full relative z-10 overflow-hidden border">
+            <div class="px-6 py-4 bg-light/50 border-b flex items-center justify-between">
+                <h4 class="text-sm font-bold text-text-primary uppercase">Add Team Member</h4>
+                <button @click="showAddModal = false" class="text-lg opacity-70 hover:opacity-100">&times;</button>
             </div>
+            <form action="{{ route('admin.settings.operators.store') }}" method="POST" class="p-6 space-y-4">
+                @csrf
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Full Name</label>
+                    <input type="text" name="name" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Email Address</label>
+                    <input type="email" name="email" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Mobile Phone (Optional)</label>
+                    <input type="text" name="phone" class="w-full border px-3 py-2 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Password</label>
+                    <input type="password" name="password" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Access Level Role</label>
+                    <select name="role" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                        <option value="admin">Standard Admin</option>
+                        <option value="super_admin">Super Admin</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Status</label>
+                    <select name="is_active" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                        <option value="1">Active / Enable</option>
+                        <option value="0">Inactive / Disable</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" @click="showAddModal = false" class="px-4 py-2 border text-xs font-bold text-text-secondary rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-dark">Add Member</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div x-show="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center p-4" x-cloak>
+        <div class="fixed inset-0 bg-black/40 backdrop-blur-xs" @click="showEditModal = false"></div>
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full relative z-10 overflow-hidden border">
+            <div class="px-6 py-4 bg-light/50 border-b flex items-center justify-between">
+                <h4 class="text-sm font-bold text-text-primary uppercase">Edit Team Member</h4>
+                <button @click="showEditModal = false" class="text-lg opacity-70 hover:opacity-100">&times;</button>
+            </div>
+            <form :action="'{{ url('/admin/settings/operators') }}/' + currentOperator.id" method="POST" class="p-6 space-y-4">
+                @csrf
+                @method('PUT')
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Full Name</label>
+                    <input type="text" name="name" x-model="currentOperator.name" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Email Address</label>
+                    <input type="email" name="email" x-model="currentOperator.email" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Mobile Phone (Optional)</label>
+                    <input type="text" name="phone" x-model="currentOperator.phone" class="w-full border px-3 py-2 rounded-xl text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Change Password (leave blank to keep current)</label>
+                    <input type="password" name="password" class="w-full border px-3 py-2 rounded-xl text-sm" placeholder="••••••••">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Access Level Role</label>
+                    <select name="role" x-model="currentOperator.role" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                        <option value="admin">Standard Admin</option>
+                        <option value="super_admin">Super Admin</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-text-secondary mb-1">Status</label>
+                    <select name="is_active" x-model="currentOperator.is_active" required class="w-full border px-3 py-2 rounded-xl text-sm">
+                        <option value="1">Active / Enable</option>
+                        <option value="0">Inactive / Disable</option>
+                    </select>
+                </div>
+                <div class="pt-4 flex justify-end gap-3">
+                    <button type="button" @click="showEditModal = false" class="px-4 py-2 border text-xs font-bold text-text-secondary rounded-lg hover:bg-gray-50">Cancel</button>
+                    <button type="submit" class="px-5 py-2 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-dark">Save Changes</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

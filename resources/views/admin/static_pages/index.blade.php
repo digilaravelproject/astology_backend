@@ -133,6 +133,16 @@
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center justify-center gap-2">
+                                <a href="{{ route('admin.static_pages.show', $page->id) }}" 
+                                   class="px-3 py-1 text-xs bg-gray-100 text-text-primary rounded hover:bg-gray-200 transition-all">
+                                    <i class="fas fa-eye"></i> Show
+                                </a>
+                                @if($page->is_active)
+                                    <a href="{{ route(str_replace('_', '-', 'page.' . $page->type)) }}" target="_blank"
+                                       class="px-3 py-1 text-xs bg-info/10 text-info rounded hover:bg-info hover:text-white transition-all">
+                                        <i class="fas fa-external-link-alt"></i> View
+                                    </a>
+                                @endif
                                 <a href="{{ route('admin.static_pages.edit', $page->id) }}" 
                                    class="px-3 py-1 text-xs bg-primary/10 text-primary rounded hover:bg-primary hover:text-white transition-all">
                                     <i class="fas fa-edit"></i> Edit

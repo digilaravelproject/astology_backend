@@ -8,10 +8,12 @@
     "require": {
         "php": "^8.2",
         "aws/aws-sdk-php": "*",
+        "barryvdh/laravel-dompdf": "^3.1",
         "firebase/php-jwt": "*",
         "laravel/framework": "^12.0",
         "laravel/reverb": "*",
         "laravel/sanctum": "^4.3",
+        "laravel/telescope": "^5.20",
         "laravel/tinker": "^2.10.1",
         "pusher/pusher-php-server": "^7.2",
         "razorpay/razorpay": "^2.9"

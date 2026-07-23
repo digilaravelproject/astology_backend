@@ -8,6 +8,15 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            if (!Schema::hasColumn('kundlis', 'user_id')) {
+                Schema::table('kundlis', function ($table) {
+                    $table->foreignId('user_id')->default(1)->constrained('users')->onDelete('cascade');
+                });
+            }
+            return;
+        }
+
         if (!Schema::hasColumn('kundlis', 'user_id')) {
             DB::statement('ALTER TABLE kundlis ADD COLUMN user_id BIGINT UNSIGNED NULL');
         }
@@ -33,6 +42,15 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            if (Schema::hasColumn('kundlis', 'user_id')) {
+                Schema::table('kundlis', function ($table) {
+                    $table->dropColumn('user_id');
+                });
+            }
+            return;
+        }
+
         if (Schema::hasColumn('kundlis', 'user_id')) {
             DB::statement('ALTER TABLE kundlis DROP FOREIGN KEY kundlis_user_id_foreign');
             DB::statement('ALTER TABLE kundlis DROP COLUMN user_id');

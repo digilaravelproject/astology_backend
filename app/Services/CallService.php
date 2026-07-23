@@ -37,15 +37,15 @@ class CallService
     {
         return DB::transaction(function () use ($consumerId, $providerId) {
             try {
-                // Eager load provider and astrologer details to prevent N+1
                 $provider = User::with('astrologer')->lockForUpdate()->findOrFail($providerId);
-                
                 $astrologer = $provider->astrologer;
-
                 if (!$astrologer || !$astrologer->is_call_enabled) {
                     throw new Exception("Astrologer is not available for calls.");
                 }
-                $rate = $astrologer->call_rate_per_minute ?? 15.00;
+
+                $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                $pricing = $pricingCalculator->calculate($astrologer, 'call');
+                $rate = $pricing['customer_rate'];
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -54,10 +54,14 @@ class CallService
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
                     ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->exists();
-                $isBusy = $isChatBusy || $isCallBusy;
-                if ($isBusy) {
-                    throw new Exception("Astrologer is currently busy on another session. Please try again later.");
-                }
+                // Cross-channel waiting queue check: considers BOTH chat and call waiting rows
+                $hasWaitingQueue = \App\Models\CallSession::where('provider_id', $providerId)
+                    ->where('status', 'waiting')
+                    ->exists()
+                    || \App\Models\ChatSession::where('provider_id', $providerId)
+                    ->where('status', 'waiting')
+                    ->exists();
+                $isBusy = $isChatBusy || $isCallBusy || $hasWaitingQueue;
 
                 // Dynamic check for consumer
                 $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
@@ -83,20 +87,33 @@ class CallService
 
                 // Check minimum balance (5 minutes minimum to start)
                 $balance = $this->walletService->getBalance($consumerId);
-                if ($balance < $rate * 5) {
+
+                // Skip minimum balance check if user has an active prepaid package with this astrologer.
+                // Package users have already pre-paid, so wallet check is not applicable.
+                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $consumerId)
+                    ->where('astrologer_id', $providerId)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
+
+                if (!$hasActivePackage && $balance < $rate * 5) {
                     throw new Exception("Insufficient balance. You need minimum " . ($rate * 5) . " in your wallet to start this call.");
                 }
+
+                $status = $isBusy ? 'waiting' : 'initiated';
 
                 $session = $this->callRepo->create([
                     'consumer_id' => $consumerId,
                     'provider_id' => $providerId,
                     'call_type'   => 'audio',
-                    'status' => 'initiated',
+                    'status' => $status,
                     'rate_per_minute' => $rate,
                 ]);
 
-                // Dispatch timeout cleanup (60 seconds ringing timeout)
-                \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
+                if ($status === 'initiated') {
+                    // Dispatch timeout cleanup (60 seconds ringing timeout)
+                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'call')->delay(now()->addSeconds(60));
+                }
 
                 return $session;
 
@@ -117,7 +134,7 @@ class CallService
                 // Lock the session row FIRST (prevents deadlock with missedCall/endCall/rejectCall)
                 $session = \App\Models\CallSession::where('id', $sessionId)->lockForUpdate()->first();
 
-                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing'])) {
+                if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing', 'waiting'])) {
                     throw new Exception("The call session is no longer valid or has been cancelled.");
                 }
 
@@ -146,8 +163,24 @@ class CallService
                 $this->presenceService->setBusy($session->consumer_id, $sessionId);
                 $this->presenceService->setBusy($providerId, $sessionId);
                 
-                // Start billing ticker (delayed by 1 minute)
-                CallBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
+                // Start billing ticker ONLY if consumer does NOT have an active prepaid package for this astrologer.
+                // If an active package purchase exists, billing is prepaid — no per-minute tick needed.
+                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
+                    ->where('astrologer_id', $session->provider_id)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
+
+                if ($hasActivePackage) {
+                    $subSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)
+                        ->whereNull('started_at')
+                        ->first();
+                    if ($subSession) {
+                        app(\App\Services\SessionTimerService::class)->activateSubSessionTimer($subSession->id);
+                    }
+                } else {
+                    CallBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
+                }
                 
                 $session->refresh();
                 return $session;
@@ -187,6 +220,13 @@ class CallService
                 // Reset presence status for both users
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
+
+                // Close any orphaned PackageSubSession linked to this rejected call.
+                // Without this, the sub-session stays open (started_at=null, ended_at=null)
+                // and blocks the user from starting a new package session.
+                \App\Models\PackageSubSession::where('call_session_id', $sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now()]);
 
                 $session->refresh();
                 return $session;
@@ -229,7 +269,10 @@ class CallService
 
                 $endTime = now();
                 $durationSeconds = $session->started_at ? $session->started_at->diffInSeconds($endTime) : 0;
-                $finalCost = $this->calculateCost($durationSeconds, $session->rate_per_minute);
+                
+                // Skip charging if this is a prepaid package session
+                $isPackageSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists();
+                $finalCost = $isPackageSession ? 0.00 : $this->calculateCost($durationSeconds, $session->rate_per_minute);
                 
                 // Calculate unbilled amount
                 $alreadyBilled = $session->total_cost ?? 0;
@@ -239,8 +282,66 @@ class CallService
                 if ($unbilledBalance > 0 && $consumerWallet) {
                     $chargeAmount = min($unbilledBalance, $consumerWallet->balance);
                     if ($chargeAmount > 0) {
-                        $this->walletService->deductForCall($session->consumer_id, $chargeAmount, $session->id);
-                        $this->walletService->creditProviderForCall($session->provider_id, $chargeAmount, $session->id);
+                        $this->walletService->debitBalanceOnly($session->consumer_id, $chargeAmount);
+                        
+                        // Calculate astrologer share based on active offer or global fallback
+                        $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
+                        $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                        $pricing = $pricingCalculator->calculate($provider->astrologer, 'call');
+                        $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                        $creditAmount = round(($chargeAmount * $astrologerSharePct) / 100, 2);
+
+                        $this->walletService->creditBalanceOnly($session->provider_id, $creditAmount);
+                    }
+                }
+
+                $totalCost = $alreadyBilled + $chargeAmount;
+
+                // Create consolidated transaction records for the entire session at once!
+                if ($totalCost > 0) {
+                    $this->walletService->logDebitOnly($session->consumer_id, $totalCost, 'call_deduction', 'App\Models\CallSession', $session->id);
+                    
+                    $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
+                    $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                    $pricing = $pricingCalculator->calculate($provider->astrologer, 'call');
+                    $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                    $totalCreditAmount = round(($totalCost * $astrologerSharePct) / 100, 2);
+
+                    $this->walletService->logCreditOnly($session->provider_id, $totalCreditAmount, 'call_credit', 'App\Models\CallSession', $session->id);
+                }
+
+                // Update package sub-session if this is a prepaid package session
+                if ($isPackageSession) {
+                    $subSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)
+                        ->whereNull('ended_at')
+                        ->first();
+                    if ($subSession) {
+                        $purchase = \App\Models\PackagePurchase::where('id', $subSession->package_purchase_id)
+                            ->lockForUpdate()
+                            ->first();
+                        if ($purchase) {
+                            $durationUsed = (int) min($durationSeconds, $purchase->remaining_duration);
+                            
+                            $subSession->update([
+                                'ended_at' => $endTime,
+                                'duration_used' => $durationUsed
+                            ]);
+                            
+                            $purchase->remaining_duration -= $durationUsed;
+                            if ($purchase->remaining_duration <= 0) {
+                                $purchase->remaining_duration = 0;
+                                $purchase->status = 'exhausted';
+                            }
+                            $purchase->save();
+                            
+                            // Broadcast package sub-session ended event
+                            broadcast(new \App\Events\PackageSubSessionEnded($subSession, $purchase->remaining_duration, $userId));
+                            
+                            // Broadcast termination if exhausted
+                            if ($purchase->status === 'exhausted') {
+                                broadcast(new \App\Events\PackageSessionTerminated($purchase, "Your package session has exhausted all remaining balance.", 'call'));
+                            }
+                        }
                     }
                 }
 
@@ -248,7 +349,7 @@ class CallService
                     'status' => 'completed',
                     'ended_at' => $endTime,
                     'duration_seconds' => $durationSeconds,
-                    'total_cost' => $alreadyBilled + $chargeAmount,
+                    'total_cost' => $totalCost,
                 ]);
 
                 // Reset presence status for both users

@@ -14,15 +14,18 @@ class ChatService
     protected $chatRepo;
     protected $walletService;
     protected $presenceService;
+    protected $pricingCalculator;
 
     public function __construct(
         ChatSessionRepository $chatRepo,
         WalletService $walletService,
-        PresenceService $presenceService
+        PresenceService $presenceService,
+        \App\Services\PricingCalculatorService $pricingCalculator
     ) {
         $this->chatRepo = $chatRepo;
         $this->walletService = $walletService;
         $this->presenceService = $presenceService;
+        $this->pricingCalculator = $pricingCalculator;
     }
 
     public function getSession($sessionId)
@@ -51,7 +54,11 @@ class ChatService
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
                     ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->exists();
+                // Cross-channel waiting queue check: considers BOTH chat and call waiting rows
                 $hasWaitingQueue = \App\Models\ChatSession::where('provider_id', $providerId)
+                    ->where('status', 'waiting')
+                    ->exists()
+                    || \App\Models\CallSession::where('provider_id', $providerId)
                     ->where('status', 'waiting')
                     ->exists();
                 $isBusy = $isChatBusy || $isCallBusy || $hasWaitingQueue;
@@ -78,10 +85,20 @@ class ChatService
                     throw new Exception("You already have a pending or waiting request.");
                 }
                 
-                $rate = $provider->astrologer->chat_rate_per_minute ?? 15.00;
+                $pricing = $this->pricingCalculator->calculate($astrologer, 'chat');
+                $rate = $pricing['customer_rate'];
                 
                 $balance = $this->walletService->getBalance($consumerId);
-                if ($balance < $rate * 5) {
+
+                // Skip minimum balance check if user has an active prepaid package with this astrologer.
+                // Package users have already pre-paid, so wallet check is not applicable.
+                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $consumerId)
+                    ->where('astrologer_id', $providerId)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
+
+                if (!$hasActivePackage && $balance < $rate * 5) {
                     throw new Exception("Insufficient balance. Minimum 5 minutes required (" . ($rate * 5) . ").");
                 }
 
@@ -193,8 +210,24 @@ class ChatService
 
                 }
                 
-                // Start billing ticker (delayed by 1 minute)
-                ChatBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
+                // Start billing ticker ONLY if consumer does NOT have an active prepaid package for this astrologer.
+                // If an active package purchase exists, billing is prepaid — no per-minute tick needed.
+                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
+                    ->where('astrologer_id', $session->provider_id)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
+
+                if ($hasActivePackage) {
+                    $subSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                        ->whereNull('started_at')
+                        ->first();
+                    if ($subSession) {
+                        app(\App\Services\SessionTimerService::class)->activateSubSessionTimer($subSession->id);
+                    }
+                } else {
+                    ChatBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());
+                }
                 
                 $session->refresh();
                 $session->setRelation('consumer', $consumer);
@@ -289,6 +322,13 @@ class ChatService
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
 
+                // Close any orphaned PackageSubSession linked to this rejected chat.
+                // Without this, the sub-session stays open (started_at=null, ended_at=null)
+                // and blocks the user from starting a new package session.
+                \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now()]);
+
                 $session->refresh();
                 return $session;
 
@@ -329,7 +369,10 @@ class ChatService
 
                 $endTime = now();
                 $durationSeconds = $session->started_at ? (int) $session->started_at->diffInSeconds($endTime) : 0;
-                $finalCost = ceil($durationSeconds / 60) * $session->rate_per_minute;
+                
+                // Skip charging if this is a prepaid package session
+                $isPackageSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists();
+                $finalCost = $isPackageSession ? 0.00 : (ceil($durationSeconds / 60) * $session->rate_per_minute);
                 
                 // Calculate unbilled amount
                 $alreadyBilled = $session->total_cost ?? 0;
@@ -339,8 +382,66 @@ class ChatService
                 if ($unbilledBalance > 0 && $consumerWallet) {
                     $chargeAmount = min($unbilledBalance, $consumerWallet->balance);
                     if ($chargeAmount > 0) {
-                        $this->walletService->deductForChat($session->consumer_id, $chargeAmount, $session->id);
-                        $this->walletService->creditProviderForChat($session->provider_id, $chargeAmount, $session->id);
+                        $this->walletService->debitBalanceOnly($session->consumer_id, $chargeAmount);
+                        
+                        // Calculate astrologer share based on active offer or global fallback
+                        $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
+                        $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                        $pricing = $pricingCalculator->calculate($provider->astrologer, 'chat');
+                        $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                        $creditAmount = round(($chargeAmount * $astrologerSharePct) / 100, 2);
+
+                        $this->walletService->creditBalanceOnly($session->provider_id, $creditAmount);
+                    }
+                }
+
+                $totalCost = $alreadyBilled + $chargeAmount;
+
+                // Create consolidated transaction records for the entire session at once!
+                if ($totalCost > 0) {
+                    $this->walletService->logDebitOnly($session->consumer_id, $totalCost, 'chat_deduction', 'App\Models\ChatSession', $session->id);
+                    
+                    $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
+                    $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                    $pricing = $pricingCalculator->calculate($provider->astrologer, 'chat');
+                    $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                    $totalCreditAmount = round(($totalCost * $astrologerSharePct) / 100, 2);
+
+                    $this->walletService->logCreditOnly($session->provider_id, $totalCreditAmount, 'chat_credit', 'App\Models\ChatSession', $session->id);
+                }
+
+                // Update package sub-session if this is a prepaid package session
+                if ($isPackageSession) {
+                    $subSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                        ->whereNull('ended_at')
+                        ->first();
+                    if ($subSession) {
+                        $purchase = \App\Models\PackagePurchase::where('id', $subSession->package_purchase_id)
+                            ->lockForUpdate()
+                            ->first();
+                        if ($purchase) {
+                            $durationUsed = (int) min($durationSeconds, $purchase->remaining_duration);
+                            
+                            $subSession->update([
+                                'ended_at' => $endTime,
+                                'duration_used' => $durationUsed
+                            ]);
+                            
+                            $purchase->remaining_duration -= $durationUsed;
+                            if ($purchase->remaining_duration <= 0) {
+                                $purchase->remaining_duration = 0;
+                                $purchase->status = 'exhausted';
+                            }
+                            $purchase->save();
+                            
+                            // Broadcast package sub-session ended event
+                            broadcast(new \App\Events\PackageSubSessionEnded($subSession, $purchase->remaining_duration, $userId));
+                            
+                            // Broadcast termination if exhausted
+                            if ($purchase->status === 'exhausted') {
+                                broadcast(new \App\Events\PackageSessionTerminated($purchase, "Your package session has exhausted all remaining balance.", 'chat'));
+                            }
+                        }
                     }
                 }
 
@@ -348,7 +449,7 @@ class ChatService
                     'status' => 'completed',
                     'ended_at' => $endTime,
                     'duration_seconds' => $durationSeconds,
-                    'total_cost' => $alreadyBilled + $chargeAmount,
+                    'total_cost' => $totalCost,
                 ]);
 
                 $this->presenceService->setFree($session->consumer_id);
@@ -376,16 +477,41 @@ class ChatService
             throw new Exception("You are not authorized to access this chat history.", 403);
         }
 
-        return \App\Models\Message::where('chat_session_id', $sessionId)
-            ->oldest()
-            ->paginate(30);
+        return $this->fetchMessagesForSessionPair($session, $sessionId);
     }
 
     public function getMessages($sessionId)
     {
-        return \App\Models\Message::where('chat_session_id', $sessionId)
+        $session = \App\Models\ChatSession::findOrFail($sessionId);
+        return $this->fetchMessagesForSessionPair($session, $sessionId);
+    }
+
+    /**
+     * Helper method to fetch and force sessionId on historical messages (DRY).
+     */
+    private function fetchMessagesForSessionPair($session, $sessionId)
+    {
+        // Fetch all chat session IDs between this consumer and provider
+        $sessionIds = \App\Models\ChatSession::where(function($q) use ($session) {
+                $q->where('consumer_id', $session->consumer_id)
+                  ->where('provider_id', $session->provider_id);
+            })
+            ->orWhere(function($q) use ($session) {
+                $q->where('consumer_id', $session->provider_id)
+                  ->where('provider_id', $session->consumer_id);
+            })
+            ->pluck('id');
+
+        $messages = \App\Models\Message::whereIn('chat_session_id', $sessionIds)
             ->oldest()
             ->paginate(30);
+
+        $messages->getCollection()->transform(function ($message) use ($sessionId) {
+            $message->chat_session_id = (int) $sessionId;
+            return $message;
+        });
+
+        return $messages;
     }
 
     /**
@@ -489,6 +615,12 @@ class ChatService
                 // Reset busy status for both consumer and provider
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
+
+                // Close any orphaned PackageSubSession linked to this timed-out chat.
+                // This prevents the user from being locked out of starting new package sessions.
+                \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now()]);
 
                 $session->refresh();
                 return $session;

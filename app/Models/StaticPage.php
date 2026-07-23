@@ -23,6 +23,7 @@ class StaticPage extends Model
     public const TYPE_PAYMENT_POLICY = 'payment_policy';
     public const TYPE_ABOUT_US = 'about_us';
     public const TYPE_CUSTOMER_SUPPORT = 'customer_support';
+    public const TYPE_CONTACT_US = 'contact_us';
 
     public static function getTypes()
     {
@@ -33,6 +34,7 @@ class StaticPage extends Model
             self::TYPE_PAYMENT_POLICY => 'Payment Policy',
             self::TYPE_ABOUT_US => 'About Us',
             self::TYPE_CUSTOMER_SUPPORT => 'Customer Support',
+            self::TYPE_CONTACT_US => 'Contact Us',
         ];
     }
 }

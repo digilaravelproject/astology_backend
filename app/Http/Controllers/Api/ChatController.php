@@ -101,6 +101,12 @@ class ChatController extends Controller
             $durationSeconds = (int) ($session->duration_seconds ?? 0);
             $totalCost = (float) ($session->total_cost ?? 0.00);
 
+            // Calculate astrologer share based on active offer or global fallback
+            $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+            $pricing = $pricingCalculator->calculate($session->provider->astrologer, 'chat');
+            $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+            $astrologerEarning = round(($totalCost * $astrologerSharePct) / 100, 2);
+
             $billingDetails = [
                 'duration_seconds' => $durationSeconds,
                 'user_details' => [
@@ -109,7 +115,7 @@ class ChatController extends Controller
                 ],
                 'astrologer_details' => [
                     'duration_seconds' => $durationSeconds,
-                    'amount_added' => (float) $totalCost,
+                    'amount_added' => (float) $astrologerEarning,
                 ],
             ];
 
@@ -139,7 +145,7 @@ class ChatController extends Controller
         $request->validate([
             'message' => 'required_without:attachment_url|string',
             'attachment_url' => 'nullable|string',
-            'type' => 'in:text,image,system'
+            'type' => 'in:text,image,system,document,file,audio,video'
         ]);
 
         try {
@@ -302,6 +308,31 @@ class ChatController extends Controller
         try {
             $userId = $request->user()->id;
             $sessions = $this->chatService->getAstrologerSessions($userId);
+
+            $consumerIds = $sessions->pluck('consumer_id')->unique()->toArray();
+            $assistanceSessions = \App\Models\ChatAssistanceSession::where(function($query) use ($userId, $consumerIds) {
+                    $query->where('provider_id', $userId)
+                          ->whereIn('consumer_id', $consumerIds);
+                })
+                ->orWhere(function($query) use ($userId, $consumerIds) {
+                    $query->where('consumer_id', $userId)
+                          ->whereIn('provider_id', $consumerIds);
+                })
+                ->get()
+                ->mapWithKeys(function ($session) use ($userId) {
+                    $otherId = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
+                    return [$otherId => $session->id];
+                });
+
+            $sessions->getCollection()->transform(function ($session) use ($assistanceSessions) {
+                $assistanceSessionId = $assistanceSessions[$session->consumer_id] ?? null;
+                $session->chat_assistance_session_id = $assistanceSessionId;
+                if ($session->consumer) {
+                    $session->consumer->chat_assistance_session_id = $assistanceSessionId;
+                }
+                return $session;
+            });
+
             return ApiResponse::success($sessions, 'Astrologer sessions retrieved successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
@@ -351,9 +382,33 @@ class ChatController extends Controller
         try {
             $userId = $request->user()->id;
             $session = $this->chatService->getActiveSession($userId);
+
+            $isPackageSession = false;
+            $remainingDurationSeconds = null;
+
+            if ($session) {
+                $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
+                    ->whereNull('ended_at')
+                    ->first();
+
+                if ($subSession) {
+                    $isPackageSession = true;
+                    $purchase = $subSession->purchase;
+                    if ($purchase) {
+                        $remainingDurationSeconds = (int) $purchase->remaining_duration;
+                        if ($subSession->started_at) {
+                            $elapsed = now()->diffInSeconds($subSession->started_at);
+                            $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
+                        }
+                    }
+                }
+            }
             
             return ApiResponse::success([
-                'session' => $session
+                'session' => $session,
+                'is_package_session' => $isPackageSession,
+                'session_type' => 'chat',
+                'remaining_duration_seconds' => $remainingDurationSeconds,
             ], 'Current active session retrieved successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
@@ -392,11 +447,35 @@ class ChatController extends Controller
                 ], 200);
             }
 
+            $isPackageSession = false;
+            $remainingDurationSeconds = null;
+
+            $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
+                ->whereNull('ended_at')
+                ->first();
+
+            if ($subSession) {
+                $isPackageSession = true;
+                $purchase = $subSession->purchase;
+                if ($purchase) {
+                    $remainingDurationSeconds = (int) $purchase->remaining_duration;
+                    if ($subSession->started_at) {
+                        $elapsed = now()->diffInSeconds($subSession->started_at);
+                        $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
+                    }
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'status' => 'success',
                 'message' => 'Current chat session retrieved successfully',
-                'data' => $session
+                'data' => [
+                    'session' => $session,
+                    'is_package_session' => $isPackageSession,
+                    'session_type' => 'chat',
+                    'remaining_duration_seconds' => $remainingDurationSeconds,
+                ]
             ], 200);
 
         } catch (Exception $e) {

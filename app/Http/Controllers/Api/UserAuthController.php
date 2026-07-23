@@ -143,6 +143,9 @@ class UserAuthController extends Controller
             $user->otp_verified_at = Carbon::now();
             $user->save();
 
+            // Revoke all existing tokens for single device constraint
+            $user->tokens()->delete();
+
             // Issue Sanctum token
             $token = $user->createToken('auth_token')->plainTextToken;
 

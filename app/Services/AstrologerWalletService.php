@@ -264,4 +264,105 @@ class AstrologerWalletService
             'my_weekly_earnings' => $myEarnings,
         ];
     }
+
+    /**
+     * Get monthly invoice summary and header stats for the astrologer.
+     */
+    public function getInvoicesSummary(\App\Models\User $user): array
+    {
+        $wallet = Wallet::firstOrCreate(
+            ['user_id' => $user->id],
+            ['balance' => 0]
+        );
+
+        // 1. Calculate total earnings (sum of completed credits)
+        $totalEarnings = (float) WalletTransaction::where('wallet_id', $wallet->id)
+            ->where('transaction_type', 'credit')
+            ->where('status', 'completed')
+            ->sum('amount');
+
+        // 2. Calculate total withdrawn (sum of completed/approved debits for withdrawal/payout)
+        $totalWithdrawn = (float) WalletTransaction::where('wallet_id', $wallet->id)
+            ->where('transaction_type', 'debit')
+            ->whereIn('status', ['completed', 'approved'])
+            ->where(function($q) {
+                $q->where('description', 'like', '%Withdrawal%')
+                  ->orWhere('description', 'like', '%payout%');
+            })
+            ->sum('amount');
+
+        // 3. Group credit transactions by year-month to build monthly invoices
+        $creditTransactions = WalletTransaction::where('wallet_id', $wallet->id)
+            ->where('transaction_type', 'credit')
+            ->where('status', 'completed')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $grouped = $creditTransactions->groupBy(function ($item) {
+            return Carbon::parse($item->created_at)->format('Y-m');
+        });
+
+        $invoices = [];
+        foreach ($grouped as $yearMonth => $txs) {
+            $parsedDate = Carbon::parse($yearMonth . '-01');
+            $monthName = $parsedDate->format('F Y'); // e.g. "January 2026"
+            $year = $parsedDate->format('Y');
+            $month = $parsedDate->format('m');
+
+            $grossEarnings = (float) $txs->sum('amount');
+            $netPayable = $grossEarnings; // Defaulting to same since no TDS/GST is setup
+
+            $startDate = $parsedDate->copy()->startOfMonth();
+            $endDate = $parsedDate->copy()->endOfMonth();
+
+            $withdrawnForMonth = (float) WalletTransaction::where('wallet_id', $wallet->id)
+                ->where('transaction_type', 'debit')
+                ->whereIn('status', ['completed', 'approved'])
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->where(function($q) {
+                    $q->where('description', 'like', '%Withdrawal%')
+                      ->orWhere('description', 'like', '%payout%');
+                })
+                ->sum('amount');
+
+            $invoices[] = [
+                'month_name' => $monthName,
+                'gross_earnings' => round($grossEarnings, 2),
+                'net_payable' => round($netPayable, 2),
+                'total_withdrawn' => round($withdrawnForMonth, 2),
+                'status' => 'Paid', // Custom default status indicating processed
+                'download_url' => url("/api/v1/astrologer/wallet/invoices/{$year}/{$month}/download"),
+            ];
+        }
+
+        // Current month quick access info
+        $currentYearMonth = Carbon::now()->format('Y-m');
+        $currentMonthTxs = $grouped->get($currentYearMonth);
+        $currentMonthEarnings = $currentMonthTxs ? (float) $currentMonthTxs->sum('amount') : 0.00;
+
+        $currentMonthWithdrawals = (float) WalletTransaction::where('wallet_id', $wallet->id)
+            ->where('transaction_type', 'debit')
+            ->whereIn('status', ['completed', 'approved'])
+            ->whereBetween('created_at', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
+            ->where(function($q) {
+                $q->where('description', 'like', '%Withdrawal%')
+                  ->orWhere('description', 'like', '%payout%');
+            })
+            ->sum('amount');
+
+        return [
+            'total_earnings' => round($totalEarnings, 2),
+            'total_withdrawn' => round($totalWithdrawn, 2),
+            'total_invoices' => count($invoices),
+            'status' => count($invoices) > 0 ? 'All Paid' : 'No Invoices',
+            'current_month' => [
+                'month_name' => Carbon::now()->format('F Y'),
+                'gross_earnings' => round($currentMonthEarnings, 2),
+                'net_payable' => round($currentMonthEarnings, 2),
+                'total_withdrawn' => round($currentMonthWithdrawals, 2),
+                'status' => 'Paid',
+            ],
+            'invoices' => $invoices,
+        ];
+    }
 }

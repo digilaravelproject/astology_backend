@@ -166,6 +166,11 @@ class AstrologerController extends Controller
             'po_at_5_rate_per_minute' => 'nullable|numeric|min:0',
             'po_at_5_sessions' => 'nullable|integer|min:0',
             'status' => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+            
+            // Package overrides validation
+            'package_amount' => 'nullable|numeric|min:0',
+            'package_duration_minutes' => 'nullable|numeric|min:0.1',
+            'package_commission_percentage' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $userData = [
@@ -207,6 +212,21 @@ class AstrologerController extends Controller
         $astrologerUpdateData += $this->handleFileUploads($request, $user->id, $astrologer);
 
         $astrologer->update($astrologerUpdateData);
+
+        // Sync Astrologer Custom Package overrides if any are provided
+        if ($request->filled('package_amount') || $request->filled('package_duration_minutes')) {
+            \App\Models\AstrologerPackage::updateOrCreate(
+                ['astrologer_id' => $user->id],
+                [
+                    'amount' => $request->input('package_amount'),
+                    'duration' => (int) ($request->input('package_duration_minutes') * 60), // store as seconds
+                    'commission_percentage' => $request->input('package_commission_percentage')
+                ]
+            );
+        } else {
+            // Remove overrides so they fallback to global defaults if cleared
+            \App\Models\AstrologerPackage::where('astrologer_id', $user->id)->delete();
+        }
 
         return redirect()->route('admin.astrologers.index')->with('success', 'Astrologer updated successfully.');
     }

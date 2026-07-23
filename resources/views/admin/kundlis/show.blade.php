@@ -79,8 +79,8 @@
                         <p class="text-lg font-black text-dark">{{ $kundli->birth_time ? \Carbon\Carbon::parse($kundli->birth_time)->format('H:i A') : 'N/A' }}</p>
                     </div>
                     <div class="md:col-span-2">
-                        <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Birth Location</div>
-                        <p class="text-lg font-black text-dark">{{ $kundli->birth_location ?? 'N/A' }}</p>
+                        <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Birth Place / Location</div>
+                        <p class="text-lg font-black text-dark">{{ $kundli->birth_place ?? 'N/A' }}</p>
                     </div>
                 </div>
             </div>
