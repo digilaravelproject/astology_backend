@@ -166,7 +166,7 @@
                     <li class="nav-item"><a class="nav-link" href="{{ url('/#home') }}">Home</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url('/#panchang-section') }}">Panchang</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ url('/#numerology-section') }}">Numerology</a></li>
-                    <li class="nav-item"><a class="nav-link" href="{{ url('/#astrologers-section') }}">Astrologers</a></li>
+                    <!-- <li class="nav-item"><a class="nav-link" href="{{ url('/#astrologers-section') }}">Astrologers</a></li> -->
                     <li class="nav-item"><a class="nav-link" href="{{ url('/#blogs-section') }}">Blogs</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ route('about') }}">About Us</a></li>
                     <li class="nav-item"><a class="nav-link" href="{{ route('support') }}">Contact Us</a></li>
@@ -243,7 +243,7 @@
                         <li class="mb-2"><a href="{{ url('/#home') }}" class="text-white-50 text-decoration-none hover-gold small">Home</a></li>
                         <li class="mb-2"><a href="{{ url('/#panchang-section') }}" class="text-white-50 text-decoration-none hover-gold small">Panchang</a></li>
                         <li class="mb-2"><a href="{{ url('/#numerology-section') }}" class="text-white-50 text-decoration-none hover-gold small">Numerology</a></li>
-                        <li class="mb-2"><a href="{{ url('/#astrologers-section') }}" class="text-white-50 text-decoration-none hover-gold small">Astrologers</a></li>
+                        <!-- <li class="mb-2"><a href="{{ url('/#astrologers-section') }}" class="text-white-50 text-decoration-none hover-gold small">Astrologers</a></li> -->
                         <li class="mb-2"><a href="{{ url('/#blogs-section') }}" class="text-white-50 text-decoration-none hover-gold small">Blogs</a></li>
                     </ul>
                 </div>

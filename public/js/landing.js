@@ -308,7 +308,18 @@
                 selectNumberDetails(nameNum);
                 
                 setTimeout(() => {
-                    alert('Your Name Number is ' + nameNum + '! Explore your full profile below.');
+                    Swal.fire({
+                        title: 'Name Number Calculated!',
+                        html: `Your Name Number is <strong style="color: #ad003a; font-size: 1.5rem;">${nameNum}</strong>!<br>Explore your full profile below.`,
+                        icon: 'success',
+                        confirmButtonText: 'Explore Profile',
+                        confirmButtonColor: '#ad003a',
+                        customClass: {
+                            popup: 'rounded-4 shadow-lg border-0',
+                            title: 'font-family-serif fw-bold',
+                            confirmButton: 'px-4 py-2 rounded-pill fw-semibold'
+                        }
+                    });
                 }, 800);
             }
         }
