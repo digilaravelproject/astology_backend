@@ -258,6 +258,10 @@ class ChatService
         $lines[] = "- Time of Birth: " . ($tob ? ($tob instanceof \Carbon\Carbon ? $tob->format('H:i') : $tob) : 'N/A');
         
         $lines[] = "- Place of Birth: " . ($consumer->place_of_birth ?? 'N/A');
+        if (isset($consumer->latitude) || isset($consumer->longitude)) {
+            $lines[] = "- Latitude: " . ($consumer->latitude ?? 'N/A');
+            $lines[] = "- Longitude: " . ($consumer->longitude ?? 'N/A');
+        }
         $lines[] = "- Gender: " . ($consumer->gender ?? 'N/A');
         
         if (isset($consumer->relationship_status)) {
@@ -287,6 +291,8 @@ class ChatService
             '{{date_of_birth}}' => $dobStr,
             '{{time_of_birth}}' => $tobStr,
             '{{place_of_birth}}' => $consumer->place_of_birth ?? 'N/A',
+            '{{latitude}}' => $consumer->latitude ?? 'N/A',
+            '{{longitude}}' => $consumer->longitude ?? 'N/A',
             '{{session_id}}' => $session->id,
         ];
 
