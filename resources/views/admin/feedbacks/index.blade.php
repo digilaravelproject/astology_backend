@@ -91,9 +91,9 @@
                             </td>
                             <td class="px-6 py-5">
                                 @if($feedback->rating)
-                                    <div class="flex gap-1">
+                                    <div class="flex gap-1 text-amber-400">
                                         @for($i = 1; $i <= 5; $i++)
-                                            <span class="text-lg {{ $i <= $feedback->rating ? '⭐' : '☆' }}"></span>
+                                            <i class="{{ $i <= $feedback->rating ? 'fas' : 'far' }} fa-star text-sm"></i>
                                         @endfor
                                     </div>
                                 @else

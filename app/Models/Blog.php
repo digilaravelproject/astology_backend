@@ -56,6 +56,6 @@ class Blog extends Model
 
     public function getBlogImageUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->blog_image);
+        return \App\Helpers\MediaHelper::getFullUrl($this->blog_image);
     }
 }

@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
+use App\Services\ExotelSmsService;
 
 class UserAuthController extends Controller
 {
@@ -51,16 +52,20 @@ class UserAuthController extends Controller
                 ]);
             }
 
-            // Generate 4-digit OTP
             $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-
-            $otp = '1234';
 
             // Store OTP (in users table - adding otp_* fields)
             $user->otp = $otp;
             $user->otp_expires_at = Carbon::now()->addMinutes(10);
             $user->otp_verified_at = null;
             $user->save();
+
+            $smsService = new ExotelSmsService();
+
+            $smsResponse = $smsService->sendOtp(
+                $phone,
+                $otp
+            );
 
             DB::commit();
 

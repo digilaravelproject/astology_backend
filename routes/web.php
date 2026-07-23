@@ -11,9 +11,12 @@ use App\Http\Controllers\Admin\FeedbackController;
 use App\Http\Controllers\Admin\RateLimitController;
 
 Route::get('/', function () {
-    // return view('welcome');
-    return redirect()->route('admin.login');
+    $faq = \App\Models\StaticPage::where('type', 'faq')->where('is_active', true)->first();
+    $blogs = \App\Models\Blog::where('is_active', true)->orderByDesc('created_at')->get();
+    $feedbacks = \App\Models\Feedback::with('user')->orderByDesc('created_at')->get();
+    return view('welcome', compact('faq', 'blogs', 'feedbacks'));
 });
+
 
 Route::get('/admin', function () {
     return redirect()->route('admin.login');
@@ -195,3 +198,30 @@ Route::prefix('admin')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('admin.logout');
     });
 });
+
+// Public Static Page Routes
+Route::get('/about-us', function () {
+    $page = \App\Models\StaticPage::where('type', 'about_us')->where('is_active', true)->first();
+    return view('about', compact('page'));
+})->name('about');
+
+Route::get('/privacy-policy', function () {
+    $page = \App\Models\StaticPage::where('type', 'privacy_policy')->where('is_active', true)->first();
+    return view('privacy', compact('page'));
+})->name('privacy');
+
+Route::get('/terms-and-conditions', function () {
+    $page = \App\Models\StaticPage::where('type', 'terms_and_conditions')->where('is_active', true)->first();
+    return view('terms', compact('page'));
+})->name('terms');
+
+Route::get('/support', function () {
+    $page = \App\Models\StaticPage::where('type', 'customer_support')->where('is_active', true)->first();
+    return view('support', compact('page'));
+})->name('support');
+
+Route::get('/payment-policy', function () {
+    $page = \App\Models\StaticPage::where('type', 'payment_policy')->where('is_active', true)->first();
+    return view('payment', compact('page'));
+})->name('payment_policy');
+

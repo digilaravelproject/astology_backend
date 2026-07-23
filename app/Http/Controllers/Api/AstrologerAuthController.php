@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
+use App\Services\ExotelSmsService;
 
 class AstrologerAuthController extends Controller
 {
@@ -238,12 +239,19 @@ class AstrologerAuthController extends Controller
 
         $astrologer = $user->astrologer;
 
-        // $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        $otp = '1234';
+        $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        
         $astrologer->otp = $otp;
         $astrologer->otp_expires_at = Carbon::now()->addMinutes(10);
         $astrologer->otp_verified_at = null;
         $astrologer->save();
+
+        $smsService = new ExotelSmsService();
+
+        $smsResponse = $smsService->sendOtp(
+            $phone,
+            $otp
+        );
 
         NotificationHelper::send(
             $user->id,
