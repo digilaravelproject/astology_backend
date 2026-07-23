@@ -21,24 +21,31 @@ class ExotelSmsService
                 $cleanedMobile = substr($cleanedMobile, -10);
             }
 
-            $url = "https://api.exotel.com/v1/Accounts/".env('EXOTEL_ACCOUNT_SID')."/Sms/send.json";
+            $accountSid = (string) (config('services.exotel.account_sid') ?? env('EXOTEL_ACCOUNT_SID', ''));
+            $apiKey     = (string) (config('services.exotel.api_key') ?? env('EXOTEL_API_KEY', ''));
+            $apiToken   = (string) (config('services.exotel.api_token') ?? env('EXOTEL_API_TOKEN', ''));
+            $senderId   = (string) (config('services.exotel.sender_id') ?? env('EXOTEL_SENDER_ID', ''));
+            $dltEntity  = (string) (config('services.exotel.dlt_entity_id') ?? env('EXOTEL_DLT_ENTITY_ID', ''));
+            $dltTemplate= (string) (config('services.exotel.dlt_template_id') ?? env('EXOTEL_DLT_TEMPLATE_ID', ''));
+
+            $url = "https://api.exotel.com/v1/Accounts/{$accountSid}/Sms/send.json";
 
             $response = Http::withBasicAuth(
-                env('EXOTEL_API_KEY'),
-                env('EXOTEL_API_TOKEN')
+                $apiKey,
+                $apiToken
             )->withHeaders([
                 'accept' => 'application/json',
             ])->asForm()->post($url, [
-                'From' => env('EXOTEL_SENDER_ID'),
+                'From' => $senderId,
                 'To' => $cleanedMobile,
                 'Body' => $message,
-                'DltEntityId' => env('EXOTEL_DLT_ENTITY_ID'),
-                'DltTemplateId' => env('EXOTEL_DLT_TEMPLATE_ID'),
+                'DltEntityId' => $dltEntity,
+                'DltTemplateId' => $dltTemplate,
             ]);
 
             Log::info('Exotel Config', [
-                'sid' => env('EXOTEL_ACCOUNT_SID'),
-                'sender' => env('EXOTEL_SENDER_ID'),
+                'sid' => $accountSid,
+                'sender' => $senderId,
                 'url' => $url,
             ]);
 

@@ -61,4 +61,13 @@ return [
         'ttl'        => env('TURN_CREDENTIAL_TTL', 86400),
     ],
 
+    'exotel' => [
+        'account_sid'     => env('EXOTEL_ACCOUNT_SID'),
+        'api_key'         => env('EXOTEL_API_KEY'),
+        'api_token'       => env('EXOTEL_API_TOKEN'),
+        'sender_id'       => env('EXOTEL_SENDER_ID'),
+        'dlt_entity_id'   => env('EXOTEL_DLT_ENTITY_ID'),
+        'dlt_template_id' => env('EXOTEL_DLT_TEMPLATE_ID'),
+    ],
+
 ];
