@@ -1,97 +1,42 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ $page->title }} - {{ config('app.name') }}</title>
-    <meta name="description" content="{{ $page->title }} - {{ config('app.name') }}">
-    
-    <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-            color: #e0e0e0;
-            line-height: 1.8;
-            min-height: 100vh;
-        }
-        .container { max-width: 900px; margin: 0 auto; padding: 60px 24px; }
-        .header {
-            text-align: center;
-            margin-bottom: 50px;
-            padding-bottom: 30px;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .header h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, #f7971e, #ffd200);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        .header .logo {
-            font-size: 1.2rem;
-            color: #f7971e;
-            margin-bottom: 10px;
-            display: block;
-            text-decoration: none;
-        }
-        .content {
-            background: rgba(255,255,255,0.05);
-            border-radius: 16px;
-            padding: 40px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.08);
-        }
-        .content h2 { color: #ffd200; font-size: 1.5rem; margin: 30px 0 15px; }
-        .content h3 { color: #f7971e; font-size: 1.2rem; margin: 25px 0 10px; }
-        .content p { margin-bottom: 16px; color: #ccc; }
-        .content ul, .content ol { margin: 15px 0 15px 25px; color: #ccc; }
-        .content li { margin-bottom: 8px; }
-        .content a { color: #ffd200; text-decoration: underline; }
-        .content strong { color: #fff; }
-        .footer {
-            text-align: center;
-            margin-top: 40px;
-            padding-top: 30px;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            font-size: 0.9rem;
-            color: #888;
-        }
-        .footer a { color: #f7971e; text-decoration: none; }
-        @media (max-width: 768px) {
-            .container { padding: 30px 16px; }
-            .header h1 { font-size: 1.8rem; }
-            .content { padding: 24px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <a href="/" class="logo">&#x2605; Surya Path Kundli</a>
-            <h1>{{ $page->title }}</h1>
-        </div>
+@section('title', $page->title . ' - ' . config('app.name', 'Surya Path'))
 
-        <div class="content">
+@include('layouts.header')
+
+<style>
+    .dynamic-content p {
+        margin-bottom: 1.25rem;
+        line-height: 1.7;
+    }
+    .dynamic-content h2, .dynamic-content h3, .dynamic-content h4 {
+        color: #E1A61B;
+        font-family: 'Marcellus', serif !important;
+        font-weight: bold;
+        margin-top: 1.75rem;
+        margin-bottom: 0.75rem;
+    }
+    .dynamic-content h2 { font-size: 1.5rem; }
+    .dynamic-content h3 { font-size: 1.25rem; }
+    .dynamic-content h4 { font-size: 1.15rem; }
+    .dynamic-content ul, .dynamic-content ol {
+        margin-left: 1.5rem;
+        margin-bottom: 1.25rem;
+        list-style-type: disc;
+    }
+    .dynamic-content li {
+        margin-bottom: 0.5rem;
+    }
+</style>
+
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+    <div class="bg-white dark:bg-[#1C1217]/95 backdrop-blur-md rounded-3xl p-6 sm:p-10 border border-amber-200/80 dark:border-surya-red/30 shadow-xl space-y-6">
+        <h1 class="text-3xl sm:text-4xl font-serif font-bold text-surya-red dark:text-surya-gold border-b border-amber-200/40 dark:border-white/10 pb-4">
+            {{ $page->title }}
+        </h1>
+        
+        <div class="dynamic-content text-slate-700 dark:text-amber-100/90 leading-relaxed font-normal text-sm sm:text-base">
             {!! $page->content !!}
         </div>
-
-        <div class="footer">
-            <p>&copy; {{ date('Y') }} {{ config('app.name') }}. All rights reserved.</p>
-            <p style="margin-top:8px;">
-                <a href="{{ route('page.faq') }}">FAQs</a> &middot;
-                <a href="{{ route('page.privacy-policy') }}">Privacy Policy</a> &middot;
-                <a href="{{ route('page.terms-and-conditions') }}">Terms &amp; Conditions</a> &middot;
-                <a href="{{ route('page.payment-policy') }}">Payment Policy</a> &middot;
-                <a href="{{ route('page.about-us') }}">About Us</a> &middot;
-                <a href="{{ route('page.customer-support') }}">Customer Support</a>
-            </p>
-        </div>
     </div>
-</body>
-</html>
+</div>
+
+@include('layouts.footer')

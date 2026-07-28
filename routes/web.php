@@ -15,7 +15,11 @@ Route::get('/', function () {
     $faq = \App\Models\StaticPage::where('type', 'faq')->where('is_active', true)->first();
     $blogs = \App\Models\Blog::where('is_active', true)->orderByDesc('created_at')->get();
     $feedbacks = \App\Models\Feedback::with('user')->orderByDesc('created_at')->get();
-    return view('welcome', compact('faq', 'blogs', 'feedbacks'));
+    $astrologers = \App\Models\Astrologer::with('user')
+        ->where('status', 'approved')
+        ->take(4)
+        ->get();
+    return view('welcome', compact('faq', 'blogs', 'feedbacks', 'astrologers'));
 });
 
 
