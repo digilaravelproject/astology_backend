@@ -16,7 +16,8 @@ Route::get('/', function () {
     $blogs = \App\Models\Blog::where('is_active', true)->orderByDesc('created_at')->get();
     $feedbacks = \App\Models\Feedback::with('user')->orderByDesc('created_at')->get();
     $astrologers = \App\Models\Astrologer::with('user')
-        ->where('status', 'approved')
+        ->orderByRaw("CASE WHEN status = 'approved' THEN 1 ELSE 2 END")
+        ->orderByDesc('created_at')
         ->take(4)
         ->get();
     return view('welcome', compact('faq', 'blogs', 'feedbacks', 'astrologers'));

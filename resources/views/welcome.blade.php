@@ -1485,7 +1485,7 @@
                                         <i class="fa-solid {{ $iconClass }}"></i>
                                     </div>
                                     <span
-                                        class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider {{ $badgeBg }} px-2.5 py-0.5 rounded-full shadow relative z-10">{{ $blog->type ? ucfirst($blog->type) : 'Vedic' }}</span>
+                                        class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider {{ $badgeBg }} px-2.5 py-0.5 rounded-full shadow z-10">{{ $blog->type ? ucfirst($blog->type) : 'Vedic' }}</span>
                                 </div>
 
                                 <div class="p-5 space-y-3">
@@ -1538,7 +1538,7 @@
                                     <i class="fa-solid fa-sun"></i>
                                 </div>
                                 <span
-                                    class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider bg-surya-red text-white px-2.5 py-0.5 rounded-full shadow relative z-10">Vedic Rituals</span>
+                                    class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider bg-surya-red text-white px-2.5 py-0.5 rounded-full shadow z-10">Vedic Rituals</span>
                             </div>
 
                             <div class="p-5 space-y-3">
@@ -1590,7 +1590,7 @@
                                     <i class="fa-solid fa-moon"></i>
                                 </div>
                                 <span
-                                    class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider bg-rose-500 text-white px-2.5 py-0.5 rounded-full shadow relative z-10">Kundli Matching</span>
+                                    class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider bg-rose-500 text-white px-2.5 py-0.5 rounded-full shadow z-10">Kundli Matching</span>
                             </div>
 
                             <div class="p-5 space-y-3">
@@ -1642,7 +1642,7 @@
                                     <i class="fa-solid fa-gem"></i>
                                 </div>
                                 <span
-                                    class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2.5 py-0.5 rounded-full shadow relative z-10">Gemstones</span>
+                                    class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider bg-amber-500 text-white px-2.5 py-0.5 rounded-full shadow z-10">Gemstones</span>
                             </div>
 
                             <div class="p-5 space-y-3">
@@ -1694,7 +1694,7 @@
                                     <i class="fa-solid fa-compass"></i>
                                 </div>
                                 <span
-                                    class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2.5 py-0.5 rounded-full shadow relative z-10">Vastu Tips</span>
+                                    class="absolute top-3 left-3 text-[9px] font-bold uppercase tracking-wider bg-emerald-600 text-white px-2.5 py-0.5 rounded-full shadow z-10">Vastu Tips</span>
                             </div>
 
                             <div class="p-5 space-y-3">
