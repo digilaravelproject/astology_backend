@@ -28,14 +28,14 @@
                             class="w-8 h-8 rounded-full bg-white/10 hover:bg-surya-gold hover:text-slate-950 flex items-center justify-center text-xs transition-colors border border-white/20">
                             <i class="fa-brands fa-instagram"></i>
                         </a>
-                        <a href="#"
+                        <?php /*<a href="#"
                             class="w-8 h-8 rounded-full bg-white/10 hover:bg-surya-gold hover:text-slate-950 flex items-center justify-center text-xs transition-colors border border-white/20">
                             <i class="fa-brands fa-youtube"></i>
                         </a>
                         <a href="#"
                             class="w-8 h-8 rounded-full bg-white/10 hover:bg-surya-gold hover:text-slate-950 flex items-center justify-center text-xs transition-colors border border-white/20">
                             <i class="fa-brands fa-x-twitter"></i>
-                        </a>
+                        </a> */?>
                     </div>
                 </div>
 
