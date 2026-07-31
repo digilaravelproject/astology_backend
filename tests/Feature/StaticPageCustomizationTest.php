@@ -42,4 +42,27 @@ class StaticPageCustomizationTest extends TestCase
             ->assertSee('Refund Policy')
             ->assertSee('Refund details');
     }
+
+    public function test_active_database_pages_are_displayed_as_footer_links(): void
+    {
+        StaticPage::create([
+            'type' => 'corporate_information',
+            'title' => 'Corporate Information',
+            'content' => '<p>Company details</p>',
+            'is_active' => true,
+        ]);
+
+        StaticPage::create([
+            'type' => 'hidden_page',
+            'title' => 'Hidden Page',
+            'content' => '<p>Hidden details</p>',
+            'is_active' => false,
+        ]);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('Corporate Information')
+            ->assertSee(route('page.show', 'corporate_information'))
+            ->assertDontSee('Hidden Page');
+    }
 }

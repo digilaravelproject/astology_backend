@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\StaticPage;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +22,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        View::composer('layouts.footer', function ($view) {
+            $footerPages = collect();
+
+            try {
+                if (Schema::hasTable('static_pages')) {
+                    $footerPages = StaticPage::query()
+                        ->where('is_active', true)
+                        ->orderBy('title')
+                        ->get(['type', 'title']);
+                }
+            } catch (\Throwable) {
+                // Keep the public layout available while the database is unavailable or migrating.
+            }
+
+            $view->with('footerPages', $footerPages);
+        });
+
         // Broadcast auth routes with Sanctum middleware (token auth)
         \Illuminate\Support\Facades\Broadcast::routes([
             'middleware' => ['auth:sanctum'],

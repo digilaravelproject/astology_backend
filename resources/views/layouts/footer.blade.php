@@ -65,27 +65,23 @@
                     </ul>
                 </div>
 
-                <!-- Col 3: Support & Policies -->
+                <!-- Col 3: Database-managed pages -->
                 <div>
                     <h4
                         class="font-bold text-surya-gold uppercase text-xs tracking-wider mb-4 border-b border-white/10 pb-2">
-                        Policies & Support</h4>
+                        Pages</h4>
                     <ul class="space-y-2.5 text-amber-200/80 font-medium">
-                        <li><a href="{{ route('about') }}" class="hover:text-surya-gold transition-colors flex items-center gap-1.5"><i
-                                    class="fa-solid fa-angle-right text-[10px] text-surya-gold"></i> About Us</a></li>
-                        <li><a href="{{ route('privacy') }}" class="hover:text-surya-gold transition-colors flex items-center gap-1.5"><i
-                                    class="fa-solid fa-angle-right text-[10px] text-surya-gold"></i> Privacy Policy</a>
-                        </li>
-                        <li><a href="{{ route('terms') }}" class="hover:text-surya-gold transition-colors flex items-center gap-1.5"><i
-                                    class="fa-solid fa-angle-right text-[10px] text-surya-gold"></i> Terms & Conditions</a>
-                        </li>
-                        <li><a href="{{ route('payment_policy') }}"
-                                class="hover:text-surya-gold transition-colors flex items-center gap-1.5"><i
-                                    class="fa-solid fa-angle-right text-[10px] text-surya-gold"></i> Refund Policy</a>
-                        </li>
-                        <li><a href="{{ route('support') }}" class="hover:text-surya-gold transition-colors flex items-center gap-1.5"><i
-                                    class="fa-solid fa-angle-right text-[10px] text-surya-gold"></i> Contact Support</a>
-                        </li>
+                        @forelse($footerPages as $footerPage)
+                            <li>
+                                <a href="{{ route('page.show', $footerPage->type) }}"
+                                   class="hover:text-surya-gold transition-colors flex items-center gap-1.5">
+                                    <i class="fa-solid fa-angle-right text-[10px] text-surya-gold"></i>
+                                    {{ $footerPage->title }}
+                                </a>
+                            </li>
+                        @empty
+                            <li class="text-amber-200/60">No pages available.</li>
+                        @endforelse
                     </ul>
                 </div>
 

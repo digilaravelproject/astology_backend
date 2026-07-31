@@ -7,22 +7,75 @@
     <link rel="shortcut icon" href="{{ \App\Models\Setting::get('favicon_path', '/favicon.ico') }}" type="image/x-icon">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <style>
+        .admin-content { min-width: 0; }
+
+        .admin-content img,
+        .admin-content video,
+        .admin-content canvas,
+        .admin-content svg { max-width: 100%; }
+
+        .admin-content div:has(> table) {
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 767px) {
+            body { overflow-x: hidden; }
+            .admin-header { height: 64px; padding-inline: 12px; }
+            .admin-brand { min-width: 0; gap: 8px; font-size: 15px; line-height: 1.15; }
+            .admin-brand img { width: 36px; height: 36px; flex: none; }
+            .admin-main-shell { padding-top: 64px; }
+            .admin-sidebar { top: 64px; height: calc(100vh - 64px); width: min(280px, 86vw); }
+            .admin-main { width: 100%; min-width: 0; overflow-x: hidden; }
+            .admin-main-inner { width: 100%; min-width: 0; padding: 16px 12px; }
+
+            .admin-content > .flex,
+            .admin-content form.flex { flex-wrap: wrap; gap: 12px; }
+
+            .admin-content form.flex > div,
+            .admin-content form.flex > input,
+            .admin-content form.flex > select {
+                width: 100%;
+                min-width: 0 !important;
+                flex-basis: 100%;
+            }
+
+            .admin-content [class~="grid-cols-2"],
+            .admin-content [class~="grid-cols-3"],
+            .admin-content [class~="grid-cols-4"],
+            .admin-content [class~="grid-cols-5"],
+            .admin-content [class~="grid-cols-6"] {
+                grid-template-columns: minmax(0, 1fr);
+            }
+
+            .admin-content [class~="p-8"] { padding: 16px; }
+            .admin-content [class~="p-6"] { padding: 14px; }
+            .admin-content table { min-width: 720px; }
+
+            .admin-content input,
+            .admin-content select,
+            .admin-content textarea,
+            .admin-content button { max-width: 100%; }
+        }
+    </style>
 </head>
 <body class="bg-light font-sans text-text-primary" x-data="{ sidebarOpen: false }">
 
     <!-- Header -->
-    <header class="bg-white shadow-header fixed w-full top-0 left-0 z-50 h-[70px] px-4 md:px-8 flex items-center justify-between">
+    <header class="admin-header bg-white shadow-header fixed w-full top-0 left-0 z-50 h-[70px] px-4 md:px-8 flex items-center justify-between">
         <!-- Logo & Mobile Menu -->
         <div class="flex items-center gap-4">
             <button @click="sidebarOpen = !sidebarOpen" class="md:hidden text-gray text-xl">
                 <i class="fas fa-bars"></i>
             </button>
-            <span class="text-xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent flex items-center gap-2">
-                @if($logoPath = \App\Models\Setting::get('logo_path'))
-                    <img src="{{ $logoPath }}" class="h-8 object-contain">
-                @else
-                    ☉ {{ \App\Models\Setting::get('app_name', 'Astology Premium') }}
-                @endif
+            <span class="admin-brand text-xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent flex items-center gap-2">
+                @php $logoPath = \App\Models\Setting::get('logo_path'); @endphp
+                <img src="{{ $logoPath ?: asset('images/logo.jpg') }}"
+                     alt="{{ \App\Models\Setting::get('app_name', 'Astology Premium') }} Logo"
+                     class="h-9 w-9 rounded-lg object-contain border border-primary/20 shadow-sm">
+                <span>{{ \App\Models\Setting::get('app_name', 'Astology Premium') }}</span>
             </span>
         </div>
 
@@ -49,7 +102,7 @@
         </div>
     </header>
 
-    <div class="flex min-h-screen pt-[70px]">
+    <div class="admin-main-shell flex min-h-screen pt-[70px]">
 
         <!-- Sidebar Overlay (Mobile) -->
         <div x-show="sidebarOpen"
@@ -64,7 +117,7 @@
         </div>
 
         <!-- Sidebar -->
-        <aside class="fixed left-0 top-[70px] h-[calc(100vh-70px)] w-[250px] bg-white shadow-lg z-50 transition-all duration-300 transform md:translate-x-0"
+        <aside class="admin-sidebar fixed left-0 top-[70px] h-[calc(100vh-70px)] w-[250px] bg-white shadow-lg z-50 transition-all duration-300 transform md:translate-x-0"
                :class="sidebarOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:translate-x-0'">
             <nav class="py-2 h-full overflow-y-auto">
                 <ul class="space-y-1">
@@ -581,8 +634,8 @@
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 md:ml-[250px] transition-all duration-300">
-            <div class="p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen">
+        <main class="admin-main flex-1 md:ml-[250px] transition-all duration-300">
+            <div class="admin-main-inner p-4 md:p-8 max-w-[1600px] mx-auto min-h-screen">
 
                 <!-- Success Alert -->
                 @if(session('success'))
@@ -612,7 +665,9 @@
                 </div>
                 @endif
 
-                @yield('content')
+                <div class="admin-content">
+                    @yield('content')
+                </div>
             </div>
         </main>
     </div>
