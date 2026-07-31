@@ -393,42 +393,6 @@
                                     <i class="fas fa-circle text-[6px]"></i> All Pages
                                 </a>
                             </li>
-                            <li>
-                                <a href="{{ route('admin.static_pages.create') }}" 
-                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.static_pages.create') ? 'text-primary' : 'text-gray hover:text-primary' }}">
-                                    <i class="fas fa-circle text-[6px]"></i> Create Page
-                                </a>
-                            </li>
-                            <li>
-                                <a href="{{ route('admin.static_pages.index', ['type' => 'faq']) }}" 
-                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-gray hover:text-primary">
-                                    <i class="fas fa-circle text-[6px]"></i> FAQs
-                                </a>
-                            </li>
-                            <li>
-                                <a href="{{ route('admin.static_pages.index', ['type' => 'privacy_policy']) }}" 
-                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-gray hover:text-primary">
-                                    <i class="fas fa-circle text-[6px]"></i> Privacy Policy
-                                </a>
-                            </li>
-                            <li>
-                                <a href="{{ route('admin.static_pages.index', ['type' => 'terms_and_conditions']) }}" 
-                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-gray hover:text-primary">
-                                    <i class="fas fa-circle text-[6px]"></i> Terms & Conditions
-                                </a>
-                            </li>
-                            <li>
-                                <a href="{{ route('admin.static_pages.index', ['type' => 'payment_policy']) }}" 
-                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold text-gray hover:text-primary">
-                                    <i class="fas fa-circle text-[6px]"></i> Payment Policy
-                                </a>
-                            </li>
-                            <li>
-                                <a href="{{ route('admin.founder_words.index') }}" 
-                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.founder_words.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
-                                    <i class="fas fa-circle text-[6px]"></i> Founder Words
-                                </a>
-                            </li>
                         </ul>
                     </li>
 

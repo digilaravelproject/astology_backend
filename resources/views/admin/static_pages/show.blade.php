@@ -20,7 +20,7 @@
     </div>
     <div class="flex gap-2">
         @if($page->is_active)
-            <a href="{{ route(str_replace('_', '-', 'page.' . $page->type)) }}" target="_blank"
+            <a href="{{ route('page.show', $page->type) }}" target="_blank"
                class="px-4 py-2 bg-info text-white rounded-lg hover:bg-info-dark transition-all">
                 <i class="fas fa-external-link-alt mr-2"></i> View Live
             </a>

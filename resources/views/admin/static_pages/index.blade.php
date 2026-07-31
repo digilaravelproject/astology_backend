@@ -138,7 +138,7 @@
                                     <i class="fas fa-eye"></i> Show
                                 </a>
                                 @if($page->is_active)
-                                    <a href="{{ route(str_replace('_', '-', 'page.' . $page->type)) }}" target="_blank"
+                                    <a href="{{ route('page.show', $page->type) }}" target="_blank"
                                        class="px-3 py-1 text-xs bg-info/10 text-info rounded hover:bg-info hover:text-white transition-all">
                                         <i class="fas fa-external-link-alt"></i> View
                                     </a>

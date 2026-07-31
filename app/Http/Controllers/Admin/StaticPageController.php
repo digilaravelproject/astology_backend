@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\StaticPage;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class StaticPageController extends Controller
 {
@@ -46,18 +48,36 @@ class StaticPageController extends Controller
     public function create()
     {
         $types = StaticPage::getTypes();
-        $page = new StaticPage();
+        $page = new StaticPage;
+
         return view('admin.static_pages.create', compact('page', 'types'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
-            'type' => 'required|in:faq,privacy_policy,terms_and_conditions,payment_policy,about_us,customer_support,contact_us|unique:static_pages,type',
+            'type' => ['required', Rule::in([...array_keys(StaticPage::getTypes()), 'other'])],
+            'custom_type' => ['nullable', 'required_if:type,other', 'string', 'max:100'],
             'title' => 'required|string|max:255',
             'content' => 'required|string',
             'is_active' => 'sometimes|boolean',
         ]);
+
+        $data['type'] = $data['type'] === 'other'
+            ? Str::slug($data['custom_type'], '_')
+            : $data['type'];
+
+        if ($data['type'] === '') {
+            return back()->withErrors(['custom_type' => 'Please enter a valid page type.'])->withInput();
+        }
+
+        if (StaticPage::where('type', $data['type'])->exists()) {
+            $field = $request->input('type') === 'other' ? 'custom_type' : 'type';
+
+            return back()->withErrors([$field => 'This page type already exists.'])->withInput();
+        }
+
+        unset($data['custom_type']);
 
         $data['is_active'] = $request->has('is_active') ? (bool) $request->input('is_active') : true;
 
@@ -70,6 +90,7 @@ class StaticPageController extends Controller
     {
         $page = StaticPage::findOrFail($id);
         $types = StaticPage::getTypes();
+
         return view('admin.static_pages.create', compact('page', 'types'));
     }
 
@@ -101,6 +122,7 @@ class StaticPageController extends Controller
     public function show($id)
     {
         $page = StaticPage::findOrFail($id);
+
         return view('admin.static_pages.show', compact('page'));
     }
 }

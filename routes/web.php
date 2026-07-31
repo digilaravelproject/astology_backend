@@ -37,6 +37,7 @@ Route::prefix('page')->group(function () {
     Route::get('/about-us',           [StaticPageController::class, 'aboutUs'])->name('page.about-us');
     Route::get('/customer-support',   [StaticPageController::class, 'customerSupport'])->name('page.customer-support');
     Route::get('/contact-us',         [StaticPageController::class, 'contactUs'])->name('page.contact-us');
+    Route::get('/{type}',              [StaticPageController::class, 'show'])->name('page.show');
 });
 // Admin Routes
 Route::prefix('admin')->group(function () {
@@ -257,4 +258,3 @@ Route::get('/payment-policy', function () {
     $page = \App\Models\StaticPage::where('type', 'payment_policy')->where('is_active', true)->first();
     return view('payment', compact('page'));
 })->name('payment_policy');
-

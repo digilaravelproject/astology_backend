@@ -1,7 +1,14 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
 <head>
+    <script>
+        try {
+            document.documentElement.classList.toggle('dark', localStorage.getItem('theme') === 'dark');
+        } catch (error) {
+            document.documentElement.classList.remove('dark');
+        }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>@yield('title', config('app.name', 'Surya Path') . ' - Trusted Guide for Astrology & Life Guidance')</title>
@@ -259,7 +266,7 @@
     class="starry-bg text-slate-800 dark:text-slate-100 transition-colors duration-300 antialiased selection:bg-surya-red selection:text-white"
     x-data="{ 
         mobileMenuOpen: false, 
-        darkMode: true,
+        darkMode: document.documentElement.classList.contains('dark'),
         isScrolled: false,
         activeBlog: null,
         showBlogModal: false,
@@ -270,6 +277,9 @@
             } else {
                 document.documentElement.classList.remove('dark');
             }
+            try {
+                localStorage.setItem('theme', this.darkMode ? 'dark' : 'light');
+            } catch (error) {}
         }
     }" @scroll.window="isScrolled = (window.pageYOffset > 20)">
 

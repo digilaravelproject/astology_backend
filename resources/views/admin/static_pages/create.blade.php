@@ -23,11 +23,11 @@
         @endif
 
         <!-- Page Type -->
-        <div class="mb-6">
+        <div class="mb-6" x-data="{ selectedType: @js(old('type', $page->type)) }">
             <label class="block text-sm font-semibold text-text-primary mb-2">
                 Page Type <span class="text-danger">*</span>
             </label>
-            <select name="type" {{ $page->id ? 'disabled' : '' }} 
+            <select name="type" x-model="selectedType" {{ $page->id ? 'disabled' : '' }}
                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary {{ $errors->has('type') ? 'border-danger' : '' }}"
                     required>
                 <option value="">Select Page Type</option>
@@ -36,7 +36,25 @@
                         {{ $label }}
                     </option>
                 @endforeach
+                @if(!$page->id)
+                    <option value="other" {{ old('type') === 'other' ? 'selected' : '' }}>Other</option>
+                @endif
             </select>
+            @if(!$page->id)
+                <div x-show="selectedType === 'other'" x-cloak class="mt-4">
+                    <label for="custom_type" class="block text-sm font-semibold text-text-primary mb-2">
+                        Enter Page Type <span class="text-danger">*</span>
+                    </label>
+                    <input type="text" id="custom_type" name="custom_type" value="{{ old('custom_type') }}"
+                           :required="selectedType === 'other'"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary {{ $errors->has('custom_type') ? 'border-danger' : '' }}"
+                           placeholder="e.g. Refund Policy" maxlength="100">
+                    <p class="text-xs text-text-muted mt-2">The page type will be converted to a URL-friendly name.</p>
+                    @error('custom_type')
+                        <p class="text-danger text-sm mt-1">{{ $message }}</p>
+                    @enderror
+                </div>
+            @endif
             @if($page->id)
                 <input type="hidden" name="type" value="{{ $page->type }}">
                 <p class="text-xs text-text-muted mt-2">Page type cannot be changed after creation</p>
