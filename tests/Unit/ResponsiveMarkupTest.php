@@ -58,4 +58,22 @@ class ResponsiveMarkupTest extends TestCase
             );
         }
     }
+
+    public function test_admin_theme_uses_the_logo_palette_without_legacy_pink_or_teal(): void
+    {
+        $themeFiles = [
+            $this->projectRoot . '/resources/css/app.css',
+            $this->projectRoot . '/tailwind.config.js',
+            $this->projectRoot . '/resources/views/admin/auth/login.blade.php',
+        ];
+
+        foreach ($themeFiles as $themeFile) {
+            $contents = strtolower(file_get_contents($themeFile));
+
+            $this->assertStringContainsString('#c40000', $contents);
+            $this->assertStringNotContainsString('#d63384', $contents);
+            $this->assertStringNotContainsString('#f95a8f', $contents);
+            $this->assertStringNotContainsString('#4ecdc4', $contents);
+        }
+    }
 }

@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f95a8f 0%, #d63384 50%, #9b3b9b 100%);
+            background: linear-gradient(135deg, #f4b41a 0%, #c40000 52%, #820000 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -43,7 +43,7 @@
         }
 
         .login-header {
-            background: linear-gradient(135deg, #f95a8f 0%, #d63384 100%);
+            background: linear-gradient(135deg, #e01818 0%, #9d0000 100%);
             color: white;
             padding: 40px 20px;
             text-align: center;
@@ -125,9 +125,9 @@
 
         .form-group input:focus {
             outline: none;
-            border-color: #d63384;
+            border-color: #c40000;
             background: white;
-            box-shadow: 0 0 0 3px rgba(214, 51, 132, 0.1);
+            box-shadow: 0 0 0 3px rgba(196, 0, 0, 0.12);
         }
 
         .form-group input::placeholder {
@@ -143,13 +143,13 @@
         }
 
         .remember-forgot a {
-            color: #d63384;
+            color: #c40000;
             text-decoration: none;
             transition: color 0.3s ease;
         }
 
         .remember-forgot a:hover {
-            color: #f95a8f;
+            color: #820000;
         }
 
         .checkbox-group {
@@ -171,7 +171,7 @@
         .login-btn {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(135deg, #f95a8f 0%, #d63384 100%);
+            background: linear-gradient(135deg, #e01818 0%, #9d0000 100%);
             color: white;
             border: none;
             border-radius: 8px;
@@ -179,12 +179,12 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(214, 51, 132, 0.3);
+            box-shadow: 0 4px 15px rgba(130, 0, 0, 0.3);
         }
 
         .login-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(214, 51, 132, 0.4);
+            box-shadow: 0 6px 20px rgba(130, 0, 0, 0.4);
         }
 
         .login-btn:active {
@@ -198,7 +198,7 @@
             border-radius: 6px;
             margin-bottom: 20px;
             font-size: 13px;
-            border-left: 4px solid #d63384;
+            border-left: 4px solid #c40000;
         }
 
         .error-list {

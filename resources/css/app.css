@@ -11,20 +11,20 @@
     --font-sans: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     --font-heading: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 
-    /* Primary Colors */
-    --color-primary: #d63384;
-    --color-primary-light: #f95a8f;
-    --color-primary-dark: #b02a6f;
+    /* Surya Path logo palette: solar red */
+    --color-primary: #c40000;
+    --color-primary-light: #e01818;
+    --color-primary-dark: #820000;
 
-    /* Secondary Colors */
-    --color-secondary: #4ecdc4;
-    --color-secondary-light: #6ee7df;
-    --color-secondary-dark: #3ab5ad;
+    /* Surya Path logo palette: metallic gold */
+    --color-secondary: #d99a00;
+    --color-secondary-light: #f4bf2a;
+    --color-secondary-dark: #a96e00;
 
-    /* Accent Colors */
-    --color-accent: #ffa500;
-    --color-accent-light: #ffb733;
-    --color-accent-dark: #cc8400;
+    /* Bright solar highlights */
+    --color-accent: #f4b41a;
+    --color-accent-light: #ffd45a;
+    --color-accent-dark: #b97800;
 
     /* Success */
     --color-success: #51cf66;
@@ -37,9 +37,9 @@
     --color-danger-dark: #ee5a52;
 
     /* Warning */
-    --color-warning: #ffa500;
-    --color-warning-light: #ffb733;
-    --color-warning-dark: #cc8400;
+    --color-warning: #d99a00;
+    --color-warning-light: #f4bf2a;
+    --color-warning-dark: #a96e00;
 
     /* Info */
     --color-info: #339af0;
@@ -47,22 +47,22 @@
     --color-info-dark: #1c7ed6;
 
     /* Neutral Colors */
-    --color-dark: #222222;
-    --color-gray: #666666;
-    --color-gray-light: #999999;
-    --color-gray-lighter: #e0e0e0;
-    --color-light: #f5f7fa;
+    --color-dark: #2b0a0a;
+    --color-gray: #6b5750;
+    --color-gray-light: #9b8980;
+    --color-gray-lighter: #eadfd2;
+    --color-light: #fff8e8;
     --color-white: #ffffff;
 
     /* Sidebar */
     --color-sidebar-bg: #ffffff;
-    --color-sidebar-hover: #fdf2f6;
-    --color-sidebar-active: #d63384;
+    --color-sidebar-hover: #fff1cf;
+    --color-sidebar-active: #c40000;
 
     /* Text Colors */
-    --color-text-primary: #222222;
-    --color-text-secondary: #555555;
-    --color-text-muted: #999999;
+    --color-text-primary: #2b0a0a;
+    --color-text-secondary: #5c4239;
+    --color-text-muted: #8f796e;
 
     /* Border Radius */
     --radius-sm: 6px;

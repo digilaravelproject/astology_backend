@@ -9,19 +9,19 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#d63384',
-          light: '#f95a8f',
-          dark: '#b02a6f',
+          DEFAULT: '#c40000',
+          light: '#e01818',
+          dark: '#820000',
         },
         secondary: {
-          DEFAULT: '#4ecdc4',
-          light: '#6ee7df',
-          dark: '#3ab5ad',
+          DEFAULT: '#d99a00',
+          light: '#f4bf2a',
+          dark: '#a96e00',
         },
         accent: {
-          DEFAULT: '#ffa500',
-          light: '#ffb733',
-          dark: '#cc8400',
+          DEFAULT: '#f4b41a',
+          light: '#ffd45a',
+          dark: '#b97800',
         },
         success: {
           DEFAULT: '#51cf66',
@@ -34,31 +34,31 @@ export default {
           dark: '#ee5a52',
         },
         warning: {
-          DEFAULT: '#ffa500',
-          light: '#ffb733',
-          dark: '#cc8400',
+          DEFAULT: '#d99a00',
+          light: '#f4bf2a',
+          dark: '#a96e00',
         },
         info: {
           DEFAULT: '#339af0',
           light: '#5cadff',
           dark: '#1c7ed6',
         },
-        dark: '#222222',
+        dark: '#2b0a0a',
         gray: {
-          DEFAULT: '#666666',
-          light: '#999999',
-          lighter: '#e0e0e0',
+          DEFAULT: '#6b5750',
+          light: '#9b8980',
+          lighter: '#eadfd2',
         },
-        light: '#f5f7fa',
+        light: '#fff8e8',
         sidebar: {
           bg: '#ffffff',
-          hover: '#fdf2f6',
-          active: '#d63384',
+          hover: '#fff1cf',
+          active: '#c40000',
         },
         text: {
-          primary: '#222222',
-          secondary: '#555555',
-          muted: '#999999',
+          primary: '#2b0a0a',
+          secondary: '#5c4239',
+          muted: '#8f796e',
         }
       },
       borderRadius: {
