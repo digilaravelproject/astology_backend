@@ -15,6 +15,42 @@ class AstrologerSignupRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'areas_of_expertise' => $this->parseArrayInput($this->input('areas_of_expertise')),
+            'languages' => $this->parseArrayInput($this->input('languages')),
+        ]);
+    }
+
+    /**
+     * Parse array input which might come as a JSON string, array, or comma-separated string.
+     */
+    private function parseArrayInput($input): ?array
+    {
+        if (is_array($input)) {
+            return $input;
+        }
+
+        if (is_string($input)) {
+            $decoded = json_decode($input, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+            if (str_contains($input, ',')) {
+                return array_map('trim', explode(',', $input));
+            }
+            if (!empty(trim($input))) {
+                return [trim($input)];
+            }
+        }
+
+        return $input;
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array|string>
