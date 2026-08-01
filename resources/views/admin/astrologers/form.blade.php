@@ -250,7 +250,7 @@
                         <label for="po_at_5_sessions" class="block text-xs font-semibold text-gray-dark">PO at ₹5 Sessions Available</label>
                         <input type="number" id="po_at_5_sessions" name="po_at_5_sessions" min="0"
                                value="{{ old('po_at_5_sessions', optional($user)->astrologer?->po_at_5_sessions ?? '') }}"
-                               class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
+                               required class="w-full px-4 py-2 border border-gray-lighter rounded-lg text-sm outline-none focus:border-primary">
                         @error('po_at_5_sessions') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                     </div>
 
