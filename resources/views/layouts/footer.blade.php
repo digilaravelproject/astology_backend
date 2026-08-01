@@ -2,10 +2,10 @@
     <footer id="contact"
         class="bg-[#12050B]/95 backdrop-blur-md text-amber-100 pt-14 pb-8 border-t border-surya-gold/40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10 text-xs">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-10 mb-10 text-xs">
 
                 <!-- Col 1: Brand Info -->
-                <div class="space-y-4">
+                <div class="space-y-4 lg:col-span-3">
                     <div class="flex items-center gap-3">
                         <img src="{{ asset('images/logo.jpg') }}" alt="Surya Path Logo"
                             class="w-10 h-10 object-contain rounded-xl border border-surya-gold/50 shadow">
@@ -40,7 +40,7 @@
                 </div>
 
                 <!-- Col 2: Quick Links -->
-                <div>
+                <div class="lg:col-span-2">
                     <h4
                         class="font-bold text-surya-gold uppercase text-xs tracking-wider mb-4 border-b border-white/10 pb-2">
                         Quick Navigation</h4>
@@ -66,27 +66,27 @@
                 </div>
 
                 <!-- Col 3: Database-managed pages -->
-                <div>
+                <div class="lg:col-span-4">
                     <h4
                         class="font-bold text-surya-gold uppercase text-xs tracking-wider mb-4 border-b border-white/10 pb-2">
                         Pages</h4>
-                    <ul class="space-y-2.5 text-amber-200/80 font-medium">
+                    <ul class="grid grid-cols-2 gap-x-6 gap-y-2.5 text-amber-200/80 font-medium">
                         @forelse($footerPages as $footerPage)
                             <li>
                                 <a href="{{ route('page.show', $footerPage->type) }}"
-                                   class="hover:text-surya-gold transition-colors flex items-center gap-1.5">
-                                    <i class="fa-solid fa-angle-right text-[10px] text-surya-gold"></i>
-                                    {{ $footerPage->title }}
+                                   class="hover:text-surya-gold transition-colors flex items-start gap-1.5 min-w-0 leading-relaxed">
+                                    <i class="fa-solid fa-angle-right text-[10px] text-surya-gold mt-1 shrink-0"></i>
+                                    <span class="min-w-0 break-words">{{ $footerPage->title }}</span>
                                 </a>
                             </li>
                         @empty
-                            <li class="text-amber-200/60">No pages available.</li>
+                            <li class="text-amber-200/60 col-span-2">No pages available.</li>
                         @endforelse
                     </ul>
                 </div>
 
                 <!-- Col 4: Download App -->
-                <div>
+                <div class="lg:col-span-3">
                     <h4
                         class="font-bold text-surya-gold uppercase text-xs tracking-wider mb-4 border-b border-white/10 pb-2">
                         Get App</h4>

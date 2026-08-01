@@ -83,16 +83,16 @@
             z-index: 1;
         }
 
-        .zodiac-icon {
-            width: 60px;
-            height: 60px;
+        .login-logo {
+            width: 76px;
+            height: 76px;
             margin: 0 auto 15px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
+            padding: 5px;
+            background: rgba(255, 255, 255, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            border-radius: 16px;
+            object-fit: contain;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
             position: relative;
             z-index: 1;
         }
@@ -221,6 +221,10 @@
         }
 
         @media (max-width: 480px) {
+            body {
+                padding: 12px;
+            }
+
             .login-container {
                 border-radius: 15px;
             }
@@ -236,13 +240,21 @@
             .login-form {
                 padding: 30px 20px;
             }
+
+            .remember-forgot {
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 12px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="login-container">
         <div class="login-header">
-            <div class="zodiac-icon">☉</div>
+            <img src="{{ asset('images/logo.jpg') }}"
+                 alt="Surya Path Logo"
+                 class="login-logo">
             <h1>Admin Panel</h1>
             <p>Astrology Management System</p>
         </div>

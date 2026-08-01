@@ -31,8 +31,23 @@
             .admin-main { width: 100%; min-width: 0; overflow-x: hidden; }
             .admin-main-inner { width: 100%; min-width: 0; padding: 16px 12px; }
 
+            .admin-content { font-size: 14px; }
+            .admin-content h1 { font-size: 1.5rem; line-height: 1.25; overflow-wrap: anywhere; }
+            .admin-content h2 { font-size: 1.25rem; line-height: 1.3; overflow-wrap: anywhere; }
+            .admin-content h3 { font-size: 1.1rem; line-height: 1.35; overflow-wrap: anywhere; }
+
+            .admin-content [class~="gap-10"],
+            .admin-content [class~="gap-8"] { gap: 20px; }
+
+            .admin-content [class~="mb-10"],
+            .admin-content [class~="mb-8"] { margin-bottom: 20px; }
+
             .admin-content > .flex,
-            .admin-content form.flex { flex-wrap: wrap; gap: 12px; }
+            .admin-content form.flex,
+            .admin-content [class*="border-b"][class*="justify-between"] {
+                flex-wrap: wrap;
+                gap: 12px;
+            }
 
             .admin-content form.flex > div,
             .admin-content form.flex > input,
@@ -51,13 +66,31 @@
             }
 
             .admin-content [class~="p-8"] { padding: 16px; }
+            .admin-content [class~="p-10"] { padding: 16px; }
             .admin-content [class~="p-6"] { padding: 14px; }
-            .admin-content table { min-width: 720px; }
+            .admin-content [class~="px-8"],
+            .admin-content [class~="px-10"] { padding-left: 16px; padding-right: 16px; }
+
+            .admin-content div:has(> table) {
+                width: 100%;
+                max-width: calc(100vw - 24px);
+            }
+
+            .admin-content table { min-width: 680px; }
+
+            .admin-content table th,
+            .admin-content table td { white-space: nowrap; }
 
             .admin-content input,
             .admin-content select,
             .admin-content textarea,
             .admin-content button { max-width: 100%; }
+
+            .admin-content input:not([type="checkbox"]):not([type="radio"]),
+            .admin-content select,
+            .admin-content textarea { width: 100%; min-width: 0; }
+
+            .admin-content [class*="rounded-["] { border-radius: 18px; }
         }
     </style>
 </head>
