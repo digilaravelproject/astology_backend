@@ -8,8 +8,8 @@
         line-height: 1.7;
     }
     .dynamic-content h2, .dynamic-content h3, .dynamic-content h4 {
-        color: #E1A61B;
-        font-family: 'Marcellus', serif !important;
+        color: #D1A167;
+        font-family: 'Poppins', Arial, sans-serif !important;
         font-weight: bold;
         margin-top: 1.75rem;
         margin-bottom: 0.75rem;
@@ -30,7 +30,7 @@
             Have queries or facing an issue? Send us a message and we'll reply shortly.
         </p>
 
-        <div class="max-w-md mx-auto p-6 rounded-2xl bg-amber-500/5 dark:bg-[#E1A61B]/5 border border-surya-gold/30 text-left space-y-6 mt-4">
+        <div class="max-w-md mx-auto p-6 rounded-2xl bg-amber-500/5 dark:bg-[#D1A167]/5 border border-surya-gold/30 text-left space-y-6 mt-4">
             <h4 class="font-bold font-serif text-lg text-surya-red dark:text-surya-gold mb-3 text-center">
                 {{ isset($page) ? $page->title : 'Contact Details' }}
             </h4>

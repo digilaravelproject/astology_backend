@@ -70,7 +70,8 @@ class ResponsiveMarkupTest extends TestCase
         foreach ($themeFiles as $themeFile) {
             $contents = strtolower(file_get_contents($themeFile));
 
-            $this->assertStringContainsString('#c40000', $contents);
+            $this->assertStringContainsString('#8b0d31', $contents);
+            $this->assertStringContainsString('#d1a167', $contents);
             $this->assertStringNotContainsString('#d63384', $contents);
             $this->assertStringNotContainsString('#f95a8f', $contents);
             $this->assertStringNotContainsString('#4ecdc4', $contents);

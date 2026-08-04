@@ -16,7 +16,7 @@
 
             <!-- Moving Brahmand Stars & Planets (Continuous Orbital & Floating Motion) -->
             <div
-                class="absolute top-12 left-1/4 w-3 h-3 bg-surya-gold rounded-full shadow-[0_0_12px_#E1A61B] animate-drift-slow opacity-90">
+                class="absolute top-12 left-1/4 w-3 h-3 bg-surya-gold rounded-full shadow-[0_0_12px_#D1A167] animate-drift-slow opacity-90">
             </div>
             <div
                 class="absolute top-1/3 left-12 w-2 h-2 bg-white rounded-full shadow-[0_0_8px_#fff] animate-drift-reverse opacity-90">
@@ -28,7 +28,7 @@
                 class="absolute top-24 right-24 w-2 h-2 bg-white rounded-full shadow-[0_0_6px_#fff] animate-drift-slow opacity-90">
             </div>
             <div
-                class="absolute bottom-20 left-1/3 w-2.5 h-2.5 bg-surya-gold rounded-full shadow-[0_0_10px_#E1A61B] animate-drift-reverse opacity-90">
+                class="absolute bottom-20 left-1/3 w-2.5 h-2.5 bg-surya-gold rounded-full shadow-[0_0_10px_#D1A167] animate-drift-reverse opacity-90">
             </div>
             <div
                 class="absolute bottom-32 right-1/4 w-2 h-2 bg-white rounded-full shadow-[0_0_8px_#fff] animate-float-wide opacity-85">
@@ -39,9 +39,9 @@
 
             <!-- Orbiting Planet/Cosmic Bodies in Motion -->
             <div
-                class="absolute top-1/2 left-1/2 w-4 h-4 bg-gradient-to-r from-surya-gold to-amber-200 rounded-full shadow-[0_0_12px_#E1A61B] animate-cosmic-orbit opacity-85">
+                class="absolute top-1/2 left-1/2 w-4 h-4 bg-gradient-to-r from-surya-gold to-amber-200 rounded-full shadow-[0_0_12px_#D1A167] animate-cosmic-orbit opacity-85">
             </div>
-            <div class="absolute top-1/3 right-1/3 w-3 h-3 bg-gradient-to-r from-surya-red to-surya-gold rounded-full shadow-[0_0_10px_#B10000] animate-cosmic-orbit opacity-80"
+            <div class="absolute top-1/3 right-1/3 w-3 h-3 bg-gradient-to-r from-surya-red to-surya-gold rounded-full shadow-[0_0_10px_#8B0D31] animate-cosmic-orbit opacity-80"
                 style="animation-duration: 28s;"></div>
 
             <!-- Dynamic Shooting Stars (Cosmic Meteor Streams Crossing Space) -->
@@ -75,10 +75,10 @@
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
 
                 <!-- Left Content -->
-                <div class="lg:col-span-6 space-y-6 text-left">
+                <div class="lg:col-span-7 space-y-6 text-left">
 
                     <h1
-                        class="text-4xl sm:text-5xl lg:text-6xl font-serif font-extrabold surya-headline-gradient leading-tight tracking-tight">
+                        class="hero-brand-heading text-4xl sm:text-5xl lg:text-6xl font-serif font-extrabold surya-headline-gradient tracking-tight">
                         Surya Path <br />Astrology Guidance
                     </h1>
 
@@ -135,7 +135,7 @@
                 </div>
 
                 <!-- Right Hero Visual (Astrotalk Floating Cards & Giant Rotating Zodiac Wheel) -->
-                <div class="lg:col-span-6 flex justify-center lg:justify-end relative items-center">
+                <div class="lg:col-span-5 flex justify-center lg:justify-end relative items-center">
 
                     <!-- Right Side Giant Rotating Half/Full Golden Zodiac Wheel Accent -->
                     <div
@@ -1475,7 +1475,7 @@
                                 <div
                                     class="h-44 bg-gradient-to-br from-[#2A101C] via-[#1A0812] to-[#12050B] relative overflow-hidden flex items-center justify-center p-4 text-center">
                                     <div
-                                        class="absolute inset-0 opacity-20 bg-[radial-gradient(#E1A61B_1px,transparent_1px)] [background-size:12px_12px]">
+                                        class="absolute inset-0 opacity-20 bg-[radial-gradient(#D1A167_1px,transparent_1px)] [background-size:12px_12px]">
                                     </div>
                                     @if($blog->blog_image)
                                         <img src="{{ asset('storage/' . $blog->blog_image) }}" alt="{{ $blog->title }}" class="absolute inset-0 w-full h-full object-cover opacity-35 group-hover:scale-105 transition-transform duration-300">
@@ -1508,18 +1508,20 @@
                             <div
                                 class="px-5 py-3.5 flex items-center justify-between border-t border-amber-200/50 dark:border-white/10 mt-3 text-xs bg-amber-100/40 dark:bg-white/5">
                                 <span class="text-[11px] text-slate-700 dark:text-amber-100 font-semibold">By {{ $blog->author ?? 'Pt. Acharya' }}</span>
-                                <a href="javascript:void(0)"
-                                    @click="activeBlog = { 
-                                        title: '{{ addslashes($blog->title) }}', 
-                                        content: '{{ addslashes(strip_tags($blog->content)) }}', 
-                                        image: '{{ $blog->blog_image ? asset('storage/' . $blog->blog_image) : '' }}', 
-                                        type: '{{ $blog->type ? ucfirst($blog->type) : 'Vedic' }}', 
-                                        date: '{{ $blog->created_at ? $blog->created_at->format('M d, Y') : 'Jul 25, 2026' }}', 
-                                        author: '{{ $blog->author ?? 'Pt. Acharya' }}' 
-                                    }; showBlogModal = true;"
+                                <button type="button"
+                                    data-blog="{{ json_encode([
+                                        'title' => $blog->title,
+                                        'content' => trim(preg_replace('/\s+/', ' ', strip_tags($blog->content))),
+                                        'image' => $blog->blog_image ? asset('storage/' . $blog->blog_image) : '',
+                                        'type' => $blog->type ? ucfirst($blog->type) : 'Vedic',
+                                        'date' => $blog->created_at ? $blog->created_at->format('M d, Y') : 'Jul 25, 2026',
+                                        'author' => $blog->author ?? 'Pt. Acharya',
+                                    ]) }}"
+                                    @click="activeBlog = JSON.parse($el.dataset.blog); showBlogModal = true"
+                                    aria-label="Read full blog: {{ $blog->title }}"
                                     class="font-bold text-surya-red dark:text-surya-gold flex items-center gap-1.5 group-hover:translate-x-1 transition-transform">
                                     <span>Read More</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
-                                </a>
+                                </button>
                             </div>
                         </div>
                     @endforeach
@@ -1531,7 +1533,7 @@
                             <div
                                 class="h-44 bg-gradient-to-br from-[#2A101C] via-[#1A0812] to-[#12050B] relative overflow-hidden flex items-center justify-center p-4 text-center">
                                 <div
-                                    class="absolute inset-0 opacity-20 bg-[radial-gradient(#E1A61B_1px,transparent_1px)] [background-size:12px_12px]">
+                                    class="absolute inset-0 opacity-20 bg-[radial-gradient(#D1A167_1px,transparent_1px)] [background-size:12px_12px]">
                                 </div>
                                 <div
                                     class="w-14 h-14 rounded-full bg-[#12050B]/60 backdrop-blur-md border border-surya-gold/50 flex items-center justify-center text-2xl text-surya-gold shadow-lg group-hover:scale-110 transition-transform relative z-10">
@@ -1583,7 +1585,7 @@
                             <div
                                 class="h-44 bg-gradient-to-br from-[#2A101C] via-[#1A0812] to-[#12050B] relative overflow-hidden flex items-center justify-center p-4 text-center">
                                 <div
-                                    class="absolute inset-0 opacity-20 bg-[radial-gradient(#E1A61B_1px,transparent_1px)] [background-size:12px_12px]">
+                                    class="absolute inset-0 opacity-20 bg-[radial-gradient(#D1A167_1px,transparent_1px)] [background-size:12px_12px]">
                                 </div>
                                 <div
                                     class="w-14 h-14 rounded-full bg-[#12050B]/60 backdrop-blur-md border border-surya-gold/50 flex items-center justify-center text-2xl text-surya-gold shadow-lg group-hover:scale-110 transition-transform relative z-10">
@@ -1635,7 +1637,7 @@
                             <div
                                 class="h-44 bg-gradient-to-br from-[#2A101C] via-[#1A0812] to-[#12050B] relative overflow-hidden flex items-center justify-center p-4 text-center">
                                 <div
-                                    class="absolute inset-0 opacity-20 bg-[radial-gradient(#E1A61B_1px,transparent_1px)] [background-size:12px_12px]">
+                                    class="absolute inset-0 opacity-20 bg-[radial-gradient(#D1A167_1px,transparent_1px)] [background-size:12px_12px]">
                                 </div>
                                 <div
                                     class="w-14 h-14 rounded-full bg-[#12050B]/60 backdrop-blur-md border border-surya-gold/50 flex items-center justify-center text-2xl text-surya-gold shadow-lg group-hover:scale-110 transition-transform relative z-10">
@@ -1687,7 +1689,7 @@
                             <div
                                 class="h-44 bg-gradient-to-br from-[#2A101C] via-[#1A0812] to-[#12050B] relative overflow-hidden flex items-center justify-center p-4 text-center">
                                 <div
-                                    class="absolute inset-0 opacity-20 bg-[radial-gradient(#E1A61B_1px,transparent_1px)] [background-size:12px_12px]">
+                                    class="absolute inset-0 opacity-20 bg-[radial-gradient(#D1A167_1px,transparent_1px)] [background-size:12px_12px]">
                                 </div>
                                 <div
                                     class="w-14 h-14 rounded-full bg-[#12050B]/60 backdrop-blur-md border border-surya-gold/50 flex items-center justify-center text-2xl text-surya-gold shadow-lg group-hover:scale-110 transition-transform relative z-10">

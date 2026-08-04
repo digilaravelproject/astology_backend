@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Login - Astrology</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,8 +15,12 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f4b41a 0%, #c40000 52%, #820000 100%);
+            font-family: 'Poppins', Arial, sans-serif;
+            background-color: #2d0815;
+            background-image:
+                radial-gradient(circle at 18% 15%, rgba(209, 161, 103, 0.4), transparent 30%),
+                radial-gradient(circle at 82% 82%, rgba(139, 13, 49, 0.7), transparent 42%),
+                linear-gradient(135deg, #650923 0%, #2d0815 52%, #18040b 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -22,9 +29,10 @@
         }
 
         .login-container {
-            background: white;
+            background: #fffaf0;
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(209, 161, 103, 0.72);
+            box-shadow: 0 24px 70px rgba(24, 4, 11, 0.55), 0 0 0 4px rgba(209, 161, 103, 0.08);
             overflow: hidden;
             max-width: 450px;
             width: 100%;
@@ -43,7 +51,7 @@
         }
 
         .login-header {
-            background: linear-gradient(135deg, #e01818 0%, #9d0000 100%);
+            background: linear-gradient(135deg, #8B0D31 0%, #650923 58%, #3D0717 100%);
             color: white;
             padding: 40px 20px;
             text-align: center;
@@ -74,6 +82,7 @@
             margin-bottom: 10px;
             position: relative;
             z-index: 1;
+            color: #fff8e8;
         }
 
         .login-header p {
@@ -81,6 +90,8 @@
             opacity: 0.9;
             position: relative;
             z-index: 1;
+            color: #D1A167;
+            letter-spacing: 0.04em;
         }
 
         .login-logo {
@@ -89,10 +100,10 @@
             margin: 0 auto 15px;
             padding: 5px;
             background: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(255, 255, 255, 0.7);
+            border: 2px solid #D1A167;
             border-radius: 16px;
             object-fit: contain;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 8px 24px rgba(24, 4, 11, 0.35), 0 0 22px rgba(209, 161, 103, 0.28);
             position: relative;
             z-index: 1;
         }
@@ -125,9 +136,9 @@
 
         .form-group input:focus {
             outline: none;
-            border-color: #c40000;
+            border-color: #8B0D31;
             background: white;
-            box-shadow: 0 0 0 3px rgba(196, 0, 0, 0.12);
+            box-shadow: 0 0 0 3px rgba(139, 13, 49, 0.12);
         }
 
         .form-group input::placeholder {
@@ -143,13 +154,13 @@
         }
 
         .remember-forgot a {
-            color: #c40000;
+            color: #8B0D31;
             text-decoration: none;
             transition: color 0.3s ease;
         }
 
         .remember-forgot a:hover {
-            color: #820000;
+            color: #650923;
         }
 
         .checkbox-group {
@@ -171,20 +182,20 @@
         .login-btn {
             width: 100%;
             padding: 14px;
-            background: linear-gradient(135deg, #e01818 0%, #9d0000 100%);
+            background: linear-gradient(135deg, #A72A4F 0%, #8B0D31 52%, #650923 100%);
             color: white;
-            border: none;
+            border: 1px solid #D1A167;
             border-radius: 8px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(130, 0, 0, 0.3);
+            box-shadow: 0 4px 15px rgba(101, 9, 35, 0.32);
         }
 
         .login-btn:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(130, 0, 0, 0.4);
+            box-shadow: 0 6px 20px rgba(101, 9, 35, 0.42);
         }
 
         .login-btn:active {
@@ -198,7 +209,7 @@
             border-radius: 6px;
             margin-bottom: 20px;
             font-size: 13px;
-            border-left: 4px solid #c40000;
+            border-left: 4px solid #8B0D31;
         }
 
         .error-list {

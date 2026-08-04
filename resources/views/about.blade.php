@@ -8,8 +8,8 @@
         line-height: 1.7;
     }
     .dynamic-content h2, .dynamic-content h3 {
-        color: #E1A61B;
-        font-family: 'Marcellus', serif !important;
+        color: #D1A167;
+        font-family: 'Poppins', Arial, sans-serif !important;
         font-weight: bold;
         margin-top: 1.75rem;
         margin-bottom: 0.75rem;
@@ -55,7 +55,7 @@
                     </p>
                 </div>
                 
-                <div class="p-6 rounded-2xl bg-amber-500/5 dark:bg-[#E1A61B]/5 border border-surya-gold/30">
+                <div class="p-6 rounded-2xl bg-amber-500/5 dark:bg-[#D1A167]/5 border border-surya-gold/30">
                     <h5 class="font-bold font-serif text-lg text-surya-red dark:text-surya-gold mb-3 flex items-center gap-2">
                         <i class="fa-solid fa-sun"></i> Why Surya Path?
                     </h5>

@@ -8,23 +8,23 @@
 
 :root {
     /* Fonts */
-    --font-sans: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    --font-heading: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --font-sans: 'Poppins', Arial, sans-serif;
+    --font-heading: 'Poppins', Arial, sans-serif;
 
-    /* Surya Path logo palette: solar red */
-    --color-primary: #c40000;
-    --color-primary-light: #e01818;
-    --color-primary-dark: #820000;
+    /* Surya Path logo palette: deep rose */
+    --color-primary: #8B0D31;
+    --color-primary-light: #A72A4F;
+    --color-primary-dark: #650923;
 
-    /* Surya Path logo palette: metallic gold */
-    --color-secondary: #d99a00;
-    --color-secondary-light: #f4bf2a;
-    --color-secondary-dark: #a96e00;
+    /* Surya Path logo palette: muted antique gold */
+    --color-secondary: #D1A167;
+    --color-secondary-light: #E4C399;
+    --color-secondary-dark: #AF7B41;
 
     /* Bright solar highlights */
-    --color-accent: #f4b41a;
-    --color-accent-light: #ffd45a;
-    --color-accent-dark: #b97800;
+    --color-accent: #D1A167;
+    --color-accent-light: #E4C399;
+    --color-accent-dark: #AF7B41;
 
     /* Success */
     --color-success: #51cf66;
@@ -37,9 +37,9 @@
     --color-danger-dark: #ee5a52;
 
     /* Warning */
-    --color-warning: #d99a00;
-    --color-warning-light: #f4bf2a;
-    --color-warning-dark: #a96e00;
+    --color-warning: #D1A167;
+    --color-warning-light: #E4C399;
+    --color-warning-dark: #AF7B41;
 
     /* Info */
     --color-info: #339af0;
@@ -56,8 +56,8 @@
 
     /* Sidebar */
     --color-sidebar-bg: #ffffff;
-    --color-sidebar-hover: #fff1cf;
-    --color-sidebar-active: #c40000;
+    --color-sidebar-hover: #F8EFE5;
+    --color-sidebar-active: #8B0D31;
 
     /* Text Colors */
     --color-text-primary: #2b0a0a;
@@ -76,4 +76,21 @@
     --shadow-md: 0 2px 10px rgba(0, 0, 0, 0.08);
     --shadow-lg: 0 5px 20px rgba(0, 0, 0, 0.12);
     --shadow-header: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Shared Surya Path admin shell, derived from the crimson-and-gold logo. */
+.admin-shell-bg {
+    background-color: var(--color-light);
+    background-image:
+        radial-gradient(circle at 8% 0%, rgba(209, 161, 103, 0.18), transparent 28rem),
+        radial-gradient(circle at 100% 100%, rgba(139, 13, 49, 0.09), transparent 34rem);
+}
+
+.admin-brand-bar {
+    border-top: 3px solid var(--color-secondary);
+    border-bottom: 1px solid rgba(139, 13, 49, 0.14);
+}
+
+.admin-brand-mark {
+    box-shadow: 0 0 0 2px rgba(209, 161, 103, 0.24), 0 5px 16px rgba(101, 9, 35, 0.2);
 }

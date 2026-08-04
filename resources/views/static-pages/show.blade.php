@@ -8,8 +8,8 @@
         line-height: 1.7;
     }
     .dynamic-content h2, .dynamic-content h3, .dynamic-content h4 {
-        color: #E1A61B;
-        font-family: 'Marcellus', serif !important;
+        color: #D1A167;
+        font-family: 'Poppins', Arial, sans-serif !important;
         font-weight: bold;
         margin-top: 1.75rem;
         margin-bottom: 0.75rem;

@@ -17,11 +17,11 @@
 
     <link rel="icon" type="image/jpeg" href="{{ asset('images/logo.jpeg') }}">
 
-    <!-- Google Fonts (Astrology Premium Vedic Typography: Cinzel Decorative, Marcellus, Plus Jakarta Sans) -->
+    <!-- Clean geometric typography based on the supplied modern reference. -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Marcellus&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap"
         rel="stylesheet">
 
     <!-- FontAwesome Icons -->
@@ -42,20 +42,40 @@
             theme: {
                 extend: {
                     colors: {
-                        'surya-red': '#B10000',
-                        'surya-red-dark': '#8B0000',
-                        'surya-crimson': '#7A0000',
-                        'surya-maroon': '#4A0000',
-                        'surya-gold': '#E1A61B',
-                        'surya-gold-light': '#FCEBB6',
-                        'surya-gold-hover': '#C68E0F',
+                        'surya-red': '#8B0D31',
+                        'surya-red-dark': '#650923',
+                        'surya-crimson': '#74102D',
+                        'surya-maroon': '#3D0717',
+                        'surya-gold': '#D1A167',
+                        'surya-gold-light': '#F2DEC2',
+                        'surya-gold-hover': '#B9874E',
                         'cosmic-dark': '#120A0E',
                         'cosmic-card': '#1C1217',
-                        'cosmic-border': '#2F1E26'
+                        'cosmic-border': '#2F1E26',
+                        amber: {
+                            50: '#FCF9F5', 100: '#F7EEE4', 200: '#ECD8C0', 300: '#DFC099',
+                            400: '#D1A167', 500: '#D1A167', 600: '#B9874E', 700: '#96683C',
+                            800: '#714A2D', 900: '#4D301E', 950: '#2E1B10'
+                        },
+                        yellow: {
+                            50: '#FCF9F5', 100: '#F7EEE4', 200: '#ECD8C0', 300: '#DFC099',
+                            400: '#D1A167', 500: '#D1A167', 600: '#B9874E', 700: '#96683C',
+                            800: '#714A2D', 900: '#4D301E', 950: '#2E1B10'
+                        },
+                        red: {
+                            50: '#FFF4F7', 100: '#FCE7EE', 200: '#F8CAD8', 300: '#EFA1B8',
+                            400: '#C74469', 500: '#8B0D31', 600: '#7A0B2B', 700: '#650923',
+                            800: '#4E071B', 900: '#3D0717', 950: '#26030D'
+                        },
+                        rose: {
+                            50: '#FFF4F7', 100: '#FCE7EE', 200: '#F8CAD8', 300: '#EFA1B8',
+                            400: '#C74469', 500: '#8B0D31', 600: '#7A0B2B', 700: '#650923',
+                            800: '#4E071B', 900: '#3D0717', 950: '#26030D'
+                        }
                     },
                     fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
-                        serif: ['"Marcellus"', '"Cinzel Decorative"', 'serif'],
+                        sans: ['"Poppins"', 'Arial', 'sans-serif'],
+                        serif: ['"Poppins"', 'Arial', 'sans-serif'],
                     },
                     animation: {
                         'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -115,8 +135,8 @@
                             '100%': { opacity: '0' },
                         },
                         orbitGlow: {
-                            '0%, 100%': { filter: 'drop-shadow(0 0 15px rgba(225, 166, 27, 0.4))' },
-                            '50%': { filter: 'drop-shadow(0 0 35px rgba(177, 0, 0, 0.7))' },
+                            '0%, 100%': { filter: 'drop-shadow(0 0 15px rgba(209, 161, 103, 0.4))' },
+                            '50%': { filter: 'drop-shadow(0 0 35px rgba(139, 13, 49, 0.7))' },
                         }
                     }
                 }
@@ -132,17 +152,31 @@
             display: none !important;
         }
 
-        /* Smooth Premium Vedic Font Rendering & Antialiasing */
+        /* Clean, modern typography shared by the landing page and public pages. */
         html, body, p, span, div, button {
-            font-family: 'Plus Jakarta Sans', sans-serif !important;
+            font-family: 'Poppins', Arial, sans-serif !important;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             text-rendering: optimizeLegibility;
         }
 
         h1, h2, h3, .font-serif {
-            font-family: 'Marcellus', 'Cinzel Decorative', serif !important;
-            letter-spacing: 0.025em;
+            font-family: 'Poppins', Arial, sans-serif !important;
+            letter-spacing: -0.025em;
+        }
+
+        /* Keep descenders (especially the "g" in Astrology) inside their line box. */
+        .brand-tagline {
+            display: block;
+            line-height: 1.45;
+            padding-bottom: 0.12em;
+        }
+
+        .hero-brand-heading {
+            font-weight: 600 !important;
+            letter-spacing: -0.045em !important;
+            line-height: 1.12 !important;
+            padding-bottom: 0.16em;
         }
 
         /* Responsive container styling */
@@ -174,14 +208,14 @@
         .starry-bg {
             background-color: #080406;
             background-image:
-                radial-gradient(circle at 10% 10%, rgba(177, 0, 0, 0.22) 0%, transparent 40%),
-                radial-gradient(circle at 90% 30%, rgba(225, 166, 27, 0.20) 0%, transparent 45%),
+                radial-gradient(circle at 10% 10%, rgba(139, 13, 49, 0.24) 0%, transparent 40%),
+                radial-gradient(circle at 90% 30%, rgba(209, 161, 103, 0.20) 0%, transparent 45%),
                 radial-gradient(circle at 20% 60%, rgba(122, 0, 0, 0.18) 0%, transparent 45%),
-                radial-gradient(circle at 80% 85%, rgba(225, 166, 27, 0.16) 0%, transparent 45%),
+                radial-gradient(circle at 80% 85%, rgba(209, 161, 103, 0.16) 0%, transparent 45%),
                 radial-gradient(1.5px 1.5px at 30px 50px, rgba(255, 255, 255, 0.7), rgba(0, 0, 0, 0)),
-                radial-gradient(2px 2px at 150px 220px, rgba(225, 166, 27, 0.6), rgba(0, 0, 0, 0)),
+                radial-gradient(2px 2px at 150px 220px, rgba(209, 161, 103, 0.6), rgba(0, 0, 0, 0)),
                 radial-gradient(1.5px 1.5px at 280px 110px, rgba(255, 255, 255, 0.65), rgba(0, 0, 0, 0)),
-                radial-gradient(2px 2px at 390px 290px, rgba(225, 166, 27, 0.5), rgba(0, 0, 0, 0));
+                radial-gradient(2px 2px at 390px 290px, rgba(209, 161, 103, 0.5), rgba(0, 0, 0, 0));
             background-repeat: repeat;
             background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 300px 300px, 300px 300px, 300px 300px, 300px 300px;
             background-attachment: fixed;
@@ -191,11 +225,11 @@
         html:not(.dark) body {
             background-color: #FFFDF7;
             background-image:
-                radial-gradient(circle at 15% 15%, rgba(225, 166, 27, 0.16) 0%, transparent 45%),
-                radial-gradient(circle at 85% 45%, rgba(177, 0, 0, 0.10) 0%, transparent 45%),
-                radial-gradient(circle at 50% 85%, rgba(225, 166, 27, 0.12) 0%, transparent 45%),
-                radial-gradient(2px 2px at 50px 70px, rgba(177, 0, 0, 0.2), rgba(0, 0, 0, 0)),
-                radial-gradient(2px 2px at 180px 200px, rgba(225, 166, 27, 0.35), rgba(0, 0, 0, 0));
+                radial-gradient(circle at 15% 15%, rgba(209, 161, 103, 0.18) 0%, transparent 45%),
+                radial-gradient(circle at 85% 45%, rgba(139, 13, 49, 0.11) 0%, transparent 45%),
+                radial-gradient(circle at 50% 85%, rgba(209, 161, 103, 0.14) 0%, transparent 45%),
+                radial-gradient(2px 2px at 50px 70px, rgba(139, 13, 49, 0.2), rgba(0, 0, 0, 0)),
+                radial-gradient(2px 2px at 180px 200px, rgba(209, 161, 103, 0.35), rgba(0, 0, 0, 0));
             background-repeat: repeat;
             background-size: 100% 100%, 100% 100%, 100% 100%, 300px 300px, 300px 300px;
             background-attachment: fixed;
@@ -226,24 +260,24 @@
         }
 
         .crimson-gradient-bg {
-            background: linear-gradient(135deg, #B10000 0%, #7A0000 50%, #4A0000 100%);
+            background: linear-gradient(135deg, #8B0D31 0%, #74102D 50%, #3D0717 100%);
         }
 
         .gold-border-glow {
-            border: 2px solid #E1A61B;
-            box-shadow: 0 0 20px rgba(225, 166, 27, 0.35);
+            border: 2px solid #D1A167;
+            box-shadow: 0 0 20px rgba(209, 161, 103, 0.35);
         }
 
         /* Gold Red Shaded Headline Gradient */
         .surya-headline-gradient {
-            background: linear-gradient(135deg, #B10000 0%, #E1A61B 50%, #8B0000 100%);
+            background: linear-gradient(135deg, #8B0D31 0%, #D1A167 50%, #650923 100%);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         html.dark .surya-headline-gradient {
-            background: linear-gradient(135deg, #E1A61B 0%, #FFFDF7 50%, #E1A61B 100%);
+            background: linear-gradient(135deg, #D1A167 0%, #FFFDF7 50%, #D1A167 100%);
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -294,7 +328,7 @@
                 <div class="flex flex-col">
                     <span class="font-serif text-2xl font-bold tracking-tight text-surya-red dark:text-surya-gold">Surya
                         Path</span>
-                    <span class="text-[10px] tracking-widest uppercase font-semibold text-surya-gold -mt-1">Astrology Guide</span>
+                    <span class="brand-tagline text-[10px] tracking-widest uppercase font-semibold text-surya-gold">Astrology Guide</span>
                 </div>
             </a>
 

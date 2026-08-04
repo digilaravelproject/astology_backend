@@ -11,7 +11,7 @@
                             class="w-10 h-10 object-contain rounded-xl border border-surya-gold/50 shadow">
                         <div class="flex flex-col">
                             <span class="font-serif text-lg font-bold tracking-tight text-white">Surya Path</span>
-                            <span class="text-[9px] tracking-widest uppercase font-semibold text-surya-gold -mt-1">Astrology Guide</span>
+                            <span class="brand-tagline text-[9px] tracking-widest uppercase font-semibold text-surya-gold">Astrology Guide</span>
                         </div>
                     </div>
                     <p class="text-amber-200/80 leading-relaxed font-normal">

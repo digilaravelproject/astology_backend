@@ -7,21 +7,24 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Poppins', 'Arial', 'sans-serif'],
+      },
       colors: {
         primary: {
-          DEFAULT: '#c40000',
-          light: '#e01818',
-          dark: '#820000',
+          DEFAULT: '#8B0D31',
+          light: '#A72A4F',
+          dark: '#650923',
         },
         secondary: {
-          DEFAULT: '#d99a00',
-          light: '#f4bf2a',
-          dark: '#a96e00',
+          DEFAULT: '#D1A167',
+          light: '#E4C399',
+          dark: '#AF7B41',
         },
         accent: {
-          DEFAULT: '#f4b41a',
-          light: '#ffd45a',
-          dark: '#b97800',
+          DEFAULT: '#D1A167',
+          light: '#E4C399',
+          dark: '#AF7B41',
         },
         success: {
           DEFAULT: '#51cf66',
@@ -34,9 +37,9 @@ export default {
           dark: '#ee5a52',
         },
         warning: {
-          DEFAULT: '#d99a00',
-          light: '#f4bf2a',
-          dark: '#a96e00',
+          DEFAULT: '#D1A167',
+          light: '#E4C399',
+          dark: '#AF7B41',
         },
         info: {
           DEFAULT: '#339af0',
@@ -52,13 +55,33 @@ export default {
         light: '#fff8e8',
         sidebar: {
           bg: '#ffffff',
-          hover: '#fff1cf',
-          active: '#c40000',
+          hover: '#F8EFE5',
+          active: '#8B0D31',
         },
         text: {
           primary: '#2b0a0a',
           secondary: '#5c4239',
           muted: '#8f796e',
+        },
+        amber: {
+          50: '#FCF9F5', 100: '#F7EEE4', 200: '#ECD8C0', 300: '#DFC099',
+          400: '#D1A167', 500: '#D1A167', 600: '#B9874E', 700: '#96683C',
+          800: '#714A2D', 900: '#4D301E', 950: '#2E1B10',
+        },
+        yellow: {
+          50: '#FCF9F5', 100: '#F7EEE4', 200: '#ECD8C0', 300: '#DFC099',
+          400: '#D1A167', 500: '#D1A167', 600: '#B9874E', 700: '#96683C',
+          800: '#714A2D', 900: '#4D301E', 950: '#2E1B10',
+        },
+        red: {
+          50: '#FFF4F7', 100: '#FCE7EE', 200: '#F8CAD8', 300: '#EFA1B8',
+          400: '#C74469', 500: '#8B0D31', 600: '#7A0B2B', 700: '#650923',
+          800: '#4E071B', 900: '#3D0717', 950: '#26030D',
+        },
+        rose: {
+          50: '#FFF4F7', 100: '#FCE7EE', 200: '#F8CAD8', 300: '#EFA1B8',
+          400: '#C74469', 500: '#8B0D31', 600: '#7A0B2B', 700: '#650923',
+          800: '#4E071B', 900: '#3D0717', 950: '#26030D',
         }
       },
       borderRadius: {
