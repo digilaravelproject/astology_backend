@@ -252,7 +252,7 @@
 <body>
     <div class="login-container">
         <div class="login-header">
-            <img src="{{ asset('images/logo.jpg') }}"
+            <img src="{{ asset('images/logo.jpeg') }}"
                  alt="Surya Path Logo"
                  class="login-logo">
             <h1>Admin Panel</h1>

@@ -7,12 +7,11 @@
                 <!-- Col 1: Brand Info -->
                 <div class="space-y-4 lg:col-span-3">
                     <div class="flex items-center gap-3">
-                        <img src="{{ asset('images/logo.jpg') }}" alt="Surya Path Logo"
+                        <img src="{{ asset('images/logo.jpeg') }}" alt="Surya Path Logo"
                             class="w-10 h-10 object-contain rounded-xl border border-surya-gold/50 shadow">
                         <div class="flex flex-col">
                             <span class="font-serif text-lg font-bold tracking-tight text-white">Surya Path</span>
-                            <span class="text-[9px] tracking-widest uppercase font-semibold text-surya-gold -mt-1">Vedic
-                                Astrology</span>
+                            <span class="text-[9px] tracking-widest uppercase font-semibold text-surya-gold -mt-1">Astrology Guide</span>
                         </div>
                     </div>
                     <p class="text-amber-200/80 leading-relaxed font-normal">
@@ -119,7 +118,12 @@
                 class="pt-6 border-t border-white/10 text-[11px] text-amber-200/60 flex flex-col sm:flex-row justify-between items-center gap-2">
                 <p>&copy; 2026 Surya Path. All rights reserved.</p>
                 <p class="font-semibold text-amber-100 flex items-center gap-1">
-                    <span>Made by</span> <span class="text-surya-gold font-bold">Digi Emperor</span> 👑
+                    <span>Website Designed &amp; Developed by</span>
+                    <span class="text-surya-gold font-bold">
+                        <a href="https://digiemperor.com" target="_blank" rel="noopener noreferrer">
+                            Digi Emperor
+                        </a>
+                    </span>
                 </p>
             </div>
         </div>

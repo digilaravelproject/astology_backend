@@ -31,7 +31,7 @@ class ResponsiveMarkupTest extends TestCase
         $login = file_get_contents($this->projectRoot . '/resources/views/admin/auth/login.blade.php');
         $footer = file_get_contents($this->projectRoot . '/resources/views/layouts/footer.blade.php');
 
-        $this->assertStringContainsString("asset('images/logo.jpg')", $login);
+        $this->assertStringContainsString("asset('images/logo.jpeg')", $login);
         $this->assertStringContainsString('grid grid-cols-2 gap-x-6', $footer);
     }
 

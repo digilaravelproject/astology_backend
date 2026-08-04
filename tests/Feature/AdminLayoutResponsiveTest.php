@@ -16,7 +16,7 @@ class AdminLayoutResponsiveTest extends TestCase
             ->assertOk()
             ->assertSee('admin-main', false)
             ->assertSee('admin-content', false)
-            ->assertSee(asset('images/logo.jpg'), false)
+            ->assertSee(asset('images/logo.jpeg'), false)
             ->assertSee('Astology Premium');
     }
 }

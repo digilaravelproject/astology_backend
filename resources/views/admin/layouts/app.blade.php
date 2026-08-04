@@ -105,7 +105,7 @@
             </button>
             <span class="admin-brand text-xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent flex items-center gap-2">
                 @php $logoPath = \App\Models\Setting::get('logo_path'); @endphp
-                <img src="{{ $logoPath ?: asset('images/logo.jpg') }}"
+                <img src="{{ $logoPath ?: asset('images/logo.jpeg') }}"
                      alt="{{ \App\Models\Setting::get('app_name', 'Astology Premium') }} Logo"
                      class="h-9 w-9 rounded-lg object-contain border border-primary/20 shadow-sm">
                 <span>{{ \App\Models\Setting::get('app_name', 'Astology Premium') }}</span>

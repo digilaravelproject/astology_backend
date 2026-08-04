@@ -15,7 +15,7 @@
     <meta name="description"
         content="@yield('meta_description', 'Surya Path Kundli - Your Trusted Guide for Astrology & Life Guidance. Accurate Predictions, Panchang & Muhurat, Expert Astrologers, and Numerology Analysis.')">
 
-    <link rel="icon" type="image/jpeg" href="{{ asset('images/logo.jpg') }}">
+    <link rel="icon" type="image/jpeg" href="{{ asset('images/logo.jpeg') }}">
 
     <!-- Google Fonts (Astrology Premium Vedic Typography: Cinzel Decorative, Marcellus, Plus Jakarta Sans) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -289,13 +289,12 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <!-- Brand Logo & Name -->
             <a href="{{ url('/') }}" class="flex items-center gap-3 group">
-                <img src="{{ asset('images/logo.jpg') }}" alt="Surya Path Logo"
+                <img src="{{ asset('images/logo.jpeg') }}" alt="Surya Path Logo"
                     class="w-12 h-12 object-contain rounded-xl border border-surya-gold/50 shadow-md group-hover:scale-105 transition-transform duration-300">
                 <div class="flex flex-col">
                     <span class="font-serif text-2xl font-bold tracking-tight text-surya-red dark:text-surya-gold">Surya
                         Path</span>
-                    <span class="text-[10px] tracking-widest uppercase font-semibold text-surya-gold -mt-1">Vedic
-                        Astrology</span>
+                    <span class="text-[10px] tracking-widest uppercase font-semibold text-surya-gold -mt-1">Astrology Guide</span>
                 </div>
             </a>
 
@@ -336,7 +335,7 @@
                 </div>
                 <a href="{{ url('/') }}#astrologers"
                     class="inline-flex items-center justify-center px-5 py-2.5 rounded-full bg-surya-gold hover:bg-surya-gold-hover text-slate-950 font-bold text-xs shadow-lg shadow-surya-gold/30 hover:scale-105 transition-all">
-                    Talk Now | First Chat Free &rarr;
+                    Join Now &rarr;
                 </a>
             </div>
 

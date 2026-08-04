@@ -79,7 +79,7 @@
 
                     <h1
                         class="text-4xl sm:text-5xl lg:text-6xl font-serif font-extrabold surya-headline-gradient leading-tight tracking-tight">
-                        Surya Path <br />Kundli Guidance
+                        Surya Path <br />Astrology Guidance
                     </h1>
 
                     <p class="text-lg font-semibold text-slate-700 dark:text-slate-200 max-w-lg">
@@ -181,12 +181,12 @@
                     <div
                         class="absolute -top-4 -left-4 sm:left-4 z-20 bg-white/95 dark:bg-cosmic-card/95 backdrop-blur-md p-3 rounded-2xl border-2 border-surya-gold shadow-xl flex items-center gap-3 animate-float">
                         <div class="relative">
-                            <img src="{{ asset('images/logo.jpg') }}" class="w-10 h-10 rounded-full border border-surya-gold object-cover">
+                            <img src="{{ asset('images/logo.jpeg') }}" class="w-10 h-10 rounded-full border border-surya-gold object-cover">
                             <span
                                 class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></span>
                         </div>
                         <div class="text-left text-xs">
-                            <p class="font-bold text-slate-900 dark:text-white">Pt. Sharma Acharya</p>
+                            <p class="font-bold text-slate-900 dark:text-white">Pt. Vinod Sharma</p>
                             <p class="text-[10px] text-surya-red dark:text-surya-gold font-semibold">Vedic & Prashna
                                 Specialist</p>
                         </div>
@@ -211,7 +211,7 @@
                                 </div>
                                 <div
                                     class="w-32 h-32 rounded-2xl overflow-hidden border-2 border-surya-gold shadow-2xl p-1 bg-surya-red animate-float">
-                                    <img src="{{ asset('images/logo.jpg') }}" alt="Surya Path Icon"
+                                    <img src="{{ asset('images/logo.jpeg') }}" alt="Surya Path Icon"
                                         class="w-full h-full object-cover rounded-xl">
                                 </div>
                             </div>
@@ -426,7 +426,7 @@
             'rating' => '5.0',
             'orders' => '10k+ orders',
             'price' => '60',
-            'photo' => 'images/logo.jpg'
+            'photo' => 'images/logo.jpeg'
         ],
         [
             'name' => 'Pt. Surinder',
@@ -438,7 +438,7 @@
             'rating' => '5.0',
             'orders' => '15k+ orders',
             'price' => '165',
-            'photo' => 'images/logo.jpg'
+            'photo' => 'images/logo.jpeg'
         ],
         [
             'name' => 'Svarnika',
@@ -450,7 +450,7 @@
             'rating' => '5.0',
             'orders' => '10k+ orders',
             'price' => '31',
-            'photo' => 'images/logo.jpg'
+            'photo' => 'images/logo.jpeg'
         ],
         [
             'name' => 'Ananjay',
@@ -462,7 +462,7 @@
             'rating' => '5.0',
             'orders' => '50k+ orders',
             'price' => '57',
-            'photo' => 'images/logo.jpg'
+            'photo' => 'images/logo.jpeg'
         ]
     ];
     
@@ -493,7 +493,7 @@
             
             $photo = (isset($astro['profile_photo']) && !empty($astro['profile_photo'])) 
                 ? asset('storage/' . $astro['profile_photo']) 
-                : asset('images/logo.jpg');
+                : asset('images/logo.jpeg');
                 
             $badge = $fallback['badge'];
             $badge_bg = $fallback['badge_bg'];
@@ -1311,7 +1311,7 @@
                             </div>
 
                             <div class="flex items-center gap-3 pt-4 border-t border-amber-200/50 dark:border-white/10">
-                                <img src="{{ $feedback->user->profile_photo_url ?? asset('images/logo.jpg') }}" alt="{{ $feedback->user->name ?? 'Guest' }}"
+                                <img src="{{ $feedback->user->profile_photo_url ?? asset('images/logo.jpeg') }}" alt="{{ $feedback->user->name ?? 'Guest' }}"
                                     class="w-10 h-10 rounded-full object-cover border-2 border-surya-gold shadow-sm">
                                 <div>
                                     <h3 class="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1">
@@ -1343,7 +1343,7 @@
                         </div>
 
                         <div class="flex items-center gap-3 pt-4 border-t border-amber-200/50 dark:border-white/10">
-                            <img src="{{ asset('images/logo.jpg') }}" alt="Riya Sharma"
+                            <img src="{{ asset('images/logo.jpeg') }}" alt="Riya Sharma"
                                 class="w-10 h-10 rounded-full object-cover border-2 border-surya-gold shadow-sm">
                             <div>
                                 <h3 class="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1">
@@ -1375,7 +1375,7 @@
                         </div>
 
                         <div class="flex items-center gap-3 pt-4 border-t border-amber-200/50 dark:border-white/10">
-                            <img src="{{ asset('images/logo.jpg') }}" alt="Anamika Sen"
+                            <img src="{{ asset('images/logo.jpeg') }}" alt="Anamika Sen"
                                 class="w-10 h-10 rounded-full object-cover border-2 border-surya-gold shadow-sm">
                             <div>
                                 <h3 class="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1">
@@ -1407,7 +1407,7 @@
                         </div>
 
                         <div class="flex items-center gap-3 pt-4 border-t border-amber-200/50 dark:border-white/10">
-                            <img src="{{ asset('images/logo.jpg') }}" alt="Anushka Patel"
+                            <img src="{{ asset('images/logo.jpeg') }}" alt="Anushka Patel"
                                 class="w-10 h-10 rounded-full object-cover border-2 border-surya-gold shadow-sm">
                             <div>
                                 <h3 class="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1">
