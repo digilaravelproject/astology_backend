@@ -11,7 +11,7 @@ class BlogController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Blog::query();
+        $query = Blog::with('language');
 
         if ($request->filled('search')) {
             $search = $request->input('search');

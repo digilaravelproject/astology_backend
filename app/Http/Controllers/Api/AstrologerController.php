@@ -159,4 +159,42 @@ class AstrologerController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get approved and visible gallery images of an astrologer.
+     */
+    public function getGallery($id): JsonResponse
+    {
+        try {
+            $gallery = \App\Models\AstrologerGallery::where('astrologer_id', $id)
+                ->where('status', 'active')
+                ->where('is_visible', true)
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($item) {
+                    return [
+                        'id' => $item->id,
+                        'astrologer_id' => $item->astrologer_id,
+                        'image' => \App\Helpers\MediaHelper::getFullUrl($item->image_path),
+                        'image_path' => $item->image_path,
+                        'created_at' => $item->created_at,
+                        'updated_at' => $item->updated_at,
+                    ];
+                });
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'gallery' => $gallery,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('Astrologer getGallery error: ' . $e->getMessage());
+
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch gallery images.',
+            ], 500);
+        }
+    }
 }

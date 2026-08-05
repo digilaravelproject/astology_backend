@@ -11,7 +11,7 @@ class RemedyController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Remedy::query();
+        $query = Remedy::with('language');
 
         if ($request->filled('search')) {
             $search = $request->input('search');
