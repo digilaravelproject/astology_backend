@@ -289,6 +289,19 @@ class AstrologerService
             $astrologer->is_blocked = false;
         }
 
+        $isReviewEligible = false;
+        if ($currentUser) {
+            $isReviewEligible = ChatSession::where('consumer_id', $currentUser->id)
+                ->where('provider_id', $astrologer->user_id)
+                ->where('status', 'completed')
+                ->exists()
+              || CallSession::where('consumer_id', $currentUser->id)
+                ->where('provider_id', $astrologer->user_id)
+                ->where('status', 'completed')
+                ->exists();
+        }
+        $astrologer->is_review_eligible = $isReviewEligible;
+
         // Package details
         $astroPackage = AstrologerPackage::where('astrologer_id', $astrologer->user_id)->first();
         $defaultPackage = Package::where('is_default', true)->first();
@@ -442,7 +455,9 @@ class AstrologerService
             }
         }
 
-        $formattedOrders = $results->map(function ($item) use ($consumers, $latestMessages, $waitingPositions) {
+        $baseOffset = 120 + (($page - 1) * $perPage);
+
+        $formattedOrders = $results->values()->map(function ($item, $index) use ($consumers, $latestMessages, $waitingPositions, $baseOffset) {
             $consumer = $consumers->get($item->consumer_id);
             $queuePosition = null;
             if ($item->status === 'waiting') {
@@ -452,7 +467,7 @@ class AstrologerService
 
             return [
                 'session_id' => $item->id,
-                'order_id' => $item->id,
+                'order_id' => $baseOffset + $index,
                 'user_id' => $item->consumer_id,
                 'user_name' => $consumer->name ?? 'User',
                 'user_profile_image' => $consumer ? MediaHelper::getUrl($consumer->profile_photo) : null,

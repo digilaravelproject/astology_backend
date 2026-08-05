@@ -33,6 +33,31 @@ class ReviewController extends Controller
 
         $user = $request->user();
 
+        $astrologer = Astrologer::with('user')->find($validated['astrologer_id']);
+        if (!$astrologer) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer not found.',
+            ], 404);
+        }
+
+        // Check if user has had a chart consultation or call session with this astrologer
+        $hasConsultation = \App\Models\ChatSession::where('consumer_id', $user->id)
+            ->where('provider_id', $astrologer->user_id)
+            ->where('status', 'completed')
+            ->exists()
+          || \App\Models\CallSession::where('consumer_id', $user->id)
+            ->where('provider_id', $astrologer->user_id)
+            ->where('status', 'completed')
+            ->exists();
+
+        if (!$hasConsultation) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Only users who have had a chart consultation or call with an astrologer can submit a review.',
+            ], 403);
+        }
+
         // Sanitize review text to prevent XSS
         $sanitizedReview = $this->sanitizeInput($validated['review']);
 
