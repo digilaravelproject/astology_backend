@@ -104,6 +104,10 @@ Route::prefix('admin')->group(function () {
             Route::get('/by-astrologer/{provider}', [OrderController::class, 'providerOrders'])->name('admin.orders.by-astrologer.provider');
         });
 
+        // Language Management
+        Route::resource('languages', \App\Http\Controllers\Admin\LanguageController::class)->names('admin.languages');
+        Route::post('languages/{id}/toggle-status', [\App\Http\Controllers\Admin\LanguageController::class, 'toggleStatus'])->name('admin.languages.toggle-status');
+
         // Blog Management
         Route::resource('blogs', \App\Http\Controllers\Admin\BlogController::class)->names('admin.blogs');
 

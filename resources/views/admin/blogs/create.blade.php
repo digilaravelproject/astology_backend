@@ -66,6 +66,17 @@
                             @error('type') <span class="text-xs text-danger">{{ $message }}</span> @enderror
                         </div>
 
+                        <div class="group">
+                            <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Language</label>
+                            <select name="language_id" class="w-full bg-light/30 border-2 border-transparent px-6 py-5 rounded-[24px] text-xs font-black text-dark focus:bg-white focus:border-primary/20 focus:ring-0 transition-all" required>
+                                <option value="">Select Language</option>
+                                @foreach($languages as $language)
+                                    <option value="{{ $language->id }}" {{ old('language_id', $blog->language_id ?? '') == $language->id ? 'selected' : '' }}>{{ $language->name }} ({{ $language->code }})</option>
+                                @endforeach
+                            </select>
+                            @error('language_id') <span class="text-xs text-danger">{{ $message }}</span> @enderror
+                        </div>
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div class="group">
                                 <label class="block text-[10px] font-black text-gray uppercase tracking-widest mb-3">Subtitle</label>

@@ -30,6 +30,17 @@
                     </div>
 
                     <div>
+                        <label class="text-[10px] font-black text-gray uppercase tracking-widest">Language</label>
+                        <select name="language_id" class="w-full bg-light/50 border border-gray-lighter rounded-2xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:border-dark" required>
+                            <option value="">Select Language</option>
+                            @foreach($languages as $language)
+                                <option value="{{ $language->id }}" {{ old('language_id', $remedy->language_id ?? '') == $language->id ? 'selected' : '' }}>{{ $language->name }} ({{ $language->code }})</option>
+                            @endforeach
+                        </select>
+                        @error('language_id')<div class="text-danger text-xs mt-1">{{ $message }}</div>@enderror
+                    </div>
+
+                    <div>
                         <label class="text-[10px] font-black text-gray uppercase tracking-widest">Description</label>
                         <textarea name="description" rows="6" class="w-full bg-light/50 border border-gray-lighter rounded-2xl px-4 py-3.5 text-xs font-bold focus:outline-none focus:border-dark" placeholder="Describe the remedy...">{{ old('description', $remedy->description) }}</textarea>
                         @error('description')<div class="text-danger text-xs mt-1">{{ $message }}</div>@enderror
