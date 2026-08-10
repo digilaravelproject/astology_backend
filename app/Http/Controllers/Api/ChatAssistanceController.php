@@ -55,20 +55,54 @@ class ChatAssistanceController extends Controller
     public function sendMessage(Request $request, $sessionId)
     {
         $request->validate([
-            'message' => 'required_without:attachment_url|nullable|string',
-            'attachment_url' => 'required_without:message|nullable|string',
-            'type' => 'in:text,image,document,file,audio,video',
+            'message' => 'nullable|string',
+            'attachment_url' => 'nullable',
+            'attachment' => 'nullable',
+            'file' => 'nullable|file|max:10240',
+            'type' => 'nullable|in:text,image,document,file,audio,video',
             'call_session_id' => 'nullable|exists:call_sessions,id',
         ]);
+
+        $hasMessage = $request->filled('message');
+        $hasAttachment = $request->filled('attachment_url') 
+            || $request->filled('attachment') 
+            || $request->hasFile('file') 
+            || $request->hasFile('attachment') 
+            || $request->hasFile('attachment_url');
+
+        if (!$hasMessage && !$hasAttachment) {
+            return ApiResponse::error('Either a message or an attachment is required.', 422);
+        }
 
         try {
             $userId = $request->user()->id;
             $sanitizedMessage = $request->message ? $this->sanitize($request->message) : null;
+            $attachmentUrl = null;
+
+            if ($request->hasFile('file')) {
+                $path = $request->file('file')->store("chat-assistance-attachments/{$userId}", 'public');
+                $attachmentUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+            } elseif ($request->hasFile('attachment')) {
+                $path = $request->file('attachment')->store("chat-assistance-attachments/{$userId}", 'public');
+                $attachmentUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+            } elseif ($request->hasFile('attachment_url')) {
+                $path = $request->file('attachment_url')->store("chat-assistance-attachments/{$userId}", 'public');
+                $attachmentUrl = \Illuminate\Support\Facades\Storage::disk('public')->url($path);
+            } elseif ($request->filled('attachment_url') && is_string($request->attachment_url)) {
+                $attachmentUrl = $request->attachment_url;
+            } elseif ($request->filled('attachment') && is_string($request->attachment)) {
+                $attachmentUrl = $request->attachment;
+            }
+
+            $type = $request->type;
+            if (!$type) {
+                $type = $attachmentUrl ? 'image' : 'text';
+            }
 
             $messageData = [
                 'message' => $sanitizedMessage,
-                'attachment_url' => $request->attachment_url,
-                'type' => $request->type ?? 'text',
+                'attachment_url' => $attachmentUrl,
+                'type' => $type,
                 'call_session_id' => $request->call_session_id,
             ];
 

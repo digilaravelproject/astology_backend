@@ -83,12 +83,12 @@ class AstrologerController extends Controller
     public function getOrders(Request $request): JsonResponse
     {
         try {
-            $user = Auth::user();
+            $user = $request->user() ?: Auth::guard('sanctum')->user();
             if (!$user) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Unauthorized access.',
-                ], 403);
+                ], 401);
             }
 
             $filters = [

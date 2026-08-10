@@ -41,13 +41,15 @@ class ReviewController extends Controller
             ], 404);
         }
 
+        $providerIds = array_unique(array_filter([$astrologer->user_id, $astrologer->id]));
+
         // Check if user has had a chart consultation or call session with this astrologer
         $hasConsultation = \App\Models\ChatSession::where('consumer_id', $user->id)
-            ->where('provider_id', $astrologer->user_id)
+            ->whereIn('provider_id', $providerIds)
             ->where('status', 'completed')
             ->exists()
           || \App\Models\CallSession::where('consumer_id', $user->id)
-            ->where('provider_id', $astrologer->user_id)
+            ->whereIn('provider_id', $providerIds)
             ->where('status', 'completed')
             ->exists();
 

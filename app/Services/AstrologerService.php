@@ -291,16 +291,18 @@ class AstrologerService
 
         $isReviewEligible = false;
         if ($currentUser) {
+            $providerIds = array_unique(array_filter([$astrologer->user_id, $astrologer->id]));
             $isReviewEligible = ChatSession::where('consumer_id', $currentUser->id)
-                ->where('provider_id', $astrologer->user_id)
+                ->whereIn('provider_id', $providerIds)
                 ->where('status', 'completed')
                 ->exists()
               || CallSession::where('consumer_id', $currentUser->id)
-                ->where('provider_id', $astrologer->user_id)
+                ->whereIn('provider_id', $providerIds)
                 ->where('status', 'completed')
                 ->exists();
         }
-        $astrologer->is_review_eligible = $isReviewEligible;
+        $astrologer->setAttribute('is_review_eligible', (bool) $isReviewEligible);
+        $astrologer->is_review_eligible = (bool) $isReviewEligible;
 
         // Package details
         $astroPackage = AstrologerPackage::where('astrologer_id', $astrologer->user_id)->first();
@@ -466,8 +468,8 @@ class AstrologerService
             }
 
             return [
-                'session_id' => $item->id,
-                'order_id' => $baseOffset + $index,
+                'session_id' => (int) $item->id,
+                'order_id' => (int) ($baseOffset + $index),
                 'user_id' => $item->consumer_id,
                 'user_name' => $consumer->name ?? 'User',
                 'user_profile_image' => $consumer ? MediaHelper::getUrl($consumer->profile_photo) : null,
