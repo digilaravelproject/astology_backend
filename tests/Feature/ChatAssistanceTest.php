@@ -102,8 +102,8 @@ class ChatAssistanceTest extends TestCase
         $consumerPhoto = $sessions[0]['consumer']['profile_photo'];
         $providerPhoto = $sessions[0]['provider']['profile_photo'];
 
-        $this->assertEquals('users/1/profile.png', $consumerPhoto);
-        $this->assertEquals('astrologers/2/profile.png', $providerPhoto);
+        $this->assertEquals(\App\Helpers\MediaHelper::getFullUrl('users/1/profile.png'), $consumerPhoto);
+        $this->assertEquals(\App\Helpers\MediaHelper::getFullUrl('astrologers/2/profile.png'), $providerPhoto);
     }
 
     public function test_chat_assistance_events_dispatch_with_correct_payloads()

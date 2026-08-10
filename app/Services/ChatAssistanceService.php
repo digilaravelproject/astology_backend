@@ -309,10 +309,10 @@ class ChatAssistanceService
         $sessions->getCollection()->transform(function ($session) {
             $session->chat_assistance_session_id = $session->id;
             if ($session->consumer) {
-                $session->consumer->profile_photo = MediaHelper::getUrl($session->consumer->profile_photo);
+                $session->consumer->profile_photo = MediaHelper::getFullUrl($session->consumer->profile_photo);
             }
             if ($session->provider) {
-                $session->provider->profile_photo = MediaHelper::getUrl($session->provider->profile_photo);
+                $session->provider->profile_photo = MediaHelper::getFullUrl($session->provider->profile_photo);
             }
             return $session;
         });

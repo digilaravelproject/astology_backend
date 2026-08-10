@@ -43,7 +43,7 @@ class ChatAssistanceMessageSent implements ShouldBroadcastNow
                 'sender_id' => (int) $this->messageData->sender_id,
                 'receiver_id' => (int) $this->messageData->receiver_id,
                 'message' => $this->messageData->message,
-                'attachment_url' => $this->messageData->attachment_url ? \App\Helpers\MediaHelper::getUrl($this->messageData->attachment_url) : null,
+                'attachment_url' => $this->messageData->attachment_url ? \App\Helpers\MediaHelper::getFullUrl($this->messageData->attachment_url) : null,
                 'type' => $this->messageData->type,
                 'is_read' => (bool) $this->messageData->is_read,
                 'is_delivered' => (bool) $this->messageData->is_delivered,

@@ -47,7 +47,7 @@ class ChatAssistanceInitiated implements ShouldBroadcastNow
             'senderData' => [
                 'id' => $this->senderData->id,
                 'name' => $this->senderData->name,
-                'profile_photo' => $this->senderData->profile_photo ? \App\Helpers\MediaHelper::getUrl($this->senderData->profile_photo) : null,
+                'profile_photo' => $this->senderData->profile_photo ? \App\Helpers\MediaHelper::getFullUrl($this->senderData->profile_photo) : null,
             ],
         ];
     }

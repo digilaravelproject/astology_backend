@@ -30,7 +30,7 @@ class ChatAssistanceMessage extends Model
 
     public function getAttachmentUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->attributes['attachment_url'] ?? null);
+        return \App\Helpers\MediaHelper::getFullUrl($this->attributes['attachment_url'] ?? null);
     }
 
     public function chatAssistanceSession()
