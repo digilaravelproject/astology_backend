@@ -313,6 +313,14 @@ class ChatAssistanceService
             }
             if ($session->provider) {
                 $session->provider->profile_photo = MediaHelper::getFullUrl($session->provider->profile_photo);
+                
+                $completedChats = \App\Models\ChatSession::where('provider_id', $session->provider_id)->where('status', 'completed')->count();
+                $completedCalls = \App\Models\CallSession::where('provider_id', $session->provider_id)->where('status', 'completed')->count();
+                $totalOrders = 120 + $completedChats + $completedCalls;
+
+                $session->provider->total_orders = $totalOrders;
+                $session->provider->orders_count = $totalOrders;
+                $session->provider->orders_formatted = "{$totalOrders}+ orders";
             }
             return $session;
         });

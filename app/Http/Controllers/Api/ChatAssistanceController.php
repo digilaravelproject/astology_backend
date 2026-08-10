@@ -123,6 +123,17 @@ class ChatAssistanceController extends Controller
             $responseData = $messages->toArray();
             $responseData['chat_assistance_session_id'] = (int) $sessionId;
 
+            $session = ChatAssistanceSession::find($sessionId);
+            if ($session) {
+                $completedChats = \App\Models\ChatSession::where('provider_id', $session->provider_id)->where('status', 'completed')->count();
+                $completedCalls = \App\Models\CallSession::where('provider_id', $session->provider_id)->where('status', 'completed')->count();
+                $totalOrders = 120 + $completedChats + $completedCalls;
+
+                $responseData['total_orders'] = $totalOrders;
+                $responseData['orders_count'] = $totalOrders;
+                $responseData['orders_formatted'] = "{$totalOrders}+ orders";
+            }
+
             return ApiResponse::success($responseData, 'Messages retrieved successfully');
         } catch (Exception $e) {
             $code = $e->getCode() == 403 ? 403 : 500;

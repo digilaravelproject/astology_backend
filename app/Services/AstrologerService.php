@@ -149,6 +149,19 @@ class AstrologerService
         $customPackages = AstrologerPackage::whereIn('astrologer_id', $astrologerUserIds)->get()->keyBy('astrologer_id');
         $defaultPackage = Package::where('is_default', true)->first();
 
+        // Batch query completed orders (chats + calls) for all listed astrologers
+        $completedChatCounts = ChatSession::whereIn('provider_id', $astrologerUserIds)
+            ->where('status', 'completed')
+            ->select('provider_id', DB::raw('count(*) as count'))
+            ->groupBy('provider_id')
+            ->pluck('count', 'provider_id');
+
+        $completedCallCounts = CallSession::whereIn('provider_id', $astrologerUserIds)
+            ->where('status', 'completed')
+            ->select('provider_id', DB::raw('count(*) as count'))
+            ->groupBy('provider_id')
+            ->pluck('count', 'provider_id');
+
         $activePurchases = collect();
         if ($currentUser) {
             $activePurchases = PackagePurchase::where('user_id', $currentUser->id)
@@ -158,9 +171,16 @@ class AstrologerService
                 ->keyBy('astrologer_id');
         }
 
-        $astrologers = $rawAstrologers->map(function ($astrologer) use ($busyProviderIds, $customPackages, $defaultPackage, $activePurchases, $currentUser) {
+        $astrologers = $rawAstrologers->map(function ($astrologer) use ($busyProviderIds, $customPackages, $defaultPackage, $activePurchases, $currentUser, $completedChatCounts, $completedCallCounts) {
             $avgRating = $astrologer->reviews_avg_rating;
             $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
+
+            // Total orders: Base offset 120 + actual completed chats/calls
+            $actualCompleted = ($completedChatCounts->get($astrologer->user_id, 0)) + ($completedCallCounts->get($astrologer->user_id, 0));
+            $totalOrders = 120 + $actualCompleted;
+            $astrologer->total_orders = $totalOrders;
+            $astrologer->orders_count = $totalOrders;
+            $astrologer->orders_formatted = "{$totalOrders}+ orders";
 
             $astrologer->is_online = (bool) ($astrologer->is_chat_enabled || $astrologer->is_call_enabled);
             $astrologer->is_chat_enabled = (bool) $astrologer->is_chat_enabled;
@@ -264,6 +284,15 @@ class AstrologerService
 
         $avgRating = AstrologerReview::where('astrologer_id', $astrologer->id)->avg('rating');
         $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
+
+        // Total orders calculation with base offset 120
+        $completedChats = ChatSession::where('provider_id', $astrologer->user_id)->where('status', 'completed')->count();
+        $completedCalls = CallSession::where('provider_id', $astrologer->user_id)->where('status', 'completed')->count();
+        $totalOrders = 120 + $completedChats + $completedCalls;
+
+        $astrologer->total_orders = $totalOrders;
+        $astrologer->orders_count = $totalOrders;
+        $astrologer->orders_formatted = "{$totalOrders}+ orders";
 
         $isChatBusy = ChatSession::where('provider_id', $astrologer->user_id)
             ->whereIn('status', ['accepted', 'ongoing'])
