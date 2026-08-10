@@ -11,7 +11,7 @@ class BlogController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Blog::query();
+        $query = Blog::with('language');
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -47,7 +47,8 @@ class BlogController extends Controller
 
     public function create()
     {
-        return view('admin.blogs.create', ['blog' => new Blog()]);
+        $languages = \App\Models\Language::where('is_active', true)->orderBy('name')->get();
+        return view('admin.blogs.create', ['blog' => new Blog(), 'languages' => $languages]);
     }
 
     public function store(Request $request)
@@ -62,6 +63,7 @@ class BlogController extends Controller
             'blog_tags' => 'nullable|array',
             'blog_tags.*' => 'string|max:50',
             'is_active' => 'sometimes|boolean',
+            'language_id' => 'required|exists:languages,id',
         ]);
 
         if ($request->hasFile('blog_image')) {
@@ -81,7 +83,8 @@ class BlogController extends Controller
     public function edit($id)
     {
         $blog = Blog::findOrFail($id);
-        return view('admin.blogs.create', compact('blog'));
+        $languages = \App\Models\Language::where('is_active', true)->orderBy('name')->get();
+        return view('admin.blogs.create', compact('blog', 'languages'));
     }
 
     public function update(Request $request, $id)
@@ -98,6 +101,7 @@ class BlogController extends Controller
             'blog_tags' => 'nullable|array',
             'blog_tags.*' => 'string|max:50',
             'is_active' => 'sometimes|boolean',
+            'language_id' => 'required|exists:languages,id',
         ]);
 
         if ($request->hasFile('blog_image')) {

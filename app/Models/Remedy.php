@@ -19,6 +19,7 @@ class Remedy extends Model
         'description',
         'image',
         'is_active',
+        'language_id',
     ];
 
     /**
@@ -34,6 +35,11 @@ class Remedy extends Model
 
     public function getImageUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->image);
+        return \App\Helpers\MediaHelper::getFullUrl($this->image);
+    }
+
+    public function language()
+    {
+        return $this->belongsTo(Language::class);
     }
 }

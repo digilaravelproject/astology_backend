@@ -180,6 +180,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/notices', [NoticeController::class, 'index'])->middleware('throttle:general');
         Route::get('/astrologers', [AstrologerController::class, 'index'])->middleware('throttle:general');
         Route::get('/astrologers/{id}', [AstrologerController::class, 'show'])->middleware('throttle:general');
+        Route::get('/astrologers/{id}/gallery', [AstrologerController::class, 'getGallery'])->middleware('throttle:general');
         Route::get('/reviews', [ReviewController::class, 'index'])->middleware('throttle:general');
         Route::middleware(['auth:sanctum', 'throttle:tiered'])->get('/plans', [PlanController::class, 'index']);
         Route::get('/plans/{plan}', [PlanController::class, 'show'])->middleware('throttle:general');

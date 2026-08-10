@@ -40,6 +40,7 @@ class Blog extends Model
         'blog_image',
         'blog_tags',
         'is_active',
+        'language_id',
     ];
 
     /**
@@ -57,5 +58,10 @@ class Blog extends Model
     public function getBlogImageUrlAttribute(): ?string
     {
         return \App\Helpers\MediaHelper::getFullUrl($this->blog_image);
+    }
+
+    public function language()
+    {
+        return $this->belongsTo(Language::class);
     }
 }

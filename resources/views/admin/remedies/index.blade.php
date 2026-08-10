@@ -83,6 +83,7 @@
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Image</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Title</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Description</th>
+                        <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Language</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Status</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Created</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Updated</th>
@@ -108,6 +109,10 @@
                             </td>
                             <td class="px-6 py-5 text-sm text-gray">
                                 {{ \Illuminate\Support\Str::limit($remedy->description ?? '-', 80) }}
+                            </td>
+                            <td class="px-6 py-5">
+                                <div class="text-xs font-bold text-dark">{{ $remedy->language?->name ?? 'N/A' }}</div>
+                                <div class="text-[9px] font-bold text-gray-light uppercase mt-1">({{ $remedy->language?->code ?? '-' }})</div>
                             </td>
                             <td class="px-6 py-5">
                                 @if($remedy->is_active)

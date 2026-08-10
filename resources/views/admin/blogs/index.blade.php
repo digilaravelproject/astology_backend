@@ -97,6 +97,7 @@
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Metadata</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Curator</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Metrics</th>
+                        <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Language</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest">Status</th>
                         <th class="px-6 py-5 text-[10px] font-black text-gray uppercase tracking-widest text-right">Ops</th>
                     </tr>
@@ -128,6 +129,10 @@
                             <td class="px-6 py-5 border-l border-gray-lighter/30">
                                 <div class="text-sm font-black text-dark">{{ $blog->created_at?->diffForHumans() }}</div>
                                 <div class="text-[8px] font-black text-success uppercase">Updated {{ $blog->updated_at?->diffForHumans() }}</div>
+                            </td>
+                            <td class="px-6 py-5">
+                                <div class="text-xs font-bold text-dark">{{ $blog->language?->name ?? 'N/A' }}</div>
+                                <div class="text-[9px] font-bold text-gray-light uppercase mt-1">({{ $blog->language?->code ?? '-' }})</div>
                             </td>
                             <td class="px-6 py-5">
                                 @if($blog->is_active)

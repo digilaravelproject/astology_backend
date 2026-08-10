@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Remedy;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 class RemedyController extends Controller
@@ -12,10 +13,21 @@ class RemedyController extends Controller
     /**
      * List all active remedies.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         try {
+            $langKey = $request->query('language');
+            if (!$langKey) {
+                return response()->json(['status' => 'error', 'message' => 'Language key is required.'], 400);
+            }
+
+            $language = \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+            if (!$language) {
+                return response()->json(['status' => 'error', 'message' => 'Language not found.'], 404);
+            }
+
             $remedies = Remedy::where('is_active', true)
+                ->where('language_id', $language->id)
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function ($remedy) {

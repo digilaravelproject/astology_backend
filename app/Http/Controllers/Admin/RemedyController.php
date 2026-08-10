@@ -11,7 +11,7 @@ class RemedyController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Remedy::query();
+        $query = Remedy::with('language');
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -41,7 +41,8 @@ class RemedyController extends Controller
 
     public function create()
     {
-        return view('admin.remedies.form', ['remedy' => new Remedy()]);
+        $languages = \App\Models\Language::where('is_active', true)->orderBy('name')->get();
+        return view('admin.remedies.form', ['remedy' => new Remedy(), 'languages' => $languages]);
     }
 
     public function store(Request $request)
@@ -51,6 +52,7 @@ class RemedyController extends Controller
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'sometimes|boolean',
+            'language_id' => 'required|exists:languages,id',
         ]);
 
         $data['is_active'] = $request->has('is_active');
@@ -68,7 +70,8 @@ class RemedyController extends Controller
     public function edit($id)
     {
         $remedy = Remedy::findOrFail($id);
-        return view('admin.remedies.form', compact('remedy'));
+        $languages = \App\Models\Language::where('is_active', true)->orderBy('name')->get();
+        return view('admin.remedies.form', compact('remedy', 'languages'));
     }
 
     public function update(Request $request, $id)
@@ -80,6 +83,7 @@ class RemedyController extends Controller
             'description' => 'nullable|string',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'sometimes|boolean',
+            'language_id' => 'required|exists:languages,id',
         ]);
 
         $data['is_active'] = $request->has('is_active');
