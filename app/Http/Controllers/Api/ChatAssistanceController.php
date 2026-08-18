@@ -8,6 +8,7 @@ use App\Services\ChatAssistanceService;
 use App\Helpers\ApiResponse;
 use App\Models\ChatAssistanceSession;
 use App\Models\Setting;
+use App\Services\ContentSanitizerService;
 use Exception;
 
 class ChatAssistanceController extends Controller
@@ -76,7 +77,8 @@ class ChatAssistanceController extends Controller
 
         try {
             $userId = $request->user()->id;
-            $sanitizedMessage = $request->message ? $this->sanitize($request->message) : null;
+            $cleanMessage = $request->message ? $this->sanitize($request->message) : null;
+            $sanitizedMessage = ContentSanitizerService::sanitize($cleanMessage);
             $attachmentUrl = null;
 
             if ($request->hasFile('file')) {

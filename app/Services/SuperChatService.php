@@ -6,6 +6,7 @@ use App\Models\Gift;
 use App\Models\SuperChat;
 use App\Models\Wallet;
 use App\Events\SuperChatReceived;
+use App\Services\ContentSanitizerService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -26,7 +27,8 @@ class SuperChatService
 
         $amount = (float) $gift->price;
         $astrologerUserId = $session->astrologer->user_id;
-        $giftMessage = "[Gift: {$gift->title}]" . ($message ? ' ' . $message : '');
+        $sanitizedUserMessage = $message ? ContentSanitizerService::sanitize($message) : '';
+        $giftMessage = "[Gift: {$gift->title}]" . ($sanitizedUserMessage ? ' ' . $sanitizedUserMessage : '');
 
         $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $giftMessage) {
             $firstUserId = min($user->id, $astrologerUserId);

@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 use Exception;
 use App\Helpers\MediaHelper;
+use App\Services\ContentSanitizerService;
 
 class ChatAssistanceService
 {
@@ -158,12 +159,15 @@ class ChatAssistanceService
                 $limitRecord->increment('reply_count');
             }
 
-            // Create Message
+            // Create Message with sanitized content
+            $rawMsg = $data['message'] ?? null;
+            $sanitizedMsg = $rawMsg ? ContentSanitizerService::sanitize($rawMsg) : null;
+
             $message = ChatAssistanceMessage::create([
                 'chat_assistance_session_id' => $session->id,
                 'sender_id' => $senderId,
                 'receiver_id' => $receiverId,
-                'message' => $data['message'] ?? null,
+                'message' => $sanitizedMsg,
                 'attachment_url' => $data['attachment_url'] ?? null,
                 'type' => $data['type'] ?? 'text',
                 'call_session_id' => $callSessionId,

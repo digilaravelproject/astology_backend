@@ -17,6 +17,7 @@ use App\Events\AstrologerMediaStatusChanged;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use App\Services\ContentSanitizerService;
 
 class LiveSessionService
 {
@@ -200,10 +201,12 @@ class LiveSessionService
             throw new \RuntimeException('Live session is not currently active');
         }
 
+        $sanitizedMessage = ContentSanitizerService::sanitize($message);
+
         $comment = LiveComment::create([
             'live_session_id' => $session->id,
             'user_id' => $user->id,
-            'message' => $message,
+            'message' => $sanitizedMessage,
         ]);
 
         try {

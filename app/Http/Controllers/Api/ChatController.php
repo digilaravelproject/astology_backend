@@ -13,6 +13,7 @@ use App\Events\ChatEnded;
 use App\Events\ChatAccepted;
 use App\Events\ChatQueueUpdated;
 use App\Events\MessageStatusUpdated;
+use App\Services\ContentSanitizerService;
 use Illuminate\Support\Facades\Storage;
 use Exception;
 
@@ -165,8 +166,9 @@ class ChatController extends Controller
                 return ApiResponse::error('Unauthorized participation in this session', 403);
             }
 
-            // Sanitize message to prevent XSS
-            $sanitizedMessage = $request->message ? $this->sanitize($request->message) : null;
+            // Sanitize message for XSS & redact sensitive contact info
+            $cleanMessage = $request->message ? $this->sanitize($request->message) : null;
+            $sanitizedMessage = ContentSanitizerService::sanitize($cleanMessage);
 
             $message = Message::create([
                 'chat_session_id' => $sessionId,
