@@ -11,9 +11,11 @@ use App\Events\ChatDismissed;
 use App\Events\ChatEnded;
 use App\Events\ChatInitiated;
 use App\Events\MessageSent;
+use App\Events\PackageSessionTerminated;
 use App\Listeners\SendCallPushNotificationListener;
 use App\Listeners\SendChatInitiatedPushListener;
 use App\Listeners\SendMessagePushNotificationListener;
+use App\Listeners\SendPackageSessionNotificationListener;
 use App\Listeners\SendSessionAcceptedPushListener;
 use App\Listeners\SendSessionDismissedPushListener;
 use App\Listeners\SendSessionEndedPushListener;
@@ -146,6 +148,12 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(
             CallDismissed::class,
             SendSessionDismissedPushListener::class
+        );
+
+        // 6. Prepaid Package Session Termination Listener
+        Event::listen(
+            PackageSessionTerminated::class,
+            SendPackageSessionNotificationListener::class
         );
     }
 
