@@ -315,33 +315,45 @@ class FcmChannelDriver
 
         // Android configuration
         $message['android'] = [
-            'priority' => ($payload->priority === 'high' || $payload->type === 'call') ? 'HIGH' : 'NORMAL',
+            'priority' => ($payload->priority === 'high' || $payload->type === 'call') ? 'HIGH' : 'HIGH',
             'ttl'      => $payload->type === 'call' ? '60s' : '86400s',
         ];
 
         if (!$payload->isDataOnly) {
-            $message['android']['notification'] = [
-                'channel_id'             => $channelId,
-                'sound'                  => $sound,
-                'default_sound'          => $sound === 'default',
-                'default_vibrate_timings'=> true,
-                'notification_priority'  => $payload->priority === 'high' ? 'PRIORITY_MAX' : 'PRIORITY_DEFAULT',
-                'click_action'           => $payload->clickAction,
+            $androidNotif = [
+                'notification_priority'   => 'PRIORITY_HIGH',
+                'default_vibrate_timings' => true,
+                'visibility'              => 'PUBLIC',
+                'click_action'            => $payload->clickAction,
             ];
-            if ($payload->imageUrl) {
-                $message['android']['notification']['image'] = $payload->imageUrl;
+
+            if ($channelId) {
+                $androidNotif['channel_id'] = $channelId;
             }
+
+            if ($sound === 'default') {
+                $androidNotif['default_sound'] = true;
+            } else {
+                $androidNotif['sound'] = $sound;
+            }
+
+            if ($payload->imageUrl) {
+                $androidNotif['image'] = $payload->imageUrl;
+            }
+
+            $message['android']['notification'] = $androidNotif;
         }
 
         // Apple APNs configuration
         $message['apns'] = [
             'headers' => [
-                'apns-priority' => ($payload->priority === 'high' || $payload->type === 'call') ? '10' : '5',
+                'apns-priority' => ($payload->priority === 'high' || $payload->type === 'call') ? '10' : '10',
             ],
             'payload' => [
                 'aps' => [
                     'sound'             => $sound === 'default' ? 'default' : "{$sound}.caf",
-                    'content-available' => 1, // Wake up iOS app in background
+                    'content-available' => 1,
+                    'badge'             => 1,
                 ],
             ],
         ];
