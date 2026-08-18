@@ -47,8 +47,11 @@ class AdminPushBroadcastController extends Controller
             'total_failed'    => BroadcastNotification::sum('failed_count'),
         ];
 
-        return view('admin.push_notifications.index', compact('broadcasts', 'stats'));
+        $campaigns = $broadcasts;
+
+        return view('admin.push_notifications.index', compact('broadcasts', 'campaigns', 'stats'));
     }
+
 
     /**
      * Show form to compose a new push notification broadcast.
