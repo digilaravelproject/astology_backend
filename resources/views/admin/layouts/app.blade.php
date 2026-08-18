@@ -614,10 +614,10 @@
                     </li>
 
                     <!-- Communication Management -->
-                    <li x-data="{ open: {{ request()->routeIs('admin.notices.*') || request()->routeIs('admin.app-notifications.*') ? 'true' : 'false' }} }">
+                    <li x-data="{ open: {{ request()->routeIs('admin.notices.*') || request()->routeIs('admin.app-notifications.*') || request()->routeIs('admin.push-notifications.*') ? 'true' : 'false' }} }">
                         <button @click="open = !open" 
                                 class="w-full flex items-center justify-between px-6 py-3 text-[14px] font-medium transition-all duration-300
-                                       {{ request()->routeIs('admin.notices.*') || request()->routeIs('admin.app-notifications.*')
+                                       {{ request()->routeIs('admin.notices.*') || request()->routeIs('admin.app-notifications.*') || request()->routeIs('admin.push-notifications.*')
                                           ? 'bg-sidebar-hover text-primary'
                                           : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
                             <div class="flex items-center gap-4">
@@ -636,7 +636,13 @@
                             <li>
                                 <a href="{{ route('admin.app-notifications.index') }}" 
                                    class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.app-notifications.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
-                                    <i class="fas fa-circle text-[6px]"></i> Notifications
+                                    <i class="fas fa-circle text-[6px]"></i> In-App Notifications
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.push-notifications.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.push-notifications.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Push Broadcasts
                                 </a>
                             </li>
                         </ul>
@@ -684,16 +690,40 @@
                     </li>
 
                     <!-- Settings -->
-                    <li>
-                        <a href="{{ route('admin.settings.index') }}" 
-                           class="flex items-center gap-4 px-6 py-3 text-[14px] font-medium transition-all duration-300
-                                  {{ request()->routeIs('admin.settings.index')
-                                     ? 'bg-sidebar-hover text-primary border-r-[3px] border-primary'
-                                     : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
-                            <i class="fas fa-cog w-5 text-center text-base"></i>
-                            <span>Settings</span>
-                        </a>
+                    <li x-data="{ open: {{ request()->routeIs('admin.settings.*') ? 'true' : 'false' }} }">
+                        <button @click="open = !open" 
+                                class="w-full flex items-center justify-between px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                       {{ request()->routeIs('admin.settings.*')
+                                          ? 'bg-sidebar-hover text-primary'
+                                          : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <div class="flex items-center gap-4">
+                                <i class="fas fa-cog w-5 text-center text-base"></i>
+                                <span>Settings</span>
+                            </div>
+                            <i class="fas fa-chevron-right text-[10px] transition-transform duration-300" :class="open ? 'rotate-90' : ''"></i>
+                        </button>
+                        <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
+                            <li>
+                                <a href="{{ route('admin.settings.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.settings.index') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> General Settings
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.settings.rate-limits') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.settings.rate-limits') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Rate Limits
+                                </a>
+                            </li>
+                            <li>
+                                <a href="{{ route('admin.settings.firebase.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.settings.firebase.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Firebase (FCM)
+                                </a>
+                            </li>
+                        </ul>
                     </li>
+
                 </ul>
             </nav>
         </aside>

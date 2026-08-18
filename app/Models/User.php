@@ -157,4 +157,22 @@ class User extends Authenticatable
     {
         return $this->hasMany(\App\Models\ChatSession::class, 'provider_id');
     }
+
+    /**
+     * Get all registered devices for push notifications.
+     */
+    public function devices()
+    {
+        return $this->hasMany(\App\Models\UserDevice::class);
+    }
+
+
+    /**
+     * Get active push notification devices.
+     */
+    public function activeDevices()
+    {
+        return $this->hasMany(\App\Models\UserDevice::class)->where('is_active', true);
+    }
 }
+

@@ -1,0 +1,162 @@
+<?php
+
+namespace App\Services\Notification;
+
+class PushNotificationPayload
+{
+    public string $title;
+    public string $body;
+    public ?string $imageUrl;
+    public string $type; // 'call', 'chat', 'wallet', 'system', 'promo', 'order', 'review'
+    public ?string $referenceId;
+    public ?string $clickAction;
+    public string $sound;
+    public string $priority; // 'high' or 'normal'
+    public array $customData;
+    public bool $isDataOnly; // true for background wake-up calls
+
+    public function __construct(
+        string $title = '',
+        string $body = '',
+        string $type = 'system',
+        ?string $referenceId = null,
+        ?string $imageUrl = null,
+        ?string $clickAction = 'FLUTTER_NOTIFICATION_CLICK',
+        string $sound = 'default',
+        string $priority = 'high',
+        array $customData = [],
+        bool $isDataOnly = false
+    ) {
+        $this->title = $title;
+        $this->body = $body;
+        $this->type = $type;
+        $this->referenceId = $referenceId ? (string) $referenceId : null;
+        $this->imageUrl = $imageUrl;
+        $this->clickAction = $clickAction ?? 'FLUTTER_NOTIFICATION_CLICK';
+        $this->sound = $sound;
+        $this->priority = $priority;
+        $this->customData = $customData;
+        $this->isDataOnly = $isDataOnly;
+    }
+
+    /**
+     * Build a high-priority background wake-up notification for incoming calls.
+     */
+    public static function forCall(
+        int $sessionId,
+        int $callerId,
+        string $callerName,
+        ?string $callerAvatar = null,
+        string $callType = 'audio',
+        array $extra = []
+    ): self {
+        $data = array_merge([
+            'type' => 'call',
+            'session_id' => (string) $sessionId,
+            'caller_id' => (string) $callerId,
+            'caller_name' => $callerName,
+            'caller_avatar' => $callerAvatar ?? '',
+            'call_type' => $callType,
+            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'created_at' => now()->toIso8601String(),
+        ], $extra);
+
+        return new self(
+            title: "Incoming {$callType} call",
+            body: "{$callerName} is calling you...",
+            type: 'call',
+            referenceId: (string) $sessionId,
+            imageUrl: $callerAvatar,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            sound: 'call_ringtone',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: true // Data message enables custom high-priority incoming call screen in Flutter
+        );
+    }
+
+    /**
+     * Build a chat message preview notification.
+     */
+    public static function forChat(
+        int $sessionId,
+        int $senderId,
+        string $senderName,
+        string $messagePreview,
+        ?string $senderAvatar = null,
+        array $extra = []
+    ): self {
+        $data = array_merge([
+            'type' => 'chat',
+            'session_id' => (string) $sessionId,
+            'sender_id' => (string) $senderId,
+            'sender_name' => $senderName,
+            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'created_at' => now()->toIso8601String(),
+        ], $extra);
+
+        return new self(
+            title: $senderName,
+            body: mb_strimwidth($messagePreview, 0, 120, '...'),
+            type: 'chat',
+            referenceId: (string) $sessionId,
+            imageUrl: $senderAvatar,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            sound: 'default',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: false
+        );
+    }
+
+    /**
+     * Build a standard system or transactional notification (wallet, order, review).
+     */
+    public static function forSystem(
+        string $title,
+        string $body,
+        string $type = 'system',
+        ?string $referenceId = null,
+        ?string $imageUrl = null,
+        array $extra = []
+    ): self {
+        $data = array_merge([
+            'type' => $type,
+            'reference_id' => $referenceId ? (string) $referenceId : '',
+            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'created_at' => now()->toIso8601String(),
+        ], $extra);
+
+        return new self(
+            title: $title,
+            body: $body,
+            type: $type,
+            referenceId: $referenceId,
+            imageUrl: $imageUrl,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            sound: 'default',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: false
+        );
+    }
+
+    /**
+     * Convert to standard array for storing in database logs.
+     */
+    public function toArray(): array
+    {
+        return [
+            'title' => $this->title,
+            'body' => $this->body,
+            'type' => $this->type,
+            'reference_id' => $this->referenceId,
+            'image_url' => $this->imageUrl,
+            'click_action' => $this->clickAction,
+            'sound' => $this->sound,
+            'priority' => $this->priority,
+            'custom_data' => $this->customData,
+            'is_data_only' => $this->isDataOnly,
+        ];
+    }
+}
