@@ -2,10 +2,21 @@
 
 namespace App\Providers;
 
+use App\Events\CallAccepted;
+use App\Events\CallDismissed;
+use App\Events\CallEnded;
 use App\Events\CallInitiated;
+use App\Events\ChatAccepted;
+use App\Events\ChatDismissed;
+use App\Events\ChatEnded;
+use App\Events\ChatInitiated;
 use App\Events\MessageSent;
 use App\Listeners\SendCallPushNotificationListener;
+use App\Listeners\SendChatInitiatedPushListener;
 use App\Listeners\SendMessagePushNotificationListener;
+use App\Listeners\SendSessionAcceptedPushListener;
+use App\Listeners\SendSessionDismissedPushListener;
+use App\Listeners\SendSessionEndedPushListener;
 use App\Models\Astrologer;
 use App\Models\Setting;
 use App\Models\StaticPage;
@@ -91,16 +102,50 @@ class AppServiceProvider extends ServiceProvider
             [PresenceService::class, 'handleMemberLeft']
         );
 
-        // Push notification listener for incoming real-time Calls
+        // 1. Initiation Listeners
         Event::listen(
             CallInitiated::class,
             SendCallPushNotificationListener::class
         );
+        Event::listen(
+            ChatInitiated::class,
+            SendChatInitiatedPushListener::class
+        );
 
-        // Push notification listener for Chat messages
+        // 2. Chat Message Push Listener
         Event::listen(
             MessageSent::class,
             SendMessagePushNotificationListener::class
+        );
+
+        // 3. Acceptance Listeners (Notify Consumer User)
+        Event::listen(
+            ChatAccepted::class,
+            SendSessionAcceptedPushListener::class
+        );
+        Event::listen(
+            CallAccepted::class,
+            SendSessionAcceptedPushListener::class
+        );
+
+        // 4. Session Ended & Billing Summary Listeners (Notify Both User & Astrologer)
+        Event::listen(
+            ChatEnded::class,
+            SendSessionEndedPushListener::class
+        );
+        Event::listen(
+            CallEnded::class,
+            SendSessionEndedPushListener::class
+        );
+
+        // 5. Dismissed / Rejected / Cancelled Listeners (Notify Appropriate Party)
+        Event::listen(
+            ChatDismissed::class,
+            SendSessionDismissedPushListener::class
+        );
+        Event::listen(
+            CallDismissed::class,
+            SendSessionDismissedPushListener::class
         );
     }
 

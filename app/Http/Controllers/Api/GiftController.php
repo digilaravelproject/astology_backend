@@ -122,6 +122,25 @@ class GiftController extends Controller
 
             if ($astrologer->user) {
                 $this->creditAstrologerWallet($astrologer->user->id, $amount, $transaction->id);
+
+                // Dispatch Push & In-App Notification to Astrologer
+                try {
+                    \App\Services\NotificationHelper::send(
+                        userId: $astrologer->user->id,
+                        title: 'Gift Received! 🎁',
+                        body: "{$user->name} sent you a {$gift->title} worth ₹" . number_format($amount, 2) . "!",
+                        meta: [
+                            'type'         => 'gift',
+                            'gift_id'      => (string) $gift->id,
+                            'sender_id'    => (string) $user->id,
+                            'sender_name'  => $user->name,
+                            'amount'       => (string) $amount,
+                            'screen_route' => '/wallet',
+                        ]
+                    );
+                } catch (\Throwable $ne) {
+                    Log::error('Failed to notify astrologer about gift: ' . $ne->getMessage());
+                }
             }
 
             DB::commit();
@@ -140,24 +159,27 @@ class GiftController extends Controller
 
     protected function creditAstrologerWallet(int $userId, float $amount, int $transactionId): void
     {
-        $wallet = Wallet::firstOrCreate(['user_id' => $userId], ['balance' => 0]);
         $wallet = Wallet::where('user_id', $userId)->lockForUpdate()->first();
+        if (!$wallet) {
+            $wallet = Wallet::create(['user_id' => $userId, 'balance' => 0]);
+            $wallet = Wallet::where('id', $wallet->id)->lockForUpdate()->first();
+        }
 
-        $balanceBefore = $wallet->balance;
+        $balanceBefore = (float) $wallet->balance;
         $wallet->balance += $amount;
         $wallet->save();
 
         WalletTransaction::create([
-            'wallet_id' => $wallet->id,
+            'wallet_id'        => $wallet->id,
             'transaction_type' => 'credit',
-            'amount' => $amount,
-            'status' => 'completed',
+            'amount'           => $amount,
+            'status'           => 'completed',
             'payment_provider' => 'gift',
-            'description' => 'Gift received',
-            'balance_before' => $balanceBefore,
-            'balance_after' => $wallet->balance,
-            'reference_type' => GiftTransaction::class,
-            'reference_id' => $transactionId,
+            'description'      => 'Gift received',
+            'balance_before'   => $balanceBefore,
+            'balance_after'    => (float) $wallet->balance,
+            'reference_type'   => GiftTransaction::class,
+            'reference_id'     => $transactionId,
         ]);
     }
 

@@ -110,6 +110,121 @@ class PushNotificationPayload
     }
 
     /**
+     * Build a high-priority session request notification (Chat / Call).
+     */
+    public static function forSessionRequest(
+        int $sessionId,
+        string $channelType,
+        int $userId,
+        string $userName,
+        ?string $userAvatar = null,
+        array $extra = []
+    ): self {
+        $typeStr = strtoupper($channelType) . '_REQUEST';
+        $channelLabel = ucfirst($channelType);
+
+        $data = array_merge([
+            'type'            => $typeStr,
+            'session_id'      => (string) $sessionId,
+            'channel_type'    => $channelType,
+            'user_id'         => (string) $userId,
+            'user_name'       => $userName,
+            'user_avatar'     => $userAvatar ?? '',
+            'screen_route'    => "/{$channelType}-request",
+            'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
+            'created_at'      => now()->toIso8601String(),
+        ], $extra);
+
+        return new self(
+            title: "New {$channelLabel} Request 💬",
+            body: "{$userName} has requested a {$channelType} consultation with you.",
+            type: $channelType,
+            referenceId: (string) $sessionId,
+            imageUrl: $userAvatar,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            sound: 'default',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: false
+        );
+    }
+
+    /**
+     * Build a session acceptance notification to consumer.
+     */
+    public static function forSessionAccepted(
+        int $sessionId,
+        string $channelType,
+        int $astrologerId,
+        string $astrologerName,
+        ?string $astrologerAvatar = null,
+        array $extra = []
+    ): self {
+        $typeStr = strtoupper($channelType) . '_ACCEPTED';
+        $channelLabel = ucfirst($channelType);
+
+        $data = array_merge([
+            'type'            => $typeStr,
+            'session_id'      => (string) $sessionId,
+            'channel_type'    => $channelType,
+            'astrologer_id'   => (string) $astrologerId,
+            'astrologer_name' => $astrologerName,
+            'screen_route'    => "/{$channelType}-room",
+            'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
+            'created_at'      => now()->toIso8601String(),
+        ], $extra);
+
+        return new self(
+            title: "{$astrologerName} Accepted! 🌟",
+            body: "{$astrologerName} accepted your {$channelType} request. Tap to connect now.",
+            type: $channelType,
+            referenceId: (string) $sessionId,
+            imageUrl: $astrologerAvatar,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            sound: 'default',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: false
+        );
+    }
+
+    /**
+     * Build a standardized session summary notification with financial metrics.
+     */
+    public static function forSessionEnded(
+        int $sessionId,
+        string $channelType,
+        string $recipientRole, // 'user' or 'astrologer'
+        string $title,
+        string $body,
+        array $sessionData = []
+    ): self {
+        $typeStr = strtoupper($channelType) . '_ENDED';
+
+        $data = array_merge([
+            'type'         => $typeStr,
+            'session_id'   => (string) $sessionId,
+            'channel_type' => $channelType,
+            'screen_route' => '/session-summary',
+            'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
+            'created_at'   => now()->toIso8601String(),
+        ], $sessionData);
+
+        return new self(
+            title: $title,
+            body: $body,
+            type: $channelType,
+            referenceId: (string) $sessionId,
+            imageUrl: null,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            sound: 'default',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: false
+        );
+    }
+
+    /**
      * Build a standard system or transactional notification (wallet, order, review).
      */
     public static function forSystem(

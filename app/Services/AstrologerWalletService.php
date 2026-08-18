@@ -199,6 +199,23 @@ class AstrologerWalletService
             'balance_after' => $wallet->balance,
         ]);
 
+        // Dispatch In-App & Push Notification
+        try {
+            \App\Services\NotificationHelper::send(
+                userId: $user->id,
+                title: 'Withdrawal Requested 🏦',
+                body: "Your payout request for ₹" . number_format($amount, 2) . " has been submitted and is under review.",
+                meta: [
+                    'type'           => 'wallet',
+                    'transaction_id' => (string) $transaction->id,
+                    'amount'         => (string) $amount,
+                    'screen_route'   => '/wallet',
+                ]
+            );
+        } catch (\Throwable $ne) {
+            \Illuminate\Support\Facades\Log::error('Withdrawal notification failed: ' . $ne->getMessage());
+        }
+
         return [
             'transaction' => $transaction,
             'available_balance' => $availableBalance - $amount,

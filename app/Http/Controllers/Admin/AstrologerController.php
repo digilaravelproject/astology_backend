@@ -9,6 +9,7 @@ use App\Models\AstrologerBillingAddress;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -211,7 +212,39 @@ class AstrologerController extends Controller
         // Handle file uploads  
         $astrologerUpdateData += $this->handleFileUploads($request, $user->id, $astrologer);
 
+        $oldStatus = $astrologer->status;
+        $newStatus = $request->input('status');
+
         $astrologer->update($astrologerUpdateData);
+
+        // Notify astrologer on approval or rejection
+        if ($oldStatus !== $newStatus) {
+            try {
+                if ($newStatus === 'approved') {
+                    \App\Services\NotificationHelper::send(
+                        userId: $user->id,
+                        title: 'Profile Approved! 🎉',
+                        body: 'Congratulations! Your astrologer profile has been approved. You can now go online and accept consultations.',
+                        meta: [
+                            'type'         => 'system',
+                            'screen_route' => '/profile',
+                        ]
+                    );
+                } elseif ($newStatus === 'rejected') {
+                    \App\Services\NotificationHelper::send(
+                        userId: $user->id,
+                        title: 'Profile Update Required ⚠️',
+                        body: 'Your astrologer profile could not be approved at this time. Please update your details or contact support.',
+                        meta: [
+                            'type'         => 'system',
+                            'screen_route' => '/profile',
+                        ]
+                    );
+                }
+            } catch (\Throwable $ne) {
+                Log::error('Astrologer status change notification failed: ' . $ne->getMessage());
+            }
+        }
 
         // Sync Astrologer Custom Package overrides if any are provided
         if ($request->filled('package_amount') || $request->filled('package_duration_minutes')) {

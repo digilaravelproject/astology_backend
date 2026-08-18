@@ -177,6 +177,24 @@ class WalletController extends Controller
                 'new_balance' => $wallet->balance,
             ]);
 
+            // Dispatch Push & In-App Notification
+            try {
+                $walletPayload = \App\Services\Notification\PushNotificationPayload::forSystem(
+                    title: 'Wallet Recharged! 💳',
+                    body: '₹' . number_format($transaction->amount, 2) . ' has been added to your wallet. New Balance: ₹' . number_format($wallet->balance, 2),
+                    type: 'wallet',
+                    referenceId: (string) $transaction->id,
+                    extra: [
+                        'amount'       => (string) $transaction->amount,
+                        'new_balance'  => (string) $wallet->balance,
+                        'screen_route' => '/wallet',
+                    ]
+                );
+                \App\Services\NotificationService::sendToUser($user->id, $walletPayload, saveInApp: true);
+            } catch (\Throwable $ne) {
+                Log::error('Wallet topup notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Top-up verified and wallet credited.',
