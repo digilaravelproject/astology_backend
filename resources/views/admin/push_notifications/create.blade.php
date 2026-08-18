@@ -71,16 +71,16 @@
                         Search User (Name / Phone / Email)
                     </label>
                     <div class="relative">
-                        <input type="text" x-model="userQuery" @input.debounce.300ms="searchUsers()" placeholder="Type at least 2 characters..."
+                        <input type="text" x-model="userQuery" x-on:input.debounce.300ms="searchUsers()" placeholder="Type at least 2 characters..."
                                class="w-full px-4 py-2.5 text-sm bg-white border border-gray-300 rounded-xl text-text-primary focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                         
                         <input type="hidden" name="target_user_id" :value="selectedUser ? selectedUser.id : ''">
 
                         <!-- Dropdown Search Results -->
-                        <div x-show="searchResults.length > 0" @click.away="searchResults = []"
+                        <div x-show="searchResults.length > 0" x-on:click.away="searchResults = []"
                              class="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
                             <template x-for="u in searchResults" :key="u.id">
-                                <div @click="selectUser(u)" class="p-3 hover:bg-light/40 cursor-pointer border-b border-gray-100 last:border-0 flex items-center justify-between text-xs">
+                                <div x-on:click="selectUser(u)" class="p-3 hover:bg-light/40 cursor-pointer border-b border-gray-100 last:border-0 flex items-center justify-between text-xs">
                                     <div>
                                         <div class="font-bold text-text-primary" x-text="u.name"></div>
                                         <div class="text-[11px] text-text-muted" x-text="u.phone + ' | ' + (u.email || 'No email')"></div>
@@ -99,7 +99,7 @@
                                 <i class="fas fa-check-circle"></i>
                                 <span>Selected: <strong x-text="selectedUser.name"></strong> (<span x-text="selectedUser.phone"></span>)</span>
                             </div>
-                            <button type="button" @click="clearUser()" class="text-text-muted hover:text-rose-600">
+                            <button type="button" x-on:click="clearUser()" class="text-text-muted hover:text-rose-600">
                                 <i class="fas fa-times"></i>
                             </button>
                         </div>
@@ -156,7 +156,7 @@
                             <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
                                 App Screen Preset (Deep Link)
                             </label>
-                            <select x-model="presetAction" @change="applyPreset()" class="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-text-primary focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <select x-model="presetAction" x-on:change="applyPreset()" class="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-text-primary focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                                 <option value="">Select App Screen...</option>
                                 <option value="NAV_WALLET_TOPUP">Open Wallet Recharge Screen</option>
                                 <option value="NAV_ASTROLOGER_LIST">Open Top Astrologers List</option>
@@ -230,7 +230,7 @@
                     <!-- Expandable Image Preview -->
                     <template x-if="imageUrl">
                         <div class="mt-2.5 rounded-lg overflow-hidden border border-gray-100 max-h-32 bg-gray-100">
-                            <img :src="imageUrl" class="w-full h-full object-cover" @error="$el.style.display='none'">
+                            <img :src="imageUrl" class="w-full h-full object-cover" x-on:error="$el.style.display='none'">
                         </div>
                     </template>
                 </div>
