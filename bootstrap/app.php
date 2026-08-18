@@ -18,8 +18,9 @@ return Application::configure(basePath: dirname(__DIR__))
             return '/login'; // Fallback for web (though we don't have login defined)
         });
         $middleware->alias([
-            'admin' => \App\Http\Middleware\AdminMiddleware::class,
+            'admin'      => \App\Http\Middleware\AdminMiddleware::class,
             'astrologer' => \App\Http\Middleware\AstrologerMiddleware::class,
+            'user'       => \App\Http\Middleware\EnsureUserRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

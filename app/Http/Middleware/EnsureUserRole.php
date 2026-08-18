@@ -6,10 +6,10 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class AstrologerMiddleware
+class EnsureUserRole
 {
     /**
-     * Handle an incoming request for astrologer (provider) endpoints.
+     * Handle an incoming request for standard user (consumer) endpoints.
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -24,11 +24,11 @@ class AstrologerMiddleware
         }
 
         // Strict role validation
-        if ($user->user_type !== 'astrologer' || !$user->astrologer) {
+        if ($user->user_type !== 'user') {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Unauthorized. This account is not registered as an Astrologer. Please use the Astology Consumer app.',
-                'error_code' => 'ROLE_MISMATCH_USER'
+                'message' => 'Unauthorized. This account is registered as an Astrologer and cannot access Consumer features. Please use the Astrologer app.',
+                'error_code' => 'ROLE_MISMATCH_ASTROLOGER'
             ], 403);
         }
 

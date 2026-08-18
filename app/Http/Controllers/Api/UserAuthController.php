@@ -39,8 +39,25 @@ class UserAuthController extends Controller
 
             $phone = $request->input('phone');
 
-            // Check if user exists
-            $user = User::where('phone', $phone)->where('user_type', 'user')->first();
+            // 1. Strict Role Boundary Check: Disallow Astrologers from logging in via Consumer App
+            $existingAstrologer = User::where('phone', $phone)
+                ->where('user_type', 'astrologer')
+                ->first();
+
+            if ($existingAstrologer) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This phone number is registered as an Astrologer. Please log in using the Astrologer App.',
+                    'error_code' => 'ROLE_MISMATCH_ASTROLOGER'
+                ], 403);
+            }
+
+            // 2. Check if consumer user exists (pessimistic lock for atomic safety)
+            $user = User::where('phone', $phone)
+                ->where('user_type', 'user')
+                ->lockForUpdate()
+                ->first();
 
             // If user doesn't exist, create one
             if (!$user) {
@@ -58,14 +75,13 @@ class UserAuthController extends Controller
                 $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
             }
 
-            // Store OTP (in users table - adding otp_* fields)
+            // Store OTP (in users table)
             $user->otp = $otp;
             $user->otp_expires_at = Carbon::now()->addMinutes(10);
             $user->otp_verified_at = null;
             $user->save();
 
             $smsService = new ExotelSmsService();
-
             $smsResponse = $smsService->sendOtp(
                 $phone,
                 $otp
@@ -73,7 +89,7 @@ class UserAuthController extends Controller
 
             DB::commit();
 
-            // Notify user about generated OTP (for audit/confirmation record).
+            // Notify user about generated OTP
             NotificationHelper::send(
                 $user->id,
                 'OTP generated',
@@ -81,7 +97,6 @@ class UserAuthController extends Controller
                 ['phone' => $phone]
             );
 
-            // For development/testing (no external SMS), return OTP in response.
             return response()->json([
                 'status' => 'success',
                 'message' => 'OTP generated and saved.',
@@ -124,7 +139,24 @@ class UserAuthController extends Controller
             $phone = $request->input('phone');
             $otp = $request->input('otp');
 
-            $user = User::where('phone', $phone)->where('user_type', 'user')->lockForUpdate()->first();
+            // 1. Strict Role Boundary Check
+            $existingAstrologer = User::where('phone', $phone)
+                ->where('user_type', 'astrologer')
+                ->first();
+
+            if ($existingAstrologer) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This phone number is registered as an Astrologer. Please log in using the Astrologer App.',
+                    'error_code' => 'ROLE_MISMATCH_ASTROLOGER'
+                ], 403);
+            }
+
+            $user = User::where('phone', $phone)
+                ->where('user_type', 'user')
+                ->lockForUpdate()
+                ->first();
 
             if (!$user) {
                 DB::rollBack();
@@ -154,8 +186,8 @@ class UserAuthController extends Controller
             // Revoke all existing tokens for single device constraint
             $user->tokens()->delete();
 
-            // Issue Sanctum token
-            $token = $user->createToken('auth_token')->plainTextToken;
+            // Issue Sanctum token scoped specifically for 'role:user'
+            $token = $user->createToken('user_token', ['role:user'])->plainTextToken;
 
             DB::commit();
 

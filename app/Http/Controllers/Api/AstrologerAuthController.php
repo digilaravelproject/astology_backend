@@ -236,51 +236,86 @@ class AstrologerAuthController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $phone = $request->input('phone');
+        try {
+            DB::beginTransaction();
 
-        $user = User::where('phone', $phone)->where('user_type', 'astrologer')->first();
+            $phone = $request->input('phone');
 
-        if (!$user || !$user->astrologer) {
-            return response()->json(['status' => 'error', 'message' => 'Astrologer with this phone not found.'], 404);
+            // 1. Strict Role Boundary Check: Disallow Consumers from logging in via Astrologer Portal
+            $existingConsumer = User::where('phone', $phone)
+                ->where('user_type', 'user')
+                ->first();
+
+            if ($existingConsumer) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This phone number is registered as a User account. Please log in using the Astology User App.',
+                    'error_code' => 'ROLE_MISMATCH_USER'
+                ], 403);
+            }
+
+            $user = User::where('phone', $phone)
+                ->where('user_type', 'astrologer')
+                ->first();
+
+            if (!$user || !$user->astrologer) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Astrologer account with this phone number not found. Please complete signup first.',
+                    'error_code' => 'ASTROLOGER_NOT_FOUND'
+                ], 404);
+            }
+
+            $astrologer = Astrologer::where('id', $user->astrologer->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (in_array($phone, ['7458086472', '9651017054'])) {
+                $otp = '1234';
+            } else {
+                $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            }
+            
+            $astrologer->otp = $otp;
+            $astrologer->otp_expires_at = Carbon::now()->addMinutes(10);
+            $astrologer->otp_verified_at = null;
+            $astrologer->save();
+
+            $smsService = new ExotelSmsService();
+            $smsResponse = $smsService->sendOtp(
+                $phone,
+                $otp
+            );
+
+            DB::commit();
+
+            NotificationHelper::send(
+                $user->id,
+                'OTP generated',
+                'A new OTP code has been created for astrologer login.',
+                ['phone' => $phone]
+            );
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'OTP generated and saved.',
+                'data' => [
+                    'phone' => $phone,
+                    'otp' => $otp,
+                    'expires_at' => $astrologer->otp_expires_at,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Astrologer sendOtp error: ' . $e->getMessage());
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred while sending OTP.',
+            ], 500);
         }
-
-        $astrologer = $user->astrologer;
-
-        if (in_array($phone, ['7458086472', '9651017054'])) {
-            $otp = '1234';
-        } else {
-            $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        }
-        
-        $astrologer->otp = $otp;
-        $astrologer->otp_expires_at = Carbon::now()->addMinutes(10);
-        $astrologer->otp_verified_at = null;
-        $astrologer->save();
-
-        $smsService = new ExotelSmsService();
-
-        $smsResponse = $smsService->sendOtp(
-            $phone,
-            $otp
-        );
-
-        NotificationHelper::send(
-            $user->id,
-            'OTP generated',
-            'A new OTP code has been created for astrologer login.',
-            ['phone' => $phone]
-        );
-
-        // For development/testing (no external SMS), return OTP in response.
-        return response()->json([
-            'status' => 'success',
-            'message' => 'OTP generated and saved.',
-            'data' => [
-                'phone' => $phone,
-                'otp' => $otp,
-                'expires_at' => $astrologer->otp_expires_at,
-            ],
-        ], 200);
     }
 
     /**
@@ -297,60 +332,96 @@ class AstrologerAuthController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
-        $phone = $request->input('phone');
-        $otp = $request->input('otp');
+        try {
+            DB::beginTransaction();
 
-        $user = User::where('phone', $phone)->where('user_type', 'astrologer')->first();
+            $phone = $request->input('phone');
+            $otp = $request->input('otp');
 
-        if (!$user || !$user->astrologer) {
-            return response()->json(['status' => 'error', 'message' => 'Astrologer with this phone not found.'], 404);
-        }
+            // 1. Strict Role Boundary Check
+            $existingConsumer = User::where('phone', $phone)
+                ->where('user_type', 'user')
+                ->first();
 
-        $astrologer = $user->astrologer;
-
-        $isTestUser = in_array($phone, ['7458086472', '9651017054']);
-
-        if (!($isTestUser && $otp === '1234')) {
-            if (!$astrologer->otp || !$astrologer->otp_expires_at || Carbon::now()->gt($astrologer->otp_expires_at)) {
-                return response()->json(['status' => 'error', 'message' => 'OTP expired or not generated.'], 422);
+            if ($existingConsumer) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'This phone number is registered as a User account. Please log in using the Astology User App.',
+                    'error_code' => 'ROLE_MISMATCH_USER'
+                ], 403);
             }
 
-            if ($astrologer->otp !== $otp) {
-                return response()->json(['status' => 'error', 'message' => 'Invalid OTP.'], 422);
+            $user = User::where('phone', $phone)
+                ->where('user_type', 'astrologer')
+                ->first();
+
+            if (!$user || !$user->astrologer) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Astrologer with this phone not found.',
+                    'error_code' => 'ASTROLOGER_NOT_FOUND'
+                ], 404);
             }
+
+            $astrologer = Astrologer::where('id', $user->astrologer->id)
+                ->lockForUpdate()
+                ->first();
+
+            $isTestUser = in_array($phone, ['7458086472', '9651017054']);
+
+            if (!($isTestUser && $otp === '1234')) {
+                if (!$astrologer->otp || !$astrologer->otp_expires_at || Carbon::now()->gt($astrologer->otp_expires_at)) {
+                    DB::rollBack();
+                    return response()->json(['status' => 'error', 'message' => 'OTP expired or not generated.'], 422);
+                }
+
+                if ($astrologer->otp !== $otp) {
+                    DB::rollBack();
+                    return response()->json(['status' => 'error', 'message' => 'Invalid OTP.'], 422);
+                }
+            }
+
+            // OTP verified
+            $astrologer->otp = null;
+            $astrologer->otp_expires_at = null;
+            $astrologer->otp_verified_at = Carbon::now();
+            $astrologer->save();
+
+            // Revoke all existing tokens for single device constraint
+            $user->tokens()->delete();
+
+            // Issue Sanctum token scoped specifically for 'role:astrologer'
+            $token = $user->createToken('astrologer_token', ['role:astrologer'])->plainTextToken;
+
+            DB::commit();
+
+            NotificationHelper::send(
+                $user->id,
+                'OTP verified',
+                'You have successfully verified your OTP and are now logged in as astrologer.',
+                ['phone' => $phone]
+            );
+
+            $user->load('astrologer');
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'OTP verified.',
+                'token' => $token,
+                'token_type' => 'Bearer',
+                'data' => [
+                    'user' => $user,
+                    'astrologer' => $astrologer,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Astrologer verifyOtp error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to verify OTP.'], 500);
         }
-
-        // OTP verified
-        $astrologer->otp = null;
-        $astrologer->otp_expires_at = null;
-        $astrologer->otp_verified_at = Carbon::now();
-        $astrologer->save();
-
-        NotificationHelper::send(
-            $user->id,
-            'OTP verified',
-            'You have successfully verified your OTP and are now logged in as astrologer.',
-            ['phone' => $phone]
-        );
-
-        // Revoke all existing tokens for single device constraint
-        $user->tokens()->delete();
-
-        // Issue Sanctum token
-        $token = $user->createToken('auth_token')->plainTextToken;
-
-        $user->load('astrologer');
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'OTP verified.',
-            'token' => $token,
-            'token_type' => 'Bearer',
-            'data' => [
-                'user' => $user,
-                'astrologer' => $astrologer,
-            ],
-        ], 200);
     }
 
     /**

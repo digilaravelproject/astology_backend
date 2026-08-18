@@ -64,7 +64,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/training-videos/{id}',  [TrainingVideoController::class, 'show'])->middleware('throttle:general');
 
         // ── Authenticated Astrologer Endpoints ────────────────────────────
-        Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
+        Route::middleware(['auth:sanctum', 'astrologer', 'throttle:tiered'])->group(function () {
 
             // Performance & Orders
             Route::get('/orders',       [AstrologerController::class, 'getOrders']);
@@ -118,7 +118,7 @@ Route::prefix('v1')->group(function () {
             });
 
             // Wallet & Financial Earnings
-            Route::prefix('wallet')->middleware('astrologer')->group(function () {
+            Route::prefix('wallet')->group(function () {
                 Route::get('/',                             [AstrologerWalletController::class, 'show']);
                 Route::get('/earnings',                     [AstrologerWalletController::class, 'earnings']);
                 Route::get('/withdrawals',                  [AstrologerWalletController::class, 'withdrawals']);
@@ -218,7 +218,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/plans/{plan}',         [PlanController::class, 'show'])->middleware('throttle:general');
 
         // ── Authenticated User Features ───────────────────────────────────
-        Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
+        Route::middleware(['auth:sanctum', 'user', 'throttle:tiered'])->group(function () {
 
             // Profile & Social Follows
             Route::put('/profileInAppUpdate',               [UserAuthController::class, 'updateInAppProfile']);
