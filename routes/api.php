@@ -71,15 +71,14 @@ Route::prefix('v1')->group(function () {
             Route::get('/performance',  [AstrologerController::class, 'getPerformance']);
 
             // Profile & Settings
-            Route::put('/profile',              [AstrologerAuthController::class, 'updateProfile']);
+            Route::match(['put', 'post'], '/profile',               [AstrologerAuthController::class, 'updateProfile']);
             Route::get('/home',                 [AstrologerAuthController::class, 'getHomeStatus']);
             Route::put('/home',                 [AstrologerAuthController::class, 'updateHomeStatus']);
             Route::get('/home-settings',        [AstrologerAuthController::class, 'getHomeSettings']);
             Route::put('/home-settings',        [AstrologerAuthController::class, 'updateHomeSettings']);
-            Route::put('/profile/skills',       [AstrologerAuthController::class, 'updateSkill']);
-            Route::put('/profile/other-details',[AstrologerAuthController::class, 'updateOtherDetails']);
-            Route::post('/profile/photo',       [AstrologerAuthController::class, 'updateProfilePhoto']);
-            Route::put('/profile/photo',        [AstrologerAuthController::class, 'updateProfilePhoto']);
+            Route::match(['put', 'post'], '/profile/skills',        [AstrologerAuthController::class, 'updateSkill']);
+            Route::match(['put', 'post'], '/profile/other-details', [AstrologerAuthController::class, 'updateOtherDetails']);
+            Route::match(['put', 'post'], '/profile/photo',         [AstrologerAuthController::class, 'updateProfilePhoto']);
             Route::post('/toggle-online',       [AstrologerAuthController::class, 'toggleOnlineStatus']);
 
             // Availability & Sleep Hours
@@ -199,8 +198,8 @@ Route::prefix('v1')->group(function () {
         Route::post('/send-otp',        [UserAuthController::class, 'sendOtp'])->middleware('throttle:otp');
         Route::post('/verify-otp',      [UserAuthController::class, 'verifyOtp'])->middleware('throttle:otp');
         Route::post('/resend-otp',      [UserAuthController::class, 'resendOtp'])->middleware('throttle:otp');
-        Route::get('/profile/{userId}', [UserAuthController::class, 'getProfile'])->middleware('throttle:general');
-        Route::put('/profile/{userId}', [UserAuthController::class, 'updateProfile'])->middleware('throttle:general');
+        Route::get('/profile/{userId}', [UserAuthController::class, 'getProfile'])->whereNumber('userId')->middleware('throttle:general');
+        Route::match(['put', 'post'], '/profile/{userId}', [UserAuthController::class, 'updateProfile'])->whereNumber('userId')->middleware('throttle:general');
 
         // ── Public Content Discovery ─────────────────────────────────────
         Route::get('/founders-words',       [FoundersWordController::class, 'index'])->middleware('throttle:general');
@@ -221,8 +220,8 @@ Route::prefix('v1')->group(function () {
         Route::middleware(['auth:sanctum', 'user', 'throttle:tiered'])->group(function () {
 
             // Profile & Social Follows
-            Route::put('/profileInAppUpdate',               [UserAuthController::class, 'updateInAppProfile']);
-            Route::post('/profile/photo',                   [UserAuthController::class, 'updateProfilePhoto']);
+            Route::match(['put', 'post'], '/profileInAppUpdate', [UserAuthController::class, 'updateInAppProfile']);
+            Route::match(['put', 'post'], '/profile/photo',      [UserAuthController::class, 'updateProfilePhoto']);
             Route::post('/astrologers/{id}/follow',         [UserAuthController::class, 'toggleFollowAstrologer']);
             Route::post('/astrologers/{id}/block',          [UserAuthController::class, 'blockAstrologer']);
             Route::post('/astrologers/{id}/report',         [UserAuthController::class, 'reportAstrologer']);

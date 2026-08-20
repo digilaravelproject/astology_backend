@@ -15,6 +15,34 @@ class UpdateAstrologerSkillRequest extends FormRequest
         return $user && $user->user_type === 'astrologer';
     }
 
+    protected function prepareForValidation(): void
+    {
+        $mergeData = [];
+
+        $arrayFields = ['primary_skills', 'all_skills', 'languages'];
+        foreach ($arrayFields as $field) {
+            if ($this->has($field) && !is_null($this->input($field))) {
+                $val = $this->input($field);
+                if (is_string($val)) {
+                    $decoded = json_decode($val, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                        $val = $decoded;
+                    } else {
+                        $val = array_map('trim', explode(',', $val));
+                    }
+                }
+                if (is_array($val)) {
+                    $val = array_values(array_filter($val, fn($item) => !is_null($item) && trim((string)$item) !== ''));
+                }
+                $mergeData[$field] = $val;
+            }
+        }
+
+        if (!empty($mergeData)) {
+            $this->merge($mergeData);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -23,16 +51,16 @@ class UpdateAstrologerSkillRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category' => 'sometimes|string|max:255',
-            'primary_skills' => 'sometimes|array',
+            'category' => 'sometimes|nullable|string|max:255',
+            'primary_skills' => 'sometimes|nullable|array',
             'primary_skills.*' => 'string|max:100',
-            'all_skills' => 'sometimes|array',
+            'all_skills' => 'sometimes|nullable|array',
             'all_skills.*' => 'string|max:100',
-            'languages' => 'sometimes|array',
+            'languages' => 'sometimes|nullable|array',
             'languages.*' => 'string|max:50',
-            'experience_years' => 'sometimes|integer|min:0|max:100',
-            'daily_contribution_hours' => 'sometimes|integer|min:0|max:24',
-            'heard_about' => 'sometimes|string|max:255',
+            'experience_years' => 'sometimes|nullable|integer|min:0|max:100',
+            'daily_contribution_hours' => 'sometimes|nullable|integer|min:0|max:24',
+            'heard_about' => 'sometimes|nullable|string|max:255',
         ];
     }
 }

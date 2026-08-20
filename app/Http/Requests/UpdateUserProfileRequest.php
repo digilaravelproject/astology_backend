@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use Carbon\Carbon;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,10 +21,68 @@ class UpdateUserProfileRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        if ($this->has('gender')) {
-            $this->merge([
-                'gender' => strtolower((string) $this->input('gender')),
-            ]);
+        $mergeData = [];
+
+        // Name / Full name fallback
+        if (!$this->has('name') && $this->has('full_name')) {
+            $mergeData['name'] = $this->input('full_name');
+        }
+
+        // Gender normalization
+        if ($this->has('gender') && !is_null($this->input('gender'))) {
+            $gender = strtolower(trim((string) $this->input('gender')));
+            $mergeData['gender'] = $gender !== '' ? $gender : null;
+        }
+
+        // Languages parsing (handles stringified array, comma-separated, or JSON)
+        if ($this->has('languages') && !is_null($this->input('languages'))) {
+            $languages = $this->input('languages');
+            if (is_string($languages)) {
+                $decoded = json_decode($languages, true);
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $languages = $decoded;
+                } else {
+                    $languages = array_map('trim', explode(',', $languages));
+                }
+            }
+            if (is_array($languages)) {
+                $languages = array_values(array_filter($languages, fn($l) => !is_null($l) && trim((string)$l) !== ''));
+            }
+            $mergeData['languages'] = $languages;
+        }
+
+        // Time of birth normalization to H:i
+        if ($this->has('time_of_birth') && !is_null($this->input('time_of_birth'))) {
+            $timeInput = trim((string) $this->input('time_of_birth'));
+            if ($timeInput !== '') {
+                try {
+                    $parsedTime = Carbon::parse($timeInput)->format('H:i');
+                    $mergeData['time_of_birth'] = $parsedTime;
+                } catch (\Throwable $e) {
+                    // Let validation rule catch format error if unparseable
+                }
+            } else {
+                $mergeData['time_of_birth'] = null;
+            }
+        }
+
+        // Date of birth normalization to Y-m-d
+        if ($this->has('date_of_birth') && !is_null($this->input('date_of_birth'))) {
+            $dobInput = trim((string) $this->input('date_of_birth'));
+            if ($dobInput !== '') {
+                try {
+                    $parsedDate = Carbon::parse($dobInput)->format('Y-m-d');
+                    $mergeData['date_of_birth'] = $parsedDate;
+                } catch (\Throwable $e) {
+                    // Let validation rule catch format error if unparseable
+                }
+            } else {
+                $mergeData['date_of_birth'] = null;
+            }
+        }
+
+        if (!empty($mergeData)) {
+            $this->merge($mergeData);
         }
     }
 
@@ -33,21 +92,23 @@ class UpdateUserProfileRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255'],
-            'gender' => ['required', Rule::in(['male', 'female', 'other'])],
-            'date_of_birth' => ['required', 'date', 'before:today'],
-            'time_of_birth' => ['required', 'date_format:H:i'],
-            'place_of_birth' => ['required', 'string', 'max:255'],
-            'latitude' => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['nullable', 'numeric', 'between:-180,180'],
-            'relationship_status' => ['nullable', 'string', 'max:255'],
-            'occupation' => ['nullable', 'string', 'max:255'],
-            'languages' => ['required', 'array', 'min:1'],
-            'languages.*' => [
-                'required',
-                'string',
-                Rule::in('English', 'Hindi', 'Tamil', 'Bengali', 'Telugu', 'Marathi'),
-            ],
+            'name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'full_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'email' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'phone' => ['sometimes', 'nullable', 'regex:/^[0-9]{10}$/'],
+            'gender' => ['sometimes', 'nullable', Rule::in(['male', 'female', 'other'])],
+            'date_of_birth' => ['sometimes', 'nullable', 'date', 'before:today'],
+            'time_of_birth' => ['sometimes', 'nullable', 'date_format:H:i'],
+            'place_of_birth' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'city' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'country' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
+            'relationship_status' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'occupation' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'languages' => ['sometimes', 'nullable', 'array'],
+            'languages.*' => ['string', 'max:50'],
+            'profile_photo' => ['sometimes', 'nullable', 'image', 'mimes:jpeg,png,jpg,gif,webp', 'max:5120'],
         ];
     }
 
@@ -57,36 +118,18 @@ class UpdateUserProfileRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'name.required' => 'Name is required.',
             'name.string' => 'Name must be a string.',
             'name.max' => 'Name cannot exceed 255 characters.',
-
-            'gender.required' => 'Gender is required. Please select male or female.',
-            'gender.in' => 'Gender must be either male or female.',
-
-            'date_of_birth.required' => 'Date of birth is required.',
+            'gender.in' => 'Gender must be male, female, or other.',
             'date_of_birth.date' => 'Date of birth must be a valid date (YYYY-MM-DD).',
             'date_of_birth.before' => 'Date of birth must be in the past.',
-
-            'time_of_birth.required' => 'Time of birth is required.',
             'time_of_birth.date_format' => 'Time of birth must be in HH:MM format (e.g., 14:30).',
-
-            'place_of_birth.required' => 'Place of birth is required.',
             'place_of_birth.string' => 'Place of birth must be a string.',
-            'place_of_birth.max' => 'Place of birth cannot exceed 255 characters.',
-
             'latitude.numeric' => 'Latitude must be a numeric value.',
             'latitude.between' => 'Latitude must be between -90 and 90 degrees.',
-
             'longitude.numeric' => 'Longitude must be a numeric value.',
             'longitude.between' => 'Longitude must be between -180 and 180 degrees.',
-
-            'languages.required' => 'Languages are required. Select at least one language.',
-            'languages.array' => 'Languages must be an array.',
-            'languages.min' => 'Please select at least one language.',
-            'languages.*.required' => 'Each language must be provided.',
-            'languages.*.string' => 'Each language must be a string.',
-            'languages.*.in' => 'Invalid language. Allowed languages are: English, Hindi, Tamil, Bengali, Telugu, Marathi.',
+            'languages.array' => 'Languages must be an array or list.',
         ];
     }
 }

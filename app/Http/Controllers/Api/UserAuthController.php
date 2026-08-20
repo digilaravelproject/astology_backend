@@ -197,9 +197,6 @@ class UserAuthController extends Controller
                 'You have successfully verified your OTP and are now logged in.',
                 ['phone' => $phone]
             );
-            
-            // Check matrimony profile exists
-            $user->isMatrimony = MatrimonyProfile::where('user_id', $user->id)->exists();
 
             return response()->json([
                 'status' => 'success',
@@ -248,9 +245,6 @@ class UserAuthController extends Controller
                     'message' => 'This is not a regular user.',
                 ], 404);
             }
-
-            // ✅ Check if matrimony profile exists
-            $user->isMatrimony = MatrimonyProfile::where('user_id', $userId)->exists();
 
             return response()->json([
                 'status' => 'success',
@@ -301,20 +295,37 @@ class UserAuthController extends Controller
 
             DB::beginTransaction();
 
-            // Update user profile fields
-            $user->update(array_filter([
-                'name' => $request->input('name'),
-                'gender' => $request->input('gender'),
-                'date_of_birth' => $request->input('date_of_birth'),
-                'time_of_birth' => $request->input('time_of_birth'),
-                'place_of_birth' => $request->input('place_of_birth'),
-                'latitude' => $request->input('latitude'),
-                'longitude' => $request->input('longitude'),
-                'relationship_status' => $request->input('relationship_status'),
-                'occupation' => $request->input('occupation'),
-                'languages' => $request->input('languages'),
-                'profile_completed' => true,
-            ], fn($val) => !is_null($val)));
+            $updateData = [];
+            $fields = [
+                'name', 'phone', 'email', 'gender', 'date_of_birth',
+                'time_of_birth', 'place_of_birth', 'city', 'country',
+                'latitude', 'longitude', 'relationship_status',
+                'occupation', 'languages'
+            ];
+
+            foreach ($fields as $field) {
+                if ($request->has($field)) {
+                    $val = $request->input($field);
+                    $updateData[$field] = $val !== '' ? $val : null;
+                }
+            }
+
+            // Handle optional profile_photo file upload
+            if ($request->hasFile('profile_photo')) {
+                $file = $request->file('profile_photo');
+                $filename = time() . '_' . $user->id . '_profile_photo.' . $file->getClientOriginalExtension();
+                $path = 'users/' . $user->id . '/profile_photo';
+
+                if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
+                    Storage::disk('public')->delete($user->profile_photo);
+                }
+
+                $updateData['profile_photo'] = Storage::disk('public')->putFileAs($path, $file, $filename);
+            }
+
+            $updateData['profile_completed'] = true;
+
+            $user->update($updateData);
 
             DB::commit();
 
@@ -329,7 +340,7 @@ class UserAuthController extends Controller
                 'status' => 'success',
                 'message' => 'Profile updated successfully.',
                 'data' => [
-                    'user' => $user,
+                    'user' => $user->fresh(),
                 ],
             ], 200);
 
@@ -339,7 +350,7 @@ class UserAuthController extends Controller
 
             return response()->json([
                 'status' => 'error',
-                'message' => 'An error occurred while updating profile.',
+                'message' => 'An error occurred while updating profile: ' . $e->getMessage(),
             ], 500);
         }
     }
@@ -390,7 +401,7 @@ class UserAuthController extends Controller
             'status' => 'success',
             'message' => 'Profile photo updated successfully.',
             'data' => [
-                'user' => $user,
+                'user' => $user->fresh(),
             ],
         ], 200);
     }
@@ -414,20 +425,37 @@ class UserAuthController extends Controller
         DB::beginTransaction();
 
         try {
-            $user->update(array_filter([
-                'name' => $request->input('name'),
-                'phone' => $request->input('phone'),
-                'gender' => $request->input('gender'),
-                'date_of_birth' => $request->input('date_of_birth'),
-                'time_of_birth' => $request->input('time_of_birth'),
-                'place_of_birth' => $request->input('place_of_birth'),
-                'latitude' => $request->input('latitude'),
-                'longitude' => $request->input('longitude'),
-                'relationship_status' => $request->input('relationship_status'),
-                'occupation' => $request->input('occupation'),
-                'languages' => $request->input('languages'),
-                'profile_completed' => true,
-            ], fn($val) => !is_null($val)));
+            $updateData = [];
+            $fields = [
+                'name', 'phone', 'email', 'gender', 'date_of_birth',
+                'time_of_birth', 'place_of_birth', 'city', 'country',
+                'latitude', 'longitude', 'relationship_status',
+                'occupation', 'languages'
+            ];
+
+            foreach ($fields as $field) {
+                if ($request->has($field)) {
+                    $val = $request->input($field);
+                    $updateData[$field] = $val !== '' ? $val : null;
+                }
+            }
+
+            // Handle optional profile_photo file upload
+            if ($request->hasFile('profile_photo')) {
+                $file = $request->file('profile_photo');
+                $filename = time() . '_' . $user->id . '_profile_photo.' . $file->getClientOriginalExtension();
+                $path = 'users/' . $user->id . '/profile_photo';
+
+                if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
+                    Storage::disk('public')->delete($user->profile_photo);
+                }
+
+                $updateData['profile_photo'] = Storage::disk('public')->putFileAs($path, $file, $filename);
+            }
+
+            $updateData['profile_completed'] = true;
+
+            $user->update($updateData);
 
             DB::commit();
 
@@ -442,7 +470,7 @@ class UserAuthController extends Controller
                 'status' => 'success',
                 'message' => 'Profile updated successfully.',
                 'data' => [
-                    'user' => $user,
+                    'user' => $user->fresh(),
                 ],
             ], 200);
         } catch (\Exception $e) {
@@ -451,7 +479,7 @@ class UserAuthController extends Controller
 
             return response()->json([
                 'status' => 'error',
-                'message' => 'An error occurred while updating the profile.',
+                'message' => 'An error occurred while updating the profile: ' . $e->getMessage(),
             ], 500);
         }
     }

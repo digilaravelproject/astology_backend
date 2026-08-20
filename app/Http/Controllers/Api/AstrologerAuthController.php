@@ -546,7 +546,7 @@ class AstrologerAuthController extends Controller
     {
         $user = $request->user();
 
-        if (!$user->astrologer) {
+        if (!$user || !$user->astrologer) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Astrologer profile not found.',
@@ -559,25 +559,61 @@ class AstrologerAuthController extends Controller
         try {
             $validated = $request->validated();
 
-            // Update user fields
-            $user->fill([
-                'name' => $validated['full_name'] ?? $user->name,
-                'email' => $validated['email'] ?? $user->email,
-                'phone' => $validated['phone'] ?? $user->phone,
-                'city' => $validated['city'] ?? $user->city,
-                'country' => $validated['country'] ?? $user->country,
-            ]);
-            $user->save();
-
-            // Update astrologer fields
-            if (isset($validated['id_proof_number'])) {
-                $astrologer->id_proof_number = $validated['id_proof_number'];
+            // 1. Update user fields
+            $userFields = [];
+            if ($request->has('full_name') || $request->has('name')) {
+                $userFields['name'] = $request->input('full_name') ?? $request->input('name') ?? $user->name;
             }
-            if (isset($validated['date_of_birth'])) {
-                $astrologer->date_of_birth = $validated['date_of_birth'];
+            if ($request->has('email')) {
+                $email = $request->input('email');
+                $userFields['email'] = $email !== '' ? $email : null;
+            }
+            if ($request->has('phone')) {
+                $phone = $request->input('phone');
+                if ($phone !== '' && !is_null($phone)) {
+                    $userFields['phone'] = $phone;
+                }
+            }
+            if ($request->has('city')) {
+                $userFields['city'] = $request->input('city') !== '' ? $request->input('city') : null;
+            }
+            if ($request->has('country')) {
+                $userFields['country'] = $request->input('country') !== '' ? $request->input('country') : null;
             }
 
-            // Handle optional file uploads
+            if (!empty($userFields)) {
+                $user->update($userFields);
+            }
+
+            // 2. Update astrologer base fields
+            $astrologerFields = [];
+            if ($request->has('bio')) {
+                $astrologerFields['bio'] = $request->input('bio') !== '' ? $request->input('bio') : null;
+            }
+            if ($request->has('years_of_experience') || $request->has('experience_years')) {
+                $exp = $request->input('years_of_experience') ?? $request->input('experience_years');
+                $astrologerFields['years_of_experience'] = is_numeric($exp) ? (int)$exp : $astrologer->years_of_experience;
+            }
+            if ($request->has('id_proof_number')) {
+                $astrologerFields['id_proof_number'] = $request->input('id_proof_number') !== '' ? $request->input('id_proof_number') : null;
+            }
+            if ($request->has('date_of_birth')) {
+                $astrologerFields['date_of_birth'] = $request->input('date_of_birth') !== '' ? $request->input('date_of_birth') : null;
+            }
+            if ($request->has('areas_of_expertise') || $request->has('primary_skills')) {
+                $skills = $request->input('areas_of_expertise') ?? $request->input('primary_skills');
+                if (is_array($skills)) {
+                    $astrologerFields['areas_of_expertise'] = $skills;
+                }
+            }
+            if ($request->has('languages')) {
+                $langs = $request->input('languages');
+                if (is_array($langs)) {
+                    $astrologerFields['languages'] = $langs;
+                }
+            }
+
+            // 3. Handle optional file uploads (profile_photo, id_proof, certificate)
             $fileFields = ['profile_photo', 'id_proof', 'certificate'];
             foreach ($fileFields as $field) {
                 if ($request->hasFile($field)) {
@@ -590,14 +626,68 @@ class AstrologerAuthController extends Controller
                         Storage::disk('public')->delete($astrologer->{$field});
                     }
 
-                    $astrologer->{$field} = Storage::disk('public')->putFileAs($path, $file, $filename);
+                    $astrologerFields[$field] = Storage::disk('public')->putFileAs($path, $file, $filename);
                 }
             }
 
-            $astrologer->save();
+            if (!empty($astrologerFields)) {
+                $astrologer->update($astrologerFields);
+            }
+
+            // 4. Synchronize AstrologerOtherDetail
+            $otherDetailFields = [];
+            if ($request->has('gender')) {
+                $otherDetailFields['gender'] = $request->input('gender') !== '' ? $request->input('gender') : null;
+            }
+            if ($request->has('current_address')) {
+                $otherDetailFields['current_address'] = $request->input('current_address') !== '' ? $request->input('current_address') : null;
+            }
+            if ($request->has('bio')) {
+                $otherDetailFields['bio'] = $request->input('bio') !== '' ? $request->input('bio') : null;
+            }
+            if ($request->has('date_of_birth')) {
+                $otherDetailFields['date_of_birth'] = $request->input('date_of_birth') !== '' ? $request->input('date_of_birth') : null;
+            }
+            if ($request->has('website_link')) {
+                $otherDetailFields['website_link'] = $request->input('website_link') !== '' ? $request->input('website_link') : null;
+            }
+            if ($request->has('instagram_username')) {
+                $otherDetailFields['instagram_username'] = $request->input('instagram_username') !== '' ? $request->input('instagram_username') : null;
+            }
+
+            if (!empty($otherDetailFields)) {
+                AstrologerOtherDetail::updateOrCreate(
+                    ['astrologer_id' => $astrologer->id],
+                    $otherDetailFields
+                );
+            }
+
+            // 5. Synchronize AstrologerSkill
+            $skillFields = [];
+            if ($request->has('primary_skills') || $request->has('areas_of_expertise')) {
+                $skillFields['primary_skills'] = $request->input('primary_skills') ?? $request->input('areas_of_expertise');
+            }
+            if ($request->has('all_skills')) {
+                $skillFields['all_skills'] = $request->input('all_skills');
+            }
+            if ($request->has('languages')) {
+                $skillFields['languages'] = $request->input('languages');
+            }
+            if ($request->has('experience_years') || $request->has('years_of_experience')) {
+                $exp = $request->input('experience_years') ?? $request->input('years_of_experience');
+                $skillFields['experience_years'] = is_numeric($exp) ? (int)$exp : null;
+            }
+
+            if (!empty($skillFields)) {
+                AstrologerSkill::updateOrCreate(
+                    ['astrologer_id' => $astrologer->id],
+                    $skillFields
+                );
+            }
+
             DB::commit();
 
-            $user->load('astrologer');
+            $user->load(['astrologer.skill', 'astrologer.otherDetails']);
 
             NotificationHelper::send(
                 $user->id,
@@ -611,7 +701,11 @@ class AstrologerAuthController extends Controller
                 'message' => 'Profile updated successfully.',
                 'data' => [
                     'user' => $user,
-                    'astrologer' => $astrologer,
+                    'astrologer' => $user->astrologer,
+                    'skill' => $user->astrologer->skill ?? null,
+                    'other_details' => $user->astrologer->otherDetails ?? null,
+                    'website_link' => optional($user->astrologer->otherDetails)->website_link,
+                    'instagram_username' => optional($user->astrologer->otherDetails)->instagram_username,
                 ],
             ], 200);
 
@@ -621,7 +715,7 @@ class AstrologerAuthController extends Controller
 
             return response()->json([
                 'status' => 'error',
-                'message' => 'An error occurred while updating the profile.',
+                'message' => 'An error occurred while updating the profile: ' . $e->getMessage(),
             ], 500);
         }
     }

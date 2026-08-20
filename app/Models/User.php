@@ -72,7 +72,7 @@ class User extends Authenticatable
             'otp_expires_at' => 'datetime',
             'otp_verified_at' => 'datetime',
             'date_of_birth' => 'date',
-            'time_of_birth' => 'datetime:H:i',
+            'time_of_birth' => 'string',
             'latitude' => 'float',
             'longitude' => 'float',
             'languages' => 'array',
@@ -86,7 +86,12 @@ class User extends Authenticatable
         ];
     }
 
-    protected $appends = [];
+    protected $appends = ['isMatrimony'];
+
+    public function getIsMatrimonyAttribute(): bool
+    {
+        return \App\Models\MatrimonyProfile::where('user_id', $this->id)->exists();
+    }
 
     public function getProfilePhotoUrlAttribute(): ?string
     {

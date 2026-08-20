@@ -272,6 +272,11 @@ class AstrologerDefaultMessagesAndUserDetailsTest extends TestCase
     {
         /** @var \App\Models\User $astrologer */
         $astrologer = User::factory()->create(['user_type' => 'astrologer']);
+        \App\Models\Astrologer::create([
+            'user_id' => $astrologer->id,
+            'years_of_experience' => 5,
+            'chat_rate_per_minute' => 10,
+        ]);
 
         // 1. Create message template
         $response = $this->actingAs($astrologer)->postJson('/api/v1/astrologer/default-messages', [
