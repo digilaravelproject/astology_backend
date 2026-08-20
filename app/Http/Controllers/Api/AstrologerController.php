@@ -22,9 +22,9 @@ class AstrologerController extends Controller
     {
         try {
             $filters = $request->only([
-                'type', 'min_price', 'max_price', 'skills', 'language', 'min_rating', 'is_online', 'sort_by', 'search_query'
+                'type', 'min_price', 'max_price', 'skills', 'language', 'min_rating', 'is_online', 'sort_by', 'search_query', 'include_blocked'
             ]);
-            $currentUser = Auth::guard('sanctum')->user();
+            $currentUser = Auth::guard('sanctum')->user() ?? $request->user();
 
             $data = $this->astrologerService->listAstrologers($filters, $currentUser);
 

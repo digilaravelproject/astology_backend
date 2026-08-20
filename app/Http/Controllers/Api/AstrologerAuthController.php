@@ -1948,4 +1948,91 @@ class AstrologerAuthController extends Controller
             'data' => ['billing_address' => $billingAddress]
         ], $statusCode);
     }
+
+    /**
+     * Astrologer blocks a user.
+     */
+    public function blockUser(Request $request, $userId): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || $user->user_type !== 'astrologer') {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized or not an astrologer.'], 403);
+        }
+
+        $targetUser = User::find($userId);
+        if (!$targetUser) {
+            return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
+        }
+
+        $reason = $request->input('reason');
+        /** @var \App\Services\BlockService $blockService */
+        $blockService = app(\App\Services\BlockService::class);
+        $userBlock = $blockService->block($user, $targetUser, $reason);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'User blocked successfully.',
+            'data' => [
+                'user_id' => $targetUser->id,
+                'is_blocked' => true,
+                'blocked_at' => $userBlock->created_at,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Astrologer unblocks a user.
+     */
+    public function unblockUser(Request $request, $userId): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || $user->user_type !== 'astrologer') {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized or not an astrologer.'], 403);
+        }
+
+        $targetUser = User::find($userId);
+        if (!$targetUser) {
+            return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
+        }
+
+        /** @var \App\Services\BlockService $blockService */
+        $blockService = app(\App\Services\BlockService::class);
+        $blockService->unblock($user, $targetUser);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'User unblocked successfully.',
+            'data' => [
+                'user_id' => $targetUser->id,
+                'is_blocked' => false,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Get list of users blocked by this astrologer.
+     */
+    public function getBlockedUsers(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || $user->user_type !== 'astrologer') {
+            return response()->json(['status' => 'error', 'message' => 'Unauthorized or not an astrologer.'], 403);
+        }
+
+        $perPage = (int) $request->input('per_page', 15);
+        /** @var \App\Services\BlockService $blockService */
+        $blockService = app(\App\Services\BlockService::class);
+        $paginated = $blockService->getBlockedUsersForAstrologer($user, $perPage);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'current_page' => $paginated->currentPage(),
+                'data' => $paginated->items(),
+                'total' => $paginated->total(),
+                'per_page' => $paginated->perPage(),
+                'last_page' => $paginated->lastPage(),
+            ],
+        ], 200);
+    }
 }

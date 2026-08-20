@@ -572,7 +572,7 @@ class UserAuthController extends Controller
     }
 
     /**
-     * Block an astrologer (will stop follow and record blocked status).
+     * Block an astrologer (stops follow and records blocked status).
      */
     public function blockAstrologer(Request $request, $astrologerId): JsonResponse
     {
@@ -585,46 +585,108 @@ class UserAuthController extends Controller
             ], 404);
         }
 
-        $astrologer = Astrologer::find($astrologerId);
-        if (!$astrologer) {
+        // Support both astrologers.id and astrologers.user_id
+        $astrologer = Astrologer::with('user')->find($astrologerId)
+            ?? Astrologer::with('user')->where('user_id', $astrologerId)->first();
+
+        if (!$astrologer || !$astrologer->user) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Astrologer not found.',
             ], 404);
         }
 
-        $community = AstrologerCommunity::firstOrNew([
-            'astrologer_id' => $astrologer->id,
-            'user_id' => $user->id,
-        ]);
+        $reason = $request->input('reason', $request->input('report_reason'));
 
-        $community->is_liked = false;
-        $community->liked_at = null;
-        $community->is_blocked = true;
-        $community->blocked_at = Carbon::now();
-        $community->save();
+        /** @var \App\Services\BlockService $blockService */
+        $blockService = app(\App\Services\BlockService::class);
+        $userBlock = $blockService->block($user, $astrologer->user, $reason);
 
         NotificationHelper::send(
             $user->id,
             'User blocked',
-            "You have blocked user {$astrologer->user->name}.",
+            "You have blocked astrologer {$astrologer->user->name}.",
             ['astrologer_id' => $astrologer->id]
-        );
-
-        NotificationHelper::send(
-            $astrologer->user->id,
-            'You were blocked',
-            "User {$user->name} has blocked you.",
-            ['user_id' => $user->id]
         );
 
         return response()->json([
             'status' => 'success',
-            'message' => 'Blocked.',
+            'message' => 'Astrologer blocked successfully.',
             'data' => [
                 'astrologer_id' => $astrologer->id,
+                'astrologer_user_id' => $astrologer->user->id,
                 'is_blocked' => true,
-                'blocked_at' => $community->blocked_at,
+                'blocked_at' => $userBlock->created_at,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Unblock a previously blocked astrologer.
+     */
+    public function unblockAstrologer(Request $request, $astrologerId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authenticated user not found or not a regular user.',
+            ], 404);
+        }
+
+        $astrologer = Astrologer::with('user')->find($astrologerId)
+            ?? Astrologer::with('user')->where('user_id', $astrologerId)->first();
+
+        if (!$astrologer || !$astrologer->user) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Astrologer not found.',
+            ], 404);
+        }
+
+        /** @var \App\Services\BlockService $blockService */
+        $blockService = app(\App\Services\BlockService::class);
+        $unblocked = $blockService->unblock($user, $astrologer->user);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Astrologer unblocked successfully.',
+            'data' => [
+                'astrologer_id' => $astrologer->id,
+                'astrologer_user_id' => $astrologer->user->id,
+                'is_blocked' => false,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Get list of astrologers blocked by the authenticated user.
+     */
+    public function getBlockedAstrologers(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Authenticated user not found or not a regular user.',
+            ], 404);
+        }
+
+        $perPage = (int) $request->input('per_page', 15);
+        /** @var \App\Services\BlockService $blockService */
+        $blockService = app(\App\Services\BlockService::class);
+        $paginated = $blockService->getBlockedAstrologersForUser($user, $perPage);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => [
+                'current_page' => $paginated->currentPage(),
+                'data' => $paginated->items(),
+                'total' => $paginated->total(),
+                'per_page' => $paginated->perPage(),
+                'last_page' => $paginated->lastPage(),
             ],
         ], 200);
     }

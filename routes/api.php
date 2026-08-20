@@ -88,10 +88,13 @@ Route::prefix('v1')->group(function () {
             Route::get('/sleep-hours',                      [AstrologerAuthController::class, 'getSleepHours']);
             Route::post('/sleep-hours',                     [AstrologerAuthController::class, 'setSleepHours']);
 
-            // Community & Followers
+            // Community & Followers & Blocks
             Route::get('/community/followers',                     [AstrologerAuthController::class, 'getFollowers']);
             Route::post('/community/followers/{userId}/toggle-like', [AstrologerAuthController::class, 'toggleFollowerLike']);
             Route::get('/community/favorites',                     [AstrologerAuthController::class, 'getFavorites']);
+            Route::post('/users/{id}/block',                        [AstrologerAuthController::class, 'blockUser']);
+            Route::post('/users/{id}/unblock',                      [AstrologerAuthController::class, 'unblockUser']);
+            Route::get('/blocked-users',                            [AstrologerAuthController::class, 'getBlockedUsers']);
 
             // Verification: Phone Numbers
             Route::get('/phone-numbers',                    [AstrologerAuthController::class, 'getPhoneNumbers']);
@@ -224,8 +227,10 @@ Route::prefix('v1')->group(function () {
             Route::match(['put', 'post'], '/profile/photo',      [UserAuthController::class, 'updateProfilePhoto']);
             Route::post('/astrologers/{id}/follow',         [UserAuthController::class, 'toggleFollowAstrologer']);
             Route::post('/astrologers/{id}/block',          [UserAuthController::class, 'blockAstrologer']);
+            Route::post('/astrologers/{id}/unblock',        [UserAuthController::class, 'unblockAstrologer']);
             Route::post('/astrologers/{id}/report',         [UserAuthController::class, 'reportAstrologer']);
             Route::get('/following',                        [UserAuthController::class, 'getFollowing']);
+            Route::get('/blocked-astrologers',              [UserAuthController::class, 'getBlockedAstrologers']);
 
             // Membership Plans
             Route::get('/plans',                [PlanController::class, 'index']);

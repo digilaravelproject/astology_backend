@@ -15,17 +15,20 @@ class ChatService
     protected $walletService;
     protected $presenceService;
     protected $pricingCalculator;
+    protected $blockService;
 
     public function __construct(
         ChatSessionRepository $chatRepo,
         WalletService $walletService,
         PresenceService $presenceService,
-        \App\Services\PricingCalculatorService $pricingCalculator
+        \App\Services\PricingCalculatorService $pricingCalculator,
+        \App\Services\BlockService $blockService
     ) {
         $this->chatRepo = $chatRepo;
         $this->walletService = $walletService;
         $this->presenceService = $presenceService;
         $this->pricingCalculator = $pricingCalculator;
+        $this->blockService = $blockService;
     }
 
     public function getSession($sessionId)
@@ -40,6 +43,10 @@ class ChatService
     {
         return DB::transaction(function () use ($consumerId, $providerId, $question) {
             try {
+                if ($this->blockService->isBlockedBidirectional((int) $consumerId, (int) $providerId)) {
+                    throw new Exception("You cannot initiate a chat with this user because of block status.");
+                }
+
                 $provider = User::with('astrologer')->lockForUpdate()->findOrFail($providerId);
                 
                 $astrologer = $provider->astrologer;

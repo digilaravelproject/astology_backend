@@ -21,7 +21,8 @@ use Illuminate\Support\Facades\Schema;
 class AstrologerService
 {
     public function __construct(
-        private readonly PricingCalculatorService $pricingCalculator
+        private readonly PricingCalculatorService $pricingCalculator,
+        private readonly BlockService $blockService
     ) {}
 
     /**
@@ -43,6 +44,14 @@ class AstrologerService
             },
         ])
             ->withAvg('reviews', 'rating');
+
+        // Bidirectional Block Filtering: Hide astrologers who blocked the user or whom the user blocked
+        if ($currentUser && !($filters['include_blocked'] ?? false)) {
+            $blockedUserIds = $this->blockService->getAllBidirectionalBlockedUserIds($currentUser->id);
+            if (!empty($blockedUserIds)) {
+                $query->whereNotIn('user_id', $blockedUserIds);
+            }
+        }
 
         $type = $filters['type'] ?? 'all';
         $minPrice = $filters['min_price'] ?? null;
@@ -163,15 +172,25 @@ class AstrologerService
             ->pluck('count', 'provider_id');
 
         $activePurchases = collect();
+        $followedAstrologerIds = [];
+        $blockedUserIds = [];
+
         if ($currentUser) {
             $activePurchases = PackagePurchase::where('user_id', $currentUser->id)
                 ->whereIn('astrologer_id', $astrologerUserIds)
                 ->where('status', 'active')
                 ->get()
                 ->keyBy('astrologer_id');
+
+            $followedAstrologerIds = AstrologerCommunity::where('user_id', $currentUser->id)
+                ->where('is_liked', true)
+                ->pluck('astrologer_id')
+                ->toArray();
+
+            $blockedUserIds = $this->blockService->getBlockedUserIds($currentUser->id);
         }
 
-        $astrologers = $rawAstrologers->map(function ($astrologer) use ($busyProviderIds, $customPackages, $defaultPackage, $activePurchases, $currentUser, $completedChatCounts, $completedCallCounts) {
+        $astrologers = $rawAstrologers->map(function ($astrologer) use ($busyProviderIds, $customPackages, $defaultPackage, $activePurchases, $currentUser, $completedChatCounts, $completedCallCounts, $followedAstrologerIds, $blockedUserIds) {
             $avgRating = $astrologer->reviews_avg_rating;
             $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
 
@@ -191,6 +210,9 @@ class AstrologerService
             if ($astrologer->user) {
                 $astrologer->user->is_busy = $isBusy;
             }
+
+            $astrologer->is_followed = $currentUser ? in_array($astrologer->id, $followedAstrologerIds) : false;
+            $astrologer->is_blocked = $currentUser ? in_array($astrologer->user_id, $blockedUserIds) : false;
 
             $chatPricing = $this->pricingCalculator->calculate($astrologer, 'chat');
             $callPricing = $this->pricingCalculator->calculate($astrologer, 'call');
@@ -311,8 +333,8 @@ class AstrologerService
                 ->where('user_id', $currentUser->id)
                 ->first();
 
-            $astrologer->is_followed = $community ? $community->is_liked : false;
-            $astrologer->is_blocked = $community ? $community->is_blocked : false;
+            $astrologer->is_followed = $community ? (bool) $community->is_liked : false;
+            $astrologer->is_blocked = $this->blockService->hasBlocked($currentUser->id, $astrologer->user_id) || ($community && (bool) $community->is_blocked);
         } else {
             $astrologer->is_followed = false;
             $astrologer->is_blocked = false;
