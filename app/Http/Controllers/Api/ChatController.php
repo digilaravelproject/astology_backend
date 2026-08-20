@@ -299,7 +299,8 @@ class ChatController extends Controller
     {
         try {
             $userId = $request->user()->id;
-            $sessions = $this->chatService->getUserSessions($userId);
+            $perPage = min((int) $request->query('per_page', 15), 50);
+            $sessions = $this->chatService->getUserSessions($userId, $perPage);
             return ApiResponse::success($sessions, 'User sessions retrieved successfully');
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 500);
@@ -310,7 +311,8 @@ class ChatController extends Controller
     {
         try {
             $userId = $request->user()->id;
-            $sessions = $this->chatService->getAstrologerSessions($userId);
+            $perPage = min((int) $request->query('per_page', 15), 50);
+            $sessions = $this->chatService->getAstrologerSessions($userId, $perPage);
 
             $consumerIds = $sessions->pluck('consumer_id')->unique()->toArray();
             $assistanceSessions = \App\Models\ChatAssistanceSession::where(function($query) use ($userId, $consumerIds) {
@@ -436,7 +438,8 @@ class ChatController extends Controller
                         $query->where('provider_id', $userId);
                     }
                 })
-                ->whereIn('status', ['accepted', 'ongoing', 'active'])
+                ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
+                ->orderByRaw("CASE WHEN status IN ('ongoing', 'active', 'accepted') THEN 1 WHEN status IN ('initiated', 'waiting') THEN 2 ELSE 3 END")
                 ->orderBy('accepted_at', 'desc')
                 ->orderBy('created_at', 'desc')
                 ->first();

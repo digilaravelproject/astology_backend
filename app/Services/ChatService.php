@@ -503,14 +503,14 @@ class ChatService
         return $this->chatRepo->getSessionsByUserId($userId);
     }
 
-    public function getUserSessions($userId)
+    public function getUserSessions($userId, $perPage = 15)
     {
-        return $this->chatRepo->getUserSessions($userId);
+        return $this->chatRepo->getUserSessions($userId, $perPage);
     }
 
-    public function getAstrologerSessions($userId)
+    public function getAstrologerSessions($userId, $perPage = 15)
     {
-        return $this->chatRepo->getAstrologerSessions($userId);
+        return $this->chatRepo->getAstrologerSessions($userId, $perPage);
     }
 
     /**

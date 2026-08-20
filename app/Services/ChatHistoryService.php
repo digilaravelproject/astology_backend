@@ -23,7 +23,7 @@ class ChatHistoryService
      * @return LengthAwarePaginator
      * @throws Exception
      */
-    public function getMessagesForSession(int $sessionId, int $userId, int $perPage = 30, string $scope = 'conversation'): LengthAwarePaginator
+    public function getMessagesForSession(int $sessionId, int $userId, int $perPage = 30, string $scope = 'conversation', string $direction = 'asc'): LengthAwarePaginator
     {
         $session = ChatSession::findOrFail($sessionId);
 
@@ -56,11 +56,13 @@ class ChatHistoryService
             ->orderBy('id', 'desc')
             ->paginate($perPage);
 
-        // Reverse the items on current page so they display chronologically (oldest -> newest)
-        $chronologicalItems = $paginator->getCollection()->reverse()->values();
+        // If ascending direction requested, reverse page items so they display chronologically (oldest -> newest)
+        $items = ($direction === 'desc')
+            ? $paginator->getCollection()->values()
+            : $paginator->getCollection()->reverse()->values();
 
         return new LengthAwarePaginator(
-            $chronologicalItems,
+            $items,
             $paginator->total(),
             $paginator->perPage(),
             $paginator->currentPage(),

@@ -42,7 +42,7 @@ class ChatSessionRepository
             ->paginate(15);
     }
 
-    public function getUserSessions($userId)
+    public function getUserSessions($userId, $perPage = 15)
     {
         return ChatSession::with(['provider.astrologer', 'latestMessage'])
             ->withCount(['messages as unread_count' => function ($query) use ($userId) {
@@ -50,10 +50,10 @@ class ChatSessionRepository
             }])
             ->where('consumer_id', $userId)
             ->latest()
-            ->paginate(15);
+            ->paginate($perPage);
     }
 
-    public function getAstrologerSessions($userId)
+    public function getAstrologerSessions($userId, $perPage = 15)
     {
         return ChatSession::with([
                 'consumer:id,name,profile_photo,gender,date_of_birth,time_of_birth,place_of_birth,latitude,longitude',
@@ -64,6 +64,6 @@ class ChatSessionRepository
             }])
             ->where('provider_id', $userId)
             ->latest()
-            ->paginate(15);
+            ->paginate($perPage);
     }
 }
