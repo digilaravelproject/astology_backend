@@ -16,19 +16,22 @@ class ChatService
     protected $presenceService;
     protected $pricingCalculator;
     protected $blockService;
+    protected $chatHistoryService;
 
     public function __construct(
         ChatSessionRepository $chatRepo,
         WalletService $walletService,
         PresenceService $presenceService,
         \App\Services\PricingCalculatorService $pricingCalculator,
-        \App\Services\BlockService $blockService
+        \App\Services\BlockService $blockService,
+        ?\App\Services\ChatHistoryService $chatHistoryService = null
     ) {
         $this->chatRepo = $chatRepo;
         $this->walletService = $walletService;
         $this->presenceService = $presenceService;
         $this->pricingCalculator = $pricingCalculator;
         $this->blockService = $blockService;
+        $this->chatHistoryService = $chatHistoryService ?? app(\App\Services\ChatHistoryService::class);
     }
 
     public function getSession($sessionId)
@@ -481,50 +484,15 @@ class ChatService
     /**
      * Retrieve chat history for a session with pagination and ownership check.
      */
-    public function getMessagesForSession($sessionId, $userId)
+    public function getMessagesForSession($sessionId, $userId, $perPage = 30)
     {
-        $session = \App\Models\ChatSession::findOrFail($sessionId);
-
-        // Security check: must be a participant of the session
-        if ($session->consumer_id != $userId && $session->provider_id != $userId) {
-            throw new Exception("You are not authorized to access this chat history.", 403);
-        }
-
-        return $this->fetchMessagesForSessionPair($session, $sessionId);
+        return $this->chatHistoryService->getMessagesForSession((int) $sessionId, (int) $userId, (int) $perPage);
     }
 
     public function getMessages($sessionId)
     {
         $session = \App\Models\ChatSession::findOrFail($sessionId);
-        return $this->fetchMessagesForSessionPair($session, $sessionId);
-    }
-
-    /**
-     * Helper method to fetch and force sessionId on historical messages (DRY).
-     */
-    private function fetchMessagesForSessionPair($session, $sessionId)
-    {
-        // Fetch all chat session IDs between this consumer and provider
-        $sessionIds = \App\Models\ChatSession::where(function($q) use ($session) {
-                $q->where('consumer_id', $session->consumer_id)
-                  ->where('provider_id', $session->provider_id);
-            })
-            ->orWhere(function($q) use ($session) {
-                $q->where('consumer_id', $session->provider_id)
-                  ->where('provider_id', $session->consumer_id);
-            })
-            ->pluck('id');
-
-        $messages = \App\Models\Message::whereIn('chat_session_id', $sessionIds)
-            ->oldest()
-            ->paginate(30);
-
-        $messages->getCollection()->transform(function ($message) use ($sessionId) {
-            $message->chat_session_id = (int) $sessionId;
-            return $message;
-        });
-
-        return $messages;
+        return $this->chatHistoryService->getMessagesForSession((int) $sessionId, (int) $session->consumer_id);
     }
 
     /**

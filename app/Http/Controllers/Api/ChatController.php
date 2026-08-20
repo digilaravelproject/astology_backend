@@ -191,7 +191,8 @@ class ChatController extends Controller
     {
         try {
             $userId = $request->user()->id;
-            $messages = $this->chatService->getMessagesForSession($sessionId, $userId);
+            $perPage = min((int) $request->query('per_page', 30), 100);
+            $messages = $this->chatService->getMessagesForSession($sessionId, $userId, $perPage);
             return ApiResponse::success($messages, 'Messages retrieved');
         } catch (Exception $e) {
             $code = $e->getCode() == 403 ? 403 : 500;
