@@ -215,8 +215,11 @@
                                 <p class="text-xs text-text-muted mt-0.5">Control dynamic tax application for wallet top-ups and astrologer payouts.</p>
                             </div>
                             <div class="flex items-center gap-3">
-                                <input type="hidden" name="gst_enabled" value="0">
-                                <input type="checkbox" name="gst_enabled" value="1" {{ $settings['gst_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-primary border-2 border-transparent">
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="hidden" name="gst_enabled" value="0">
+                                    <input type="checkbox" name="gst_enabled" value="1" {{ $settings['gst_enabled'] ? 'checked' : '' }} class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-xs"></div>
+                                </label>
                                 <span class="text-xs font-bold text-text-secondary uppercase">Global GST Master Switch</span>
                             </div>
                         </div>
@@ -230,8 +233,11 @@
                                         <span class="text-[11px] text-text-muted">Charged on top of base user wallet recharge</span>
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <input type="hidden" name="gst_recharge_enabled" value="0">
-                                        <input type="checkbox" name="gst_recharge_enabled" value="1" {{ $settings['gst_recharge_enabled'] ? 'checked' : '' }} class="w-8 h-5 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-3 checked:bg-primary">
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="hidden" name="gst_recharge_enabled" value="0">
+                                            <input type="checkbox" name="gst_recharge_enabled" value="1" {{ $settings['gst_recharge_enabled'] ? 'checked' : '' }} class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-xs"></div>
+                                        </label>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3 pt-2">
@@ -255,8 +261,11 @@
                                 <p class="text-xs text-text-muted mt-0.5">Control dynamic TDS deductions on monthly partner disbursements under the Income Tax Act.</p>
                             </div>
                             <div class="flex items-center gap-3">
-                                <input type="hidden" name="tds_enabled" value="0">
-                                <input type="checkbox" name="tds_enabled" value="1" {{ $settings['tds_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-indigo-600 border-2 border-transparent">
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="hidden" name="tds_enabled" value="0">
+                                    <input type="checkbox" name="tds_enabled" value="1" {{ $settings['tds_enabled'] ? 'checked' : '' }} class="sr-only peer">
+                                    <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600 shadow-xs"></div>
+                                </label>
                                 <span class="text-xs font-bold text-text-secondary uppercase">Global TDS Switch</span>
                             </div>
                         </div>
@@ -444,8 +453,11 @@
                     <div class="flex items-center justify-between border-b pb-3">
                         <h3 class="text-lg font-bold text-text-primary">Website Throttling & Protection</h3>
                         <div class="flex items-center gap-3">
-                            <input type="hidden" name="rate_limit_enabled" value="0">
-                            <input type="checkbox" name="rate_limit_enabled" value="1" {{ $settings['rate_limit_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-primary border-2 border-transparent">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="hidden" name="rate_limit_enabled" value="0">
+                                <input type="checkbox" name="rate_limit_enabled" value="1" {{ $settings['rate_limit_enabled'] ? 'checked' : '' }} class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-xs"></div>
+                            </label>
                             <span class="text-xs font-bold text-text-secondary uppercase">Master Switch</span>
                         </div>
                     </div>
@@ -511,8 +523,11 @@
                             <p class="text-xs text-text-muted mt-0.5">Toggle and configure daily free message reply limits for astrologers.</p>
                         </div>
                         <div class="flex items-center gap-3">
-                            <input type="hidden" name="chat_assistance_enabled" value="0">
-                            <input type="checkbox" name="chat_assistance_enabled" value="1" {{ $settings['chat_assistance_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-primary border-2 border-transparent">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="hidden" name="chat_assistance_enabled" value="0">
+                                <input type="checkbox" name="chat_assistance_enabled" value="1" {{ $settings['chat_assistance_enabled'] ? 'checked' : '' }} class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-xs"></div>
+                            </label>
                             <span class="text-xs font-bold text-text-secondary uppercase">Master Toggle Switch</span>
                         </div>
                     </div>

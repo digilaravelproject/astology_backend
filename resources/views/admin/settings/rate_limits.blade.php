@@ -34,13 +34,16 @@
                     </div>
                     <form method="POST" action="{{ route('admin.settings.rate-limits.update') }}" class="flex items-center gap-4">
                         @csrf
-                        <input type="hidden" name="enabled" value="0">
-                        <input type="checkbox"
-                               name="enabled"
-                               value="1"
-                               {{ $enabled ? 'checked' : '' }}
-                               class="w-12 h-7 appearance-none bg-gray-lighter rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-6 after:h-6 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-full checked:bg-primary checked:border-primary border-2"
-                               onchange="this.form.submit()">
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="hidden" name="enabled" value="0">
+                            <input type="checkbox"
+                                   name="enabled"
+                                   value="1"
+                                   {{ $enabled ? 'checked' : '' }}
+                                   class="sr-only peer"
+                                   onchange="this.form.submit()">
+                            <div class="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-xs"></div>
+                        </label>
                         <span class="text-xs font-black uppercase tracking-widest {{ $enabled ? 'text-primary' : 'text-gray' }}">
                             {{ $enabled ? 'ENABLED' : 'DISABLED' }}
                         </span>
