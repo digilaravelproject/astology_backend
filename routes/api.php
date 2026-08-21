@@ -227,6 +227,22 @@ Route::prefix('v1')->group(function () {
         Route::get('/astrologers/{id}/gallery', [AstrologerController::class, 'getGallery'])->middleware('throttle:general');
         Route::get('/reviews',              [ReviewController::class, 'index'])->middleware('throttle:general');
         Route::get('/plans/{plan}',         [PlanController::class, 'show'])->middleware('throttle:general');
+        Route::get('/gifts',                [GiftController::class, 'index'])->middleware('throttle:general');
+        Route::get('/training-videos',      [TrainingVideoController::class, 'index'])->middleware('throttle:general');
+        Route::get('/training-videos/{id}',  [TrainingVideoController::class, 'show'])->middleware('throttle:general');
+
+        // Static Pages & Policy Information
+        Route::get('/static-pages',         [StaticPageController::class, 'index'])->middleware('throttle:general');
+        Route::get('/static-pages/{type}',  [StaticPageController::class, 'show'])->middleware('throttle:general');
+        Route::get('/static-page/{type}',   [StaticPageController::class, 'show'])->middleware('throttle:general');
+        Route::get('/faqs',                 [StaticPageController::class, 'getFaqs'])->middleware('throttle:general');
+        Route::get('/privacy-policy',       [StaticPageController::class, 'getPrivacyPolicy'])->middleware('throttle:general');
+        Route::get('/terms-and-conditions', [StaticPageController::class, 'getTermsAndConditions'])->middleware('throttle:general');
+        Route::get('/payment-policy',       [StaticPageController::class, 'getPaymentPolicy'])->middleware('throttle:general');
+        Route::get('/about-us',             [StaticPageController::class, 'getAboutUs'])->middleware('throttle:general');
+        Route::get('/customer-support',     [StaticPageController::class, 'getCustomerSupport'])->middleware('throttle:general');
+        Route::get('/turn-credentials',     [TurnCredentialsController::class, 'index'])->middleware('throttle:general');
+        Route::get('/ice-servers',          [TurnCredentialsController::class, 'index'])->middleware('throttle:general');
 
         // ── Authenticated User Features ───────────────────────────────────
         Route::middleware(['auth:sanctum', 'user', 'throttle:tiered'])->group(function () {
@@ -302,6 +318,36 @@ Route::prefix('v1')->group(function () {
                 Route::get('/active-status',    [PackageSessionController::class, 'activeStatus']);
                 Route::post('/session/start',   [PackageSessionController::class, 'startSession']);
                 Route::post('/session/end',     [PackageSessionController::class, 'endSession']);
+            });
+
+            // Gifts Sending
+            Route::post('/gifts/send',      [GiftController::class, 'send']);
+            Route::post('/gift/send',       [GiftController::class, 'send']);
+
+            // User Feedback
+            Route::post('/feedback',        [FeedbackController::class, 'store']);
+            Route::get('/feedback',         [FeedbackController::class, 'index']);
+            Route::get('/feedback/{id}',    [FeedbackController::class, 'show']);
+            Route::get('/feedbacks',        [FeedbackController::class, 'index']);
+
+            // Kundli (Vedic Birth Chart Generation)
+            Route::prefix('kundli')->group(function () {
+                Route::post('/create',      [KundliController::class, 'store']);
+                Route::post('/',            [KundliController::class, 'store']);
+                Route::get('/',             [KundliController::class, 'index']);
+                Route::get('/{id}',         [KundliController::class, 'show']);
+                Route::put('/{id}',         [KundliController::class, 'update']);
+                Route::post('/{id}',        [KundliController::class, 'update']);
+                Route::delete('/{id}',      [KundliController::class, 'destroy']);
+            });
+            Route::prefix('kundlis')->group(function () {
+                Route::post('/create',      [KundliController::class, 'store']);
+                Route::post('/',            [KundliController::class, 'store']);
+                Route::get('/',             [KundliController::class, 'index']);
+                Route::get('/{id}',         [KundliController::class, 'show']);
+                Route::put('/{id}',         [KundliController::class, 'update']);
+                Route::post('/{id}',        [KundliController::class, 'update']);
+                Route::delete('/{id}',      [KundliController::class, 'destroy']);
             });
 
             // Account Lifecycle
