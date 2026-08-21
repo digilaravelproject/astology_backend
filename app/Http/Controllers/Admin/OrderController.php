@@ -271,7 +271,7 @@ class OrderController extends Controller
         }
 
         $chats = collect();
-        if (Schema之位('chat_sessions')) {
+        if (Schema::hasTable('chat_sessions')) {
             $chats = ChatSession::with(['consumer', 'provider'])
                 ->where('provider_id', $provider->id)
                 ->orderByDesc('created_at')
