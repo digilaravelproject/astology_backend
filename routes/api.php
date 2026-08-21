@@ -171,6 +171,15 @@ Route::prefix('v1')->group(function () {
                 Route::get('/history',      [AstrologerOfferController::class, 'history']);
             });
 
+            // Prepaid Package Sub-Sessions (Dual-Mode Concurrency Engine)
+            Route::prefix('packages')->group(function () {
+                Route::get('/active-banner',              [PackageSessionController::class, 'activeBanner']);
+                Route::post('/session/spawn-channel',     [PackageSessionController::class, 'spawnChannel']);
+                Route::post('/session/terminate-channel', [PackageSessionController::class, 'terminateChannel']);
+                Route::post('/session/heartbeat',         [PackageSessionController::class, 'heartbeat']);
+                Route::post('/session/end',               [PackageSessionController::class, 'endSession']);
+            });
+
             // Push Notification Device Token & Notification Center
             Route::post('/device-token', [DeviceTokenController::class, 'store']);
             Route::post('/remove-token', [DeviceTokenController::class, 'remove']);
@@ -312,12 +321,16 @@ Route::prefix('v1')->group(function () {
             Route::get('/matrimony/profiles/{id}',                  [MatrimonyController::class, 'showProfile']);
             Route::get('/matrimony/search',                         [MatrimonyController::class, 'searchProfiles']);
 
-            // Prepaid Packages & Sub-Sessions
+            // Prepaid Packages & Sub-Sessions (Dual-Mode Concurrency Engine)
             Route::prefix('packages')->group(function () {
-                Route::post('/purchase',        [PackageSessionController::class, 'purchase']);
-                Route::get('/active-status',    [PackageSessionController::class, 'activeStatus']);
-                Route::post('/session/start',   [PackageSessionController::class, 'startSession']);
-                Route::post('/session/end',     [PackageSessionController::class, 'endSession']);
+                Route::post('/purchase',                  [PackageSessionController::class, 'purchase']);
+                Route::get('/active-status',              [PackageSessionController::class, 'activeStatus']);
+                Route::get('/active-banner',              [PackageSessionController::class, 'activeBanner']);
+                Route::post('/session/start',             [PackageSessionController::class, 'startSession']);
+                Route::post('/session/end',               [PackageSessionController::class, 'endSession']);
+                Route::post('/session/spawn-channel',     [PackageSessionController::class, 'spawnChannel']);
+                Route::post('/session/terminate-channel', [PackageSessionController::class, 'terminateChannel']);
+                Route::post('/session/heartbeat',         [PackageSessionController::class, 'heartbeat']);
             });
 
             // Gifts Sending

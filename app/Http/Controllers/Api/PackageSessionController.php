@@ -181,4 +181,134 @@ class PackageSessionController extends Controller
             ], 422);
         }
     }
+
+    /**
+     * Spawn an additional channel (Call or Chat) within active session.
+     */
+    public function spawnChannel(Request $request)
+    {
+        $request->validate([
+            'sub_session_id' => 'required|integer|exists:package_sub_sessions,id',
+            'channel_type'   => 'required|in:call,chat',
+            'call_type'      => 'nullable|in:audio,video',
+            'question'       => 'nullable|string',
+        ]);
+
+        try {
+            $engine = app(\App\Services\PackageSessionEngineService::class);
+            $result = $engine->spawnSubchannel(
+                $request->sub_session_id,
+                $request->channel_type,
+                $request->user()->id,
+                $request->all()
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => ucfirst($request->channel_type) . ' channel spawned successfully.',
+                'data'    => $result,
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Terminate a specific subchannel with modal options (End Call Only vs End Complete Session).
+     */
+    public function terminateChannel(Request $request)
+    {
+        $request->validate([
+            'sub_session_id' => 'required|integer|exists:package_sub_sessions,id',
+            'channel_type'   => 'required|in:call,chat',
+            'action'         => 'required|in:end_channel_only,end_complete_session',
+        ]);
+
+        try {
+            $engine = app(\App\Services\PackageSessionEngineService::class);
+            $result = $engine->terminateSubchannel(
+                $request->sub_session_id,
+                $request->channel_type,
+                $request->action,
+                $request->user()->id
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Channel terminated successfully.',
+                'data'    => $result,
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Client Heartbeat Ping to prevent accidental timeout.
+     */
+    public function heartbeat(Request $request)
+    {
+        $request->validate([
+            'sub_session_id' => 'required|integer|exists:package_sub_sessions,id',
+        ]);
+
+        try {
+            $engine = app(\App\Services\PackageSessionEngineService::class);
+            $result = $engine->recordHeartbeat($request->sub_session_id, $request->user()->id);
+
+            return response()->json([
+                'success' => true,
+                'data'    => $result,
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Get overarching floating banner context for active package session.
+     */
+    public function activeBanner(Request $request)
+    {
+        try {
+            $userId = $request->user()->id;
+            $subSession = \App\Models\PackageSubSession::with(['purchase.user', 'purchase.astrologer.astrologer'])
+                ->whereIn('session_state', ['in_progress', 'paused'])
+                ->whereHas('purchase', function ($q) use ($userId) {
+                    $q->where('user_id', $userId)->orWhere('astrologer_id', $userId);
+                })
+                ->latest('id')
+                ->first();
+
+            if (!$subSession) {
+                return response()->json([
+                    'success' => true,
+                    'data'    => null,
+                ], 200);
+            }
+
+            $engine = app(\App\Services\PackageSessionEngineService::class);
+            $remaining = $engine->getRemainingSeconds($subSession);
+            $bannerData = $subSession->toBannerArray($remaining);
+
+            return response()->json([
+                'success' => true,
+                'data'    => $bannerData,
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }
