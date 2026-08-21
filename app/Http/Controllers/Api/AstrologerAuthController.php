@@ -283,13 +283,10 @@ class AstrologerAuthController extends Controller
             $astrologer->otp_verified_at = null;
             $astrologer->save();
 
-            $smsService = new ExotelSmsService();
-            $smsResponse = $smsService->sendOtp(
-                $phone,
-                $otp
-            );
-
             DB::commit();
+
+            // Asynchronously dispatch SMS OTP without holding DB connection or transaction locks
+            \App\Jobs\SendSmsOtpJob::dispatch($phone, $otp);
 
             NotificationHelper::send(
                 $user->id,

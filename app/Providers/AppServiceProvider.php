@@ -163,6 +163,49 @@ class AppServiceProvider extends ServiceProvider
     protected function bootObservers(): void
     {
         Astrologer::observe(AstrologerObserver::class);
+
+        // Auto-invalidate Redis cache on content updates
+        $clearBlog = function ($model) {
+            \Illuminate\Support\Facades\Cache::forget("blogs:lang:{$model->language_id}");
+            \Illuminate\Support\Facades\Cache::forget("blog:detail:{$model->id}");
+        };
+        \App\Models\Blog::saved($clearBlog);
+        \App\Models\Blog::deleted($clearBlog);
+
+        $clearRemedy = function ($model) {
+            \Illuminate\Support\Facades\Cache::forget("remedies:lang:{$model->language_id}");
+            \Illuminate\Support\Facades\Cache::forget("remedy:detail:{$model->id}");
+        };
+        \App\Models\Remedy::saved($clearRemedy);
+        \App\Models\Remedy::deleted($clearRemedy);
+
+        $clearStatic = function ($model) {
+            \Illuminate\Support\Facades\Cache::forget('static_pages:all');
+            \Illuminate\Support\Facades\Cache::forget("static_pages:{$model->type}");
+        };
+        \App\Models\StaticPage::saved($clearStatic);
+        \App\Models\StaticPage::deleted($clearStatic);
+
+        $clearFounder = function ($model) {
+            \Illuminate\Support\Facades\Cache::forget('founders_words:active');
+            \Illuminate\Support\Facades\Cache::forget("founders_word:detail:{$model->id}");
+        };
+        \App\Models\FoundersWord::saved($clearFounder);
+        \App\Models\FoundersWord::deleted($clearFounder);
+
+        $clearNotice = function () {
+            \Illuminate\Support\Facades\Cache::forget('notices:all');
+            \Illuminate\Support\Facades\Cache::forget('notices:all_u1');
+            \Illuminate\Support\Facades\Cache::forget('notices:all_u0');
+        };
+        \App\Models\Notice::saved($clearNotice);
+        \App\Models\Notice::deleted($clearNotice);
+
+        $clearPlan = function () {
+            \Illuminate\Support\Facades\Cache::forget('plans:active');
+        };
+        \App\Models\Plan::saved($clearPlan);
+        \App\Models\Plan::deleted($clearPlan);
     }
 
     /**

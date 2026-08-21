@@ -21,15 +21,21 @@ class BlogController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Language key is required.'], 400);
             }
 
-            $language = \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+            $language = \App\Helpers\CacheHelper::remember("language:code:{$langKey}", 86400, function () use ($langKey) {
+                return \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+            }, -1800, 1800);
+
             if (!$language) {
                 return response()->json(['status' => 'error', 'message' => 'Language not found.'], 404);
             }
 
-            $blogs = Blog::where('is_active', true)
-                ->where('language_id', $language->id)
-                ->orderBy('created_at', 'desc')
-                ->get();
+            $blogs = \App\Helpers\CacheHelper::remember("blogs:lang:{$language->id}", 3600, function () use ($language) {
+                return Blog::where('is_active', true)
+                    ->where('language_id', $language->id)
+                    ->select(['id', 'language_id', 'title', 'subtitle', 'author', 'image', 'blog_tags', 'type', 'is_active', 'created_at'])
+                    ->orderBy('created_at', 'desc')
+                    ->get();
+            });
 
             return response()->json([
                 'status' => 'success',
@@ -49,9 +55,11 @@ class BlogController extends Controller
     public function show($id): JsonResponse
     {
         try {
-            $blog = Blog::where('id', $id)
-                ->where('is_active', true)
-                ->first();
+            $blog = \App\Helpers\CacheHelper::remember("blog:detail:{$id}", 3600, function () use ($id) {
+                return Blog::where('id', $id)
+                    ->where('is_active', true)
+                    ->first();
+            });
 
             if (!$blog) {
                 return response()->json([

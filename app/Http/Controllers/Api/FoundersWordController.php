@@ -13,21 +13,23 @@ class FoundersWordController extends Controller
      */
     public function index(): JsonResponse
     {
-        $words = FoundersWord::where('is_active', true)
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->map(function ($word) {
-                return [
-                    'id' => $word->id,
-                    'title' => $word->title,
-                    'message' => $word->message,
-                    'image' => $word->image_url,
-                    'image_path' => $word->image,
-                    'is_active' => $word->is_active,
-                    'created_at' => $word->created_at,
-                    'updated_at' => $word->updated_at,
-                ];
-            });
+        $words = \App\Helpers\CacheHelper::remember('founders_words:active', 86400, function () {
+            return FoundersWord::where('is_active', true)
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function ($word) {
+                    return [
+                        'id' => $word->id,
+                        'title' => $word->title,
+                        'message' => $word->message,
+                        'image' => $word->image_url,
+                        'image_path' => $word->image,
+                        'is_active' => $word->is_active,
+                        'created_at' => $word->created_at,
+                        'updated_at' => $word->updated_at,
+                    ];
+                });
+        }, -1800, 1800);
 
         return response()->json([
             'status' => 'success',
@@ -42,11 +44,28 @@ class FoundersWordController extends Controller
      */
     public function show($id): JsonResponse
     {
-        $word = FoundersWord::where('id', $id)
-            ->where('is_active', true)
-            ->first();
+        $wordData = \App\Helpers\CacheHelper::remember("founders_word:detail:{$id}", 86400, function () use ($id) {
+            $word = FoundersWord::where('id', $id)
+                ->where('is_active', true)
+                ->first();
 
-        if (!$word) {
+            if (!$word) {
+                return null;
+            }
+
+            return [
+                'id' => $word->id,
+                'title' => $word->title,
+                'message' => $word->message,
+                'image' => $word->image_url,
+                'image_path' => $word->image,
+                'is_active' => $word->is_active,
+                'created_at' => $word->created_at,
+                'updated_at' => $word->updated_at,
+            ];
+        });
+
+        if (!$wordData) {
             return response()->json([
                 'status' => 'error',
                 'message' => 'Founder message not found.',
@@ -56,16 +75,7 @@ class FoundersWordController extends Controller
         return response()->json([
             'status' => 'success',
             'data' => [
-                'founders_word' => [
-                    'id' => $word->id,
-                    'title' => $word->title,
-                    'message' => $word->message,
-                    'image' => $word->image_url,
-                    'image_path' => $word->image,
-                    'is_active' => $word->is_active,
-                    'created_at' => $word->created_at,
-                    'updated_at' => $word->updated_at,
-                ],
+                'founders_word' => $wordData,
             ],
         ], 200);
     }

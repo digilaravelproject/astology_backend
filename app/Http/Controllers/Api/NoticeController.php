@@ -16,19 +16,25 @@ class NoticeController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Notice::query()
-                ->where('is_active', true)
-                ->orderBy('created_at', 'desc');
+            $tag = $request->query('tag');
+            $isUrgent = $request->query('is_urgent');
+            $cacheKey = 'notices:' . ($tag ? 'tag_' . md5($tag) : 'all') . ($isUrgent !== null ? '_u' . (int) $isUrgent : '');
 
-            if ($tag = $request->query('tag')) {
-                $query->whereRaw('LOWER(tag) = ?', [strtolower(trim($tag))]);
-            }
+            $notices = \App\Helpers\CacheHelper::remember($cacheKey, 3600, function () use ($tag, $isUrgent) {
+                $query = Notice::query()
+                    ->where('is_active', true)
+                    ->orderBy('created_at', 'desc');
 
-            if (! is_null($request->query('is_urgent'))) {
-                $query->where('is_urgent', boolval($request->query('is_urgent')));
-            }
+                if ($tag) {
+                    $query->whereRaw('LOWER(tag) = ?', [strtolower(trim($tag))]);
+                }
 
-            $notices = $query->get();
+                if (! is_null($isUrgent)) {
+                    $query->where('is_urgent', boolval($isUrgent));
+                }
+
+                return $query->get();
+            });
 
             return response()->json([
                 'status' => 'success',

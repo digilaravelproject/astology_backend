@@ -145,18 +145,22 @@ class AstrologerService
                 break;
         }
 
-        $activeChatProviders = ChatSession::whereIn('status', ['accepted', 'ongoing'])
-            ->pluck('provider_id')
-            ->toArray();
-        $activeCallProviders = CallSession::whereIn('status', ['ringing', 'accepted', 'ongoing'])
-            ->pluck('provider_id')
-            ->toArray();
-        $busyProviderIds = array_unique(array_merge($activeChatProviders, $activeCallProviders));
+        $busyProviderIds = \App\Helpers\CacheHelper::remember('active_busy_provider_ids', 15, function () {
+            $activeChatProviders = ChatSession::whereIn('status', ['accepted', 'ongoing'])
+                ->pluck('provider_id')
+                ->toArray();
+            $activeCallProviders = CallSession::whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                ->pluck('provider_id')
+                ->toArray();
+            return array_values(array_unique(array_merge($activeChatProviders, $activeCallProviders)));
+        });
 
         $rawAstrologers = $query->get();
         $astrologerUserIds = $rawAstrologers->pluck('user_id')->toArray();
         $customPackages = AstrologerPackage::whereIn('astrologer_id', $astrologerUserIds)->get()->keyBy('astrologer_id');
-        $defaultPackage = Package::where('is_default', true)->first();
+        $defaultPackage = \App\Helpers\CacheHelper::remember('package:default', 3600, function () {
+            return Package::where('is_default', true)->first();
+        });
 
         // Batch query completed orders (chats + calls) for all listed astrologers
         $completedChatCounts = ChatSession::whereIn('provider_id', $astrologerUserIds)

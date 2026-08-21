@@ -21,27 +21,32 @@ class RemedyController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'Language key is required.'], 400);
             }
 
-            $language = \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+            $language = \App\Helpers\CacheHelper::remember("language:code:{$langKey}", 86400, function () use ($langKey) {
+                return \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+            }, -1800, 1800);
+
             if (!$language) {
                 return response()->json(['status' => 'error', 'message' => 'Language not found.'], 404);
             }
 
-            $remedies = Remedy::where('is_active', true)
-                ->where('language_id', $language->id)
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->map(function ($remedy) {
-                    return [
-                        'id' => $remedy->id,
-                        'title' => $remedy->title,
-                        'description' => $remedy->description,
-                        'image' => $remedy->image_url,
-                        'image_path' => $remedy->image,
-                        'is_active' => $remedy->is_active,
-                        'created_at' => $remedy->created_at,
-                        'updated_at' => $remedy->updated_at,
-                    ];
-                });
+            $remedies = \App\Helpers\CacheHelper::remember("remedies:lang:{$language->id}", 3600, function () use ($language) {
+                return Remedy::where('is_active', true)
+                    ->where('language_id', $language->id)
+                    ->orderBy('created_at', 'desc')
+                    ->get()
+                    ->map(function ($remedy) {
+                        return [
+                            'id' => $remedy->id,
+                            'title' => $remedy->title,
+                            'description' => $remedy->description,
+                            'image' => $remedy->image_url,
+                            'image_path' => $remedy->image,
+                            'is_active' => $remedy->is_active,
+                            'created_at' => $remedy->created_at,
+                            'updated_at' => $remedy->updated_at,
+                        ];
+                    });
+            });
 
             return response()->json([
                 'status' => 'success',
@@ -61,11 +66,28 @@ class RemedyController extends Controller
     public function show($id): JsonResponse
     {
         try {
-            $remedy = Remedy::where('id', $id)
-                ->where('is_active', true)
-                ->first();
+            $remedyData = \App\Helpers\CacheHelper::remember("remedy:detail:{$id}", 3600, function () use ($id) {
+                $remedy = Remedy::where('id', $id)
+                    ->where('is_active', true)
+                    ->first();
 
-            if (!$remedy) {
+                if (!$remedy) {
+                    return null;
+                }
+
+                return [
+                    'id' => $remedy->id,
+                    'title' => $remedy->title,
+                    'description' => $remedy->description,
+                    'image' => $remedy->image_url,
+                    'image_path' => $remedy->image,
+                    'is_active' => $remedy->is_active,
+                    'created_at' => $remedy->created_at,
+                    'updated_at' => $remedy->updated_at,
+                ];
+            });
+
+            if (!$remedyData) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Remedy not found.',
@@ -75,16 +97,7 @@ class RemedyController extends Controller
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'remedy' => [
-                        'id' => $remedy->id,
-                        'title' => $remedy->title,
-                        'description' => $remedy->description,
-                        'image' => $remedy->image_url,
-                        'image_path' => $remedy->image,
-                        'is_active' => $remedy->is_active,
-                        'created_at' => $remedy->created_at,
-                        'updated_at' => $remedy->updated_at,
-                    ],
+                    'remedy' => $remedyData,
                 ],
             ], 200);
         } catch (\Exception $e) {

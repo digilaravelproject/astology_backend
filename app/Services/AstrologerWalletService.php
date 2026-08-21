@@ -38,32 +38,31 @@ class AstrologerWalletService
     {
         $wallet = $this->getOrCreateWallet($user->id);
 
-        // Aggregated earnings metrics (completed credit transactions)
-        $todayEarning = (float) WalletTransaction::where('wallet_id', $wallet->id)
+        $today = Carbon::today();
+        $startOfWeek = Carbon::now()->startOfWeek();
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $threeMonthsAgo = Carbon::now()->subMonths(3);
+
+        // Single index-backed conditional aggregation query instead of 4 separate queries
+        $stats = DB::table('wallet_transactions')
+            ->where('wallet_id', $wallet->id)
             ->where('transaction_type', 'credit')
             ->where('status', 'completed')
-            ->whereDate('created_at', Carbon::today())
-            ->sum('amount');
+            ->where('created_at', '>=', $threeMonthsAgo)
+            ->selectRaw("
+                COALESCE(SUM(CASE WHEN created_at >= ? THEN amount ELSE 0 END), 0) as today_earning,
+                COALESCE(SUM(CASE WHEN created_at >= ? THEN amount ELSE 0 END), 0) as weekly_earning,
+                COALESCE(SUM(CASE WHEN created_at >= ? THEN amount ELSE 0 END), 0) as monthly_earning,
+                COALESCE(SUM(amount), 0) as three_month_earning
+            ", [$today, $startOfWeek, $startOfMonth])
+            ->first();
 
-        $weeklyEarning = (float) WalletTransaction::where('wallet_id', $wallet->id)
-            ->where('transaction_type', 'credit')
-            ->where('status', 'completed')
-            ->where('created_at', '>=', Carbon::now()->startOfWeek())
-            ->sum('amount');
+        $todayEarning = (float) ($stats->today_earning ?? 0);
+        $weeklyEarning = (float) ($stats->weekly_earning ?? 0);
+        $monthlyEarning = (float) ($stats->monthly_earning ?? 0);
+        $threeMonthEarning = (float) ($stats->three_month_earning ?? 0);
 
-        $monthlyEarning = (float) WalletTransaction::where('wallet_id', $wallet->id)
-            ->where('transaction_type', 'credit')
-            ->where('status', 'completed')
-            ->where('created_at', '>=', Carbon::now()->startOfMonth())
-            ->sum('amount');
-
-        $threeMonthEarning = (float) WalletTransaction::where('wallet_id', $wallet->id)
-            ->where('transaction_type', 'credit')
-            ->where('status', 'completed')
-            ->where('created_at', '>=', Carbon::now()->subMonths(3))
-            ->sum('amount');
-
-        // Weekly and all-time ranking calculations
+        // Weekly and all-time ranking calculations via Redis-cached dictionaries
         $weeklyRank = $this->calculateWeeklyRank($user->id);
         $allTimeRank = $this->calculateAllTimeRank($user->id);
 
@@ -291,34 +290,37 @@ class AstrologerWalletService
     {
         $startOfWeek = Carbon::now()->startOfWeek();
 
-        $rankings = DB::table('astrologers')
-            ->join('users', 'users.id', '=', 'astrologers.user_id')
-            ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
-            ->leftJoin('wallet_transactions', function ($join) use ($startOfWeek) {
-                $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
-                    ->where('wallet_transactions.transaction_type', '=', 'credit')
-                    ->where('wallet_transactions.status', '=', 'completed')
-                    ->where('wallet_transactions.created_at', '>=', $startOfWeek);
-            })
-            ->select(
-                'astrologers.id as astrologer_id',
-                'users.id as user_id',
-                'users.name',
-                'astrologers.profile_photo',
-                DB::raw('COALESCE(SUM(wallet_transactions.amount), 0) as weekly_earnings')
-            )
-            ->groupBy('astrologers.id', 'users.id', 'users.name', 'astrologers.profile_photo')
-            ->orderByDesc('weekly_earnings')
-            ->get();
+        // Cache the computed rankings list in Redis with -80s to +80s jitter to avoid cache stampede
+        $rankings = \App\Helpers\CacheHelper::remember('astrologer:weekly_rankings_raw', 300, function () use ($startOfWeek) {
+            return DB::table('astrologers')
+                ->join('users', 'users.id', '=', 'astrologers.user_id')
+                ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
+                ->leftJoin('wallet_transactions', function ($join) use ($startOfWeek) {
+                    $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
+                        ->where('wallet_transactions.transaction_type', '=', 'credit')
+                        ->where('wallet_transactions.status', '=', 'completed')
+                        ->where('wallet_transactions.created_at', '>=', $startOfWeek);
+                })
+                ->select(
+                    'astrologers.id as astrologer_id',
+                    'users.id as user_id',
+                    'users.name',
+                    'astrologers.profile_photo',
+                    DB::raw('COALESCE(SUM(wallet_transactions.amount), 0) as weekly_earnings')
+                )
+                ->groupBy('astrologers.id', 'users.id', 'users.name', 'astrologers.profile_photo')
+                ->orderByDesc('weekly_earnings')
+                ->get();
+        });
 
         $myRank = null;
         $myEarnings = 0.00;
 
         foreach ($rankings as $index => $ranking) {
-            $ranking->weekly_earnings = (float) $ranking->weekly_earnings;
+            $weeklyEarnings = (float) $ranking->weekly_earnings;
             if ($ranking->user_id == $user->id) {
                 $myRank = $index + 1;
-                $myEarnings = $ranking->weekly_earnings;
+                $myEarnings = $weeklyEarnings;
             }
         }
 
@@ -330,7 +332,7 @@ class AstrologerWalletService
                 'user_id' => $item->user_id,
                 'name' => $item->name,
                 'profile_photo' => $photo,
-                'weekly_earnings' => $item->weekly_earnings,
+                'weekly_earnings' => (float) $item->weekly_earnings,
             ];
         });
 
@@ -463,26 +465,31 @@ class AstrologerWalletService
      */
     private function calculateWeeklyRank(int $userId): int
     {
-        $weeklyRankingsList = DB::table('astrologers')
-            ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
-            ->leftJoin('wallet_transactions', function ($join) {
-                $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
-                    ->where('wallet_transactions.transaction_type', '=', 'credit')
-                    ->where('wallet_transactions.status', '=', 'completed')
-                    ->where('wallet_transactions.created_at', '>=', Carbon::now()->startOfWeek());
-            })
-            ->select('astrologers.user_id', DB::raw('COALESCE(SUM(wallet_transactions.amount), 0) as weekly_earnings'))
-            ->groupBy('astrologers.user_id')
-            ->orderByDesc('weekly_earnings')
-            ->get();
+        $startOfWeek = Carbon::now()->startOfWeek();
 
-        foreach ($weeklyRankingsList as $index => $entry) {
-            if ($entry->user_id == $userId) {
-                return $index + 1;
+        $rankMap = \App\Helpers\CacheHelper::remember('astrologer:weekly_rank_map', 300, function () use ($startOfWeek) {
+            $weeklyRankingsList = DB::table('astrologers')
+                ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
+                ->leftJoin('wallet_transactions', function ($join) use ($startOfWeek) {
+                    $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
+                        ->where('wallet_transactions.transaction_type', '=', 'credit')
+                        ->where('wallet_transactions.status', '=', 'completed')
+                        ->where('wallet_transactions.created_at', '>=', $startOfWeek);
+                })
+                ->select('astrologers.user_id', DB::raw('COALESCE(SUM(wallet_transactions.amount), 0) as weekly_earnings'))
+                ->groupBy('astrologers.user_id')
+                ->orderByDesc('weekly_earnings')
+                ->pluck('astrologers.user_id')
+                ->toArray();
+
+            $map = [];
+            foreach ($weeklyRankingsList as $index => $uid) {
+                $map[$uid] = $index + 1;
             }
-        }
+            return $map;
+        });
 
-        return 1;
+        return $rankMap[$userId] ?? 1;
     }
 
     /**
@@ -490,24 +497,27 @@ class AstrologerWalletService
      */
     private function calculateAllTimeRank(int $userId): int
     {
-        $allTimeList = DB::table('astrologers')
-            ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
-            ->leftJoin('wallet_transactions', function ($join) {
-                $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
-                    ->where('wallet_transactions.transaction_type', '=', 'credit')
-                    ->where('wallet_transactions.status', '=', 'completed');
-            })
-            ->select('astrologers.user_id', DB::raw('COALESCE(SUM(wallet_transactions.amount), 0) as total_earnings'))
-            ->groupBy('astrologers.user_id')
-            ->orderByDesc('total_earnings')
-            ->get();
+        $rankMap = \App\Helpers\CacheHelper::remember('astrologer:alltime_rank_map', 300, function () {
+            $allTimeList = DB::table('astrologers')
+                ->leftJoin('wallets', 'wallets.user_id', '=', 'astrologers.user_id')
+                ->leftJoin('wallet_transactions', function ($join) {
+                    $join->on('wallet_transactions.wallet_id', '=', 'wallets.id')
+                        ->where('wallet_transactions.transaction_type', '=', 'credit')
+                        ->where('wallet_transactions.status', '=', 'completed');
+                })
+                ->select('astrologers.user_id', DB::raw('COALESCE(SUM(wallet_transactions.amount), 0) as total_earnings'))
+                ->groupBy('astrologers.user_id')
+                ->orderByDesc('total_earnings')
+                ->pluck('astrologers.user_id')
+                ->toArray();
 
-        foreach ($allTimeList as $index => $entry) {
-            if ($entry->user_id == $userId) {
-                return $index + 1;
+            $map = [];
+            foreach ($allTimeList as $index => $uid) {
+                $map[$uid] = $index + 1;
             }
-        }
+            return $map;
+        });
 
-        return 1;
+        return $rankMap[$userId] ?? 1;
     }
 }

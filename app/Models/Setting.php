@@ -22,15 +22,27 @@ class Setting extends Model
         'value' => 'string',
     ];
 
+    /**
+     * In-memory runtime cache to eliminate repeated Redis/DB queries in same request lifecycle.
+     */
+    private static array $runtimeCache = [];
+
     public static function get(string $key, $default = null)
     {
-        return Cache::rememberForever("setting:{$key}", function () use ($key, $default) {
+        if (array_key_exists($key, self::$runtimeCache)) {
+            return self::$runtimeCache[$key];
+        }
+
+        $val = Cache::rememberForever("setting:{$key}", function () use ($key, $default) {
             $setting = self::where('key', $key)->first();
             if (!$setting) {
                 return $default;
             }
             return self::castValue($setting->value, $setting->type);
         });
+
+        self::$runtimeCache[$key] = $val;
+        return $val;
     }
 
     public static function set(string $key, $value, string $type = 'string', string $group = 'general', string $description = null): self
@@ -45,14 +57,23 @@ class Setting extends Model
             ]
         );
 
+        unset(self::$runtimeCache[$key]);
         Cache::forget("setting:{$key}");
+        Cache::forget("setting_group:{$group}");
 
         return $setting;
     }
 
     public static function getGroup(string $group): array
     {
-        return self::where('group', $group)->pluck('value', 'key')->toArray();
+        return Cache::rememberForever("setting_group:{$group}", function () use ($group) {
+            return self::where('group', $group)->pluck('value', 'key')->toArray();
+        });
+    }
+
+    public static function clearRuntimeCache(): void
+    {
+        self::$runtimeCache = [];
     }
 
     private static function castValue(string $value, string $type)

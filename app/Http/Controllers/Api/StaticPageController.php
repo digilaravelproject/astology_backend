@@ -14,10 +14,12 @@ class StaticPageController extends Controller
      */
     public function index(): JsonResponse
     {
-        $pages = StaticPage::where('is_active', true)
-            ->select('id', 'type', 'title', 'content', 'created_at', 'updated_at')
-            ->orderBy('type')
-            ->get();
+        $pages = \App\Helpers\CacheHelper::remember('static_pages:all', 86400, function () {
+            return StaticPage::where('is_active', true)
+                ->select('id', 'type', 'title', 'content', 'created_at', 'updated_at')
+                ->orderBy('type')
+                ->get();
+        }, -1800, 1800);
 
         return response()->json([
             'status' => 'success',
@@ -30,10 +32,12 @@ class StaticPageController extends Controller
      */
     public function show($type): JsonResponse
     {
-        $page = StaticPage::where('type', $type)
-            ->where('is_active', true)
-            ->select('id', 'type', 'title', 'content', 'created_at', 'updated_at')
-            ->first();
+        $page = \App\Helpers\CacheHelper::remember("static_pages:{$type}", 86400, function () use ($type) {
+            return StaticPage::where('type', $type)
+                ->where('is_active', true)
+                ->select('id', 'type', 'title', 'content', 'created_at', 'updated_at')
+                ->first();
+        }, -1800, 1800);
 
         if (!$page) {
             return response()->json([

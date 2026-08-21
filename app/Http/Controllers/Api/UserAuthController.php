@@ -81,13 +81,10 @@ class UserAuthController extends Controller
             $user->otp_verified_at = null;
             $user->save();
 
-            $smsService = new ExotelSmsService();
-            $smsResponse = $smsService->sendOtp(
-                $phone,
-                $otp
-            );
-
             DB::commit();
+
+            // Asynchronously dispatch SMS OTP without holding DB connection or transaction locks
+            \App\Jobs\SendSmsOtpJob::dispatch($phone, $otp);
 
             // Notify user about generated OTP
             NotificationHelper::send(

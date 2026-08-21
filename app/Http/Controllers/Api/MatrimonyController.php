@@ -207,7 +207,9 @@ class MatrimonyController extends Controller
             ], 401);
         }
 
-        $query = MatrimonyProfile::with('user')
+        $perPage = min((int) $request->query('per_page', 50), 100);
+
+        $query = MatrimonyProfile::with('user:id,name,phone,profile_photo')
             ->where('user_id', '!=', $user->id);
 
         if ($location = $request->query('location')) {
@@ -232,6 +234,7 @@ class MatrimonyController extends Controller
 
         $profiles = $query
             ->orderBy('created_at', 'desc')
+            ->limit($perPage)
             ->get();
 
         return response()->json([
@@ -329,9 +332,9 @@ class MatrimonyController extends Controller
             ], 401);
         }
 
-        $queryText = $request->query('q');
+        $perPage = min((int) $request->query('per_page', 50), 100);
 
-        $query = MatrimonyProfile::with('user')
+        $query = MatrimonyProfile::with('user:id,name,phone,profile_photo')
             ->where('user_id', '!=', $user->id);
 
         if ($queryText) {
@@ -369,6 +372,7 @@ class MatrimonyController extends Controller
 
         $profiles = $query
             ->orderBy('created_at', 'desc')
+            ->limit($perPage)
             ->get();
 
         return response()->json([

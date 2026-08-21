@@ -24,28 +24,22 @@ class PlanController extends Controller
     {
         $user = $request->user();
 
-        $plans = Plan::where('status', 'active')
-            ->orderBy('price')
-            ->get();
+        $basePlans = \App\Helpers\CacheHelper::remember('plans:active', 3600, function () {
+            return Plan::where('status', 'active')
+                ->orderBy('price')
+                ->get();
+        });
+
+        // Clone collection so user specific purchased flag doesn't mutate cached models
+        $plans = $basePlans->map(function ($plan) use ($user) {
+            $cloned = clone $plan;
+            $cloned->purchased = ($user && $user->plan_id == $plan->id);
+            return $cloned;
+        });
 
         $activePlan = null;
-
-        if ($user) {
-            $user->refresh();
-
-            if ($user->plan_id) {
-                $activePlan = $user->load('plan')->plan;
-            }
-
-            // Mark purchased plan
-            foreach ($plans as $plan) {
-                $plan->purchased = ($user->plan_id == $plan->id);
-            }
-        } else {
-            // If user not logged in
-            foreach ($plans as $plan) {
-                $plan->purchased = false;
-            }
+        if ($user && $user->plan_id) {
+            $activePlan = $user->loadMissing('plan')->plan;
         }
 
         return response()->json([
