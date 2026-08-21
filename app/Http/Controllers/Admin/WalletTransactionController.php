@@ -289,7 +289,7 @@ class WalletTransactionController extends Controller
      */
     public function downloadInvoice($id)
     {
-        $transaction = WalletTransaction::with(['wallet.user', 'wallet.astrologer'])->findOrFail($id);
+        $transaction = WalletTransaction::with(['wallet.user.astrologer'])->findOrFail($id);
         $taxService = app(\App\Services\WalletTaxService::class);
         return $taxService->downloadInvoicePdf($transaction);
     }

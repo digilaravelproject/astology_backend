@@ -58,4 +58,33 @@ class DashboardTest extends TestCase
         $response->assertStatus(200);
         $response->assertViewHas('recentOrders');
     }
+
+    /** @test */
+    public function it_can_render_orders_by_astrologer_provider()
+    {
+        $admin = Admin::create([
+            'name' => 'Admin User',
+            'email' => 'admin2@test.com',
+            'password' => bcrypt('password'),
+            'role' => 'super_admin',
+            'is_active' => true,
+        ]);
+
+        $provider = User::factory()->create(['user_type' => 'astrologer']);
+        $consumer = User::factory()->create(['user_type' => 'user']);
+
+        ChatSession::create([
+            'consumer_id' => $consumer->id,
+            'provider_id' => $provider->id,
+            'status' => 'completed',
+            'rate_per_minute' => 10,
+            'duration_seconds' => 60,
+            'total_cost' => 10,
+        ]);
+
+        $response = $this->actingAs($admin, 'admin')->get(route('admin.orders.by-astrologer.provider', $provider->id));
+        $response->assertStatus(200);
+        $response->assertViewHas('orders');
+        $response->assertViewHas('provider');
+    }
 }

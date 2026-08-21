@@ -352,4 +352,34 @@ class WalletGstAndWithdrawalTest extends TestCase
         $this->assertEquals('Astro Legal Tech LLP', Setting::get('company_name'));
         $this->assertEquals('27ABCDE1234F1Z5', Setting::get('company_gstin'));
     }
+
+    /** @test */
+    public function admin_can_download_wallet_transaction_tax_invoice_pdf()
+    {
+        $admin = \App\Models\Admin::create([
+            'name' => 'Super Admin 2',
+            'email' => 'admin2@astology.com',
+            'password' => bcrypt('password123'),
+            'role' => 'super_admin',
+            'is_active' => true,
+        ]);
+
+        $transaction = \App\Models\WalletTransaction::create([
+            'wallet_id' => $this->userWallet->id,
+            'transaction_type' => 'credit',
+            'amount' => 500.00,
+            'base_amount' => 500.00,
+            'gst_percent' => 18.00,
+            'gst_amount' => 90.00,
+            'total_amount' => 590.00,
+            'invoice_number' => 'INV-REC-20260821-000001',
+            'status' => 'completed',
+            'payment_provider' => 'razorpay',
+        ]);
+
+        $response = $this->actingAs($admin, 'admin')->get('/admin/wallet-transactions/' . $transaction->id . '/invoice');
+
+        $response->assertStatus(200);
+        $response->assertHeader('content-type', 'application/pdf');
+    }
 }
