@@ -251,6 +251,8 @@ Route::prefix('v1')->group(function () {
             Route::get('/wallet',                       [WalletController::class, 'show']);
             Route::post('/wallet/topup',                [WalletController::class, 'createTopup']);
             Route::post('/wallet/topup/verify',         [WalletController::class, 'verifyTopup']);
+            Route::post('/wallet/verify-topup',         [WalletController::class, 'verifyTopup']);
+            Route::post('/wallet/topup-verify',         [WalletController::class, 'verifyTopup']);
             Route::get('/wallet/transactions',          [WalletController::class, 'transactions']);
             Route::get('/wallet/transactions/{id}',     [WalletController::class, 'transactionDetail']);
             Route::get('/wallet/transactions/{id}/invoice', [WalletController::class, 'downloadInvoice']);
