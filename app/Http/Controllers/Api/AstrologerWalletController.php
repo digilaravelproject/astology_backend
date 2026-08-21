@@ -58,24 +58,56 @@ class AstrologerWalletController extends Controller
     /**
      * Get withdrawal history for the astrologer.
      */
-    public function withdrawals(Request $request): JsonResponse
+    /**
+     * Get paginated monthly payout settlements for the astrologer.
+     */
+    public function payouts(Request $request): JsonResponse
     {
         try {
-            $withdrawals = $this->walletService->getWithdrawalHistory($request->user());
+            $payouts = $this->walletService->getPayoutsHistory($request->user());
             return response()->json([
                 'status' => 'success',
-                'data' => $withdrawals
+                'data' => $payouts
             ], 200);
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Failed to fetch withdrawal history.'
+                'message' => 'Failed to fetch payout history.'
             ], 500);
         }
     }
 
     /**
-     * Get withdrawal configuration and limits for the authenticated astrologer.
+     * Download official TDS Payout Settlement Advice PDF for an astrologer payout.
+     */
+    public function payoutReceipt(Request $request, int $id)
+    {
+        try {
+            $astrologer = $request->user()->astrologer;
+            if (!$astrologer) {
+                return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+            }
+
+            $payout = \App\Models\AstrologerPayout::where('astrologer_id', $astrologer->id)->findOrFail($id);
+            /** @var \App\Services\AstrologerPayoutService $payoutService */
+            $payoutService = app(\App\Services\AstrologerPayoutService::class);
+
+            return $payoutService->generateSettlementSlipPdf($payout);
+        } catch (Exception $e) {
+            return response()->json(['status' => 'error', 'message' => 'Failed to generate payout advice slip.'], 500);
+        }
+    }
+
+    /**
+     * Get withdrawal history for the astrologer (Alias for payouts).
+     */
+    public function withdrawals(Request $request): JsonResponse
+    {
+        return $this->payouts($request);
+    }
+
+    /**
+     * Get withdrawal configuration and monthly settlement schedule for the astrologer.
      */
     public function withdrawalConfig(Request $request): JsonResponse
     {
@@ -94,47 +126,15 @@ class AstrologerWalletController extends Controller
     }
 
     /**
-     * Request a withdrawal to a selected bank account.
+     * Self-withdrawal is disabled. Payouts are processed by Admin monthly under TDS guidelines.
      */
     public function withdraw(Request $request): JsonResponse
     {
-        $request->validate([
-            'amount' => ['required', 'numeric', 'min:0.01'],
-            'bank_account_id' => ['required', 'integer'],
-        ]);
-
-        try {
-            $result = $this->walletService->requestWithdrawal(
-                $request->user(),
-                (float)$request->input('amount'),
-                (int)$request->input('bank_account_id')
-            );
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Withdrawal request submitted successfully.',
-                'data' => $result
-            ], 201);
-        } catch (Exception $e) {
-            $code = $e->getCode();
-            if ($code === 403) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $e->getMessage()
-                ], 403);
-            }
-            if ($code === 422) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => $e->getMessage()
-                ], 422);
-            }
-
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage() ?? 'Failed to submit withdrawal request.'
-            ], 500);
-        }
+        return response()->json([
+            'status'  => 'error',
+            'code'    => 'SELF_WITHDRAWAL_DISABLED',
+            'message' => 'Manual self-withdrawal is disabled. Partner earnings are settled automatically every monthly billing cycle directly to your verified bank account after TDS deduction.'
+        ], 403);
     }
 
     /**

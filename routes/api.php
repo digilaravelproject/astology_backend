@@ -119,13 +119,15 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{id}/set-default',[AstrologerDefaultMessageController::class, 'setDefault']);
             });
 
-            // Wallet & Financial Earnings
+            // Wallet, Monthly Payouts & Financial Earnings
             Route::prefix('wallet')->group(function () {
                 Route::get('/',                             [AstrologerWalletController::class, 'show']);
                 Route::get('/withdrawal-config',            [AstrologerWalletController::class, 'withdrawalConfig']);
                 Route::get('/earnings',                     [AstrologerWalletController::class, 'earnings']);
-                Route::get('/withdrawals',                  [AstrologerWalletController::class, 'withdrawals']);
-                Route::get('/withdrawals/{id}/receipt',     [AstrologerWalletController::class, 'downloadWithdrawalReceipt']);
+                Route::get('/payouts',                      [AstrologerWalletController::class, 'payouts']);
+                Route::get('/payouts/{id}/receipt',         [AstrologerWalletController::class, 'payoutReceipt']);
+                Route::get('/withdrawals',                  [AstrologerWalletController::class, 'payouts']);
+                Route::get('/withdrawals/{id}/receipt',     [AstrologerWalletController::class, 'payoutReceipt']);
                 Route::post('/withdraw',                    [AstrologerWalletController::class, 'withdraw']);
                 Route::get('/weekly-rankings',              [AstrologerWalletController::class, 'weeklyRankings']);
                 Route::get('/invoices',                     [AstrologerWalletController::class, 'invoices']);

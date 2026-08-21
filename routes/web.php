@@ -43,7 +43,8 @@ use App\Http\Controllers\Admin\{
     RateLimitController,
     AdminFcmSettingController,
     OfferController as AdminOfferController,
-    AdminPackageController
+    AdminPackageController,
+    AstrologerPayoutController as AdminAstrologerPayoutController
 };
 
 /*
@@ -200,6 +201,15 @@ Route::prefix('admin')->group(function () {
             Route::put('/{id}', [AstrologerBankAccountController::class, 'update'])->name('admin.astrologer-bank-accounts.update');
             Route::post('/{id}/toggle-verification', [AstrologerBankAccountController::class, 'toggleVerification'])->name('admin.astrologer-bank-accounts.toggle-verification');
             Route::delete('/{id}', [AstrologerBankAccountController::class, 'destroy'])->name('admin.astrologer-bank-accounts.destroy');
+        });
+
+        // Astrologer Monthly Payouts & TDS Settlements
+        Route::prefix('astrologer-payouts')->group(function () {
+            Route::get('/', [AdminAstrologerPayoutController::class, 'index'])->name('admin.astrologer-payouts.index');
+            Route::get('/{astrologerId}/context', [AdminAstrologerPayoutController::class, 'getContext'])->name('admin.astrologer-payouts.context');
+            Route::post('/preview-tds', [AdminAstrologerPayoutController::class, 'previewTds'])->name('admin.astrologer-payouts.preview-tds');
+            Route::post('/', [AdminAstrologerPayoutController::class, 'store'])->name('admin.astrologer-payouts.store');
+            Route::get('/{id}/download-slip', [AdminAstrologerPayoutController::class, 'downloadSlip'])->name('admin.astrologer-payouts.download-slip');
         });
 
         // Core Astrologer CRUD

@@ -222,12 +222,12 @@
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Recharge GST -->
+                            <!-- User Recharge GST -->
                             <div class="p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-xs">
                                 <div class="flex items-center justify-between">
                                     <div>
                                         <span class="text-sm font-bold text-text-primary block">User Recharge GST</span>
-                                        <span class="text-[11px] text-text-muted">Charged on top of base recharge amount</span>
+                                        <span class="text-[11px] text-text-muted">Charged on top of base user wallet recharge</span>
                                     </div>
                                     <div class="flex items-center gap-2">
                                         <input type="hidden" name="gst_recharge_enabled" value="0">
@@ -242,38 +242,44 @@
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <!-- Withdrawal GST -->
-                            <div class="p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-xs">
-                                <div class="flex items-center justify-between">
-                                    <div>
-                                        <span class="text-sm font-bold text-text-primary block">Astrologer Payout GST</span>
-                                        <span class="text-[11px] text-text-muted">Tax deducted on astrologer withdrawals</span>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <input type="hidden" name="gst_withdrawal_enabled" value="0">
-                                        <input type="checkbox" name="gst_withdrawal_enabled" value="1" {{ $settings['gst_withdrawal_enabled'] ? 'checked' : '' }} class="w-8 h-5 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-3 checked:bg-primary">
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-3 pt-2">
-                                    <label class="text-xs font-bold text-text-secondary uppercase">Payout GST Rate</label>
-                                    <div class="flex items-center gap-1.5 ml-auto">
-                                        <input type="number" step="0.01" name="gst_withdrawal_rate" value="{{ $settings['gst_withdrawal_rate'] }}" min="0" max="100" class="w-20 border border-gray-300 px-2 py-1.5 rounded-lg text-center font-bold text-sm">
-                                        <span class="text-sm font-bold text-text-secondary">%</span>
-                                    </div>
-                                </div>
+                    <!-- TDS Management Card -->
+                    <div class="p-6 bg-indigo-50/50 rounded-2xl border border-indigo-200 space-y-6">
+                        <div class="flex items-center justify-between border-b border-indigo-100 pb-4">
+                            <div>
+                                <h4 class="text-base font-extrabold text-text-primary flex items-center gap-2">
+                                    <i class="fas fa-hand-holding-usd text-indigo-600"></i> Astrologer Payout TDS Management (Tax Deducted at Source)
+                                </h4>
+                                <p class="text-xs text-text-muted mt-0.5">Control dynamic TDS deductions on monthly partner disbursements under the Income Tax Act.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <input type="hidden" name="tds_enabled" value="0">
+                                <input type="checkbox" name="tds_enabled" value="1" {{ $settings['tds_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-indigo-600 border-2 border-transparent">
+                                <span class="text-xs font-bold text-text-secondary uppercase">Global TDS Switch</span>
                             </div>
                         </div>
 
-                        <!-- Withdrawal GST Trigger Threshold -->
-                        <div class="p-5 bg-white border border-gray-200 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
-                            <div>
-                                <span class="text-sm font-bold text-text-primary block">Minimum Withdrawal Limit to Trigger GST</span>
-                                <span class="text-xs text-text-muted">GST deduction applies only when requested withdrawal amount is equal to or exceeds this threshold (₹0 = applies to all).</span>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- TDS Rate -->
+                            <div class="p-5 bg-white border border-gray-200 rounded-xl space-y-2 shadow-xs">
+                                <label class="text-xs font-bold text-text-secondary uppercase block">TDS Deduction Rate</label>
+                                <span class="text-[11px] text-text-muted block">Standard percentage deducted from gross settlement</span>
+                                <div class="flex items-center gap-2 pt-2">
+                                    <input type="number" step="0.01" name="tds_rate" value="{{ $settings['tds_rate'] }}" min="0" max="100" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center font-bold text-sm">
+                                    <span class="text-sm font-bold text-text-secondary">%</span>
+                                </div>
                             </div>
-                            <div class="relative">
-                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
-                                <input type="number" step="0.01" name="min_withdrawal_gst_threshold" value="{{ $settings['min_withdrawal_gst_threshold'] }}" min="0" class="w-32 border border-gray-300 pl-7 pr-3 py-2 rounded-xl text-sm font-bold">
+
+                            <!-- TDS Threshold -->
+                            <div class="p-5 bg-white border border-gray-200 rounded-xl space-y-2 shadow-xs">
+                                <label class="text-xs font-bold text-text-secondary uppercase block">Minimum Exemption Threshold (₹)</label>
+                                <span class="text-[11px] text-text-muted block">TDS applies only when settlement amount is equal to or exceeds this threshold (₹0 = applies to all amounts).</span>
+                                <div class="relative pt-2">
+                                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                    <input type="number" step="0.01" name="tds_threshold" value="{{ $settings['tds_threshold'] }}" min="0" class="w-full border border-gray-300 pl-8 pr-4 py-2 rounded-xl text-sm font-bold">
+                                </div>
                             </div>
                         </div>
                     </div>

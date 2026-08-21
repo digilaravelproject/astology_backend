@@ -29,7 +29,7 @@ class SettingController extends Controller
             'ecommerce_commission_percentage' => Setting::get('ecommerce_commission_percentage', 15.00),
             'premium_yearly_commission_percentage' => Setting::get('premium_yearly_commission_percentage', 10.00),
             
-            // Financial / Wallet Rules
+            // Financial / Wallet & Tax Rules
             'min_wallet_recharge' => Setting::get('min_wallet_recharge', 100.00),
             'max_wallet_balance' => Setting::get('max_wallet_balance', 10000.00),
             'min_withdrawal_amount' => Setting::get('min_withdrawal_amount', 500.00),
@@ -39,6 +39,11 @@ class SettingController extends Controller
             'gst_withdrawal_enabled' => Setting::get('gst_withdrawal_enabled', true, 'boolean'),
             'gst_recharge_rate' => Setting::get('gst_recharge_rate', 18.00),
             'gst_withdrawal_rate' => Setting::get('gst_withdrawal_rate', 18.00),
+
+            // Astrologer Payout TDS Management
+            'tds_enabled' => Setting::get('tds_enabled', true, 'boolean'),
+            'tds_rate' => Setting::get('tds_rate', 10.00),
+            'tds_threshold' => Setting::get('tds_threshold', 0.00),
 
             // Company Tax / Billing Info
             'company_name' => Setting::get('company_name', 'Astology Premium Services Pvt Ltd'),
@@ -108,6 +113,9 @@ class SettingController extends Controller
             'gst_withdrawal_enabled' => 'nullable|boolean',
             'gst_recharge_rate' => 'nullable|numeric|min:0|max:100',
             'gst_withdrawal_rate' => 'nullable|numeric|min:0|max:100',
+            'tds_enabled' => 'nullable|boolean',
+            'tds_rate' => 'nullable|numeric|min:0|max:100',
+            'tds_threshold' => 'nullable|numeric|min:0',
 
             // Company Tax / Billing
             'company_name' => 'nullable|string|max:255',
@@ -163,6 +171,9 @@ class SettingController extends Controller
             'gst_withdrawal_enabled' => 'tax',
             'gst_recharge_rate' => 'tax',
             'gst_withdrawal_rate' => 'tax',
+            'tds_enabled' => 'tax',
+            'tds_rate' => 'tax',
+            'tds_threshold' => 'tax',
             'company_name' => 'tax',
             'company_gstin' => 'tax',
             'company_pan' => 'tax',

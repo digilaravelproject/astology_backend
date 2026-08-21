@@ -110,53 +110,69 @@ class AstrologerWalletService
     }
 
     /**
+     * Get paginated monthly payout settlements for the astrologer.
+     */
+    public function getPayoutsHistory(User $user): LengthAwarePaginator
+    {
+        $astrologer = $user->astrologer;
+        if (!$astrologer) {
+            return new LengthAwarePaginator([], 0, 15);
+        }
+
+        return \App\Models\AstrologerPayout::with('bankAccount')
+            ->where('astrologer_id', $astrologer->id)
+            ->latest('payment_date')
+            ->paginate(15);
+    }
+
+    /**
      * Get paginated withdrawal requests and payout history for the astrologer.
      */
     public function getWithdrawalHistory(User $user): LengthAwarePaginator
     {
-        $wallet = $this->getOrCreateWallet($user->id);
-
-        return WalletTransaction::where('wallet_id', $wallet->id)
-            ->where('transaction_type', 'debit')
-            ->where(function ($query) {
-                $query->where('description', 'like', '%Withdrawal%')
-                    ->orWhere('description', 'like', '%payout%');
-            })
-            ->latest()
-            ->paginate(15);
+        return $this->getPayoutsHistory($user);
     }
 
     // =========================================================================
-    // 3. WITHDRAWAL CONFIGURATION & LIVE LIMITS
+    // 3. WITHDRAWAL & PAYOUT POLICY CONFIGURATION
     // =========================================================================
 
     /**
-     * Get live withdrawal limits, pending debit deductions, and dynamic GST tax rules.
+     * Get live balance, TDS tax rules, and monthly settlement schedule for the astrologer.
      */
     public function getWithdrawalConfig(User $user): array
     {
         $wallet = $this->getOrCreateWallet($user->id);
 
-        $pendingWithdrawalSum = (float) WalletTransaction::where('wallet_id', $wallet->id)
-            ->where('transaction_type', 'debit')
-            ->where('status', 'pending')
-            ->sum('amount');
+        /** @var \App\Services\TDSCalculatorService $tdsService */
+        $tdsService = app(\App\Services\TDSCalculatorService::class);
+        $tdsConfig = $tdsService->getTdsSettings();
 
-        $availableBalance = max(0, (float) $wallet->balance - $pendingWithdrawalSum);
+        $astrologer = $user->astrologer;
+        $totalPaidOut = 0.00;
+        $totalTdsDeducted = 0.00;
+        if ($astrologer) {
+            $totalPaidOut = (float) \App\Models\AstrologerPayout::where('astrologer_id', $astrologer->id)
+                ->where('status', 'completed')
+                ->sum('net_paid_amount');
 
-        /** @var WalletTaxService $taxService */
-        $taxService = app(WalletTaxService::class);
-        $settings = $taxService->getGstSettings();
+            $totalTdsDeducted = (float) \App\Models\AstrologerPayout::where('astrologer_id', $astrologer->id)
+                ->where('status', 'completed')
+                ->sum('tds_amount');
+        }
 
         return [
-            'total_balance' => (float) $wallet->balance,
-            'pending_withdrawals' => round($pendingWithdrawalSum, 2),
-            'available_balance' => round($availableBalance, 2),
-            'min_withdrawal_amount' => $settings['min_withdrawal_amount'],
-            'max_withdrawal_amount' => round($availableBalance, 2),
-            'gst_enabled' => $settings['gst_enabled'] && $settings['gst_withdrawal_enabled'],
-            'gst_withdrawal_rate' => $settings['gst_withdrawal_rate'],
-            'min_withdrawal_gst_threshold' => $settings['min_withdrawal_gst_threshold'],
+            'total_balance'          => (float) $wallet->balance,
+            'available_balance'      => (float) $wallet->balance,
+            'total_paid_out'         => round($totalPaidOut, 2),
+            'total_tds_deducted'     => round($totalTdsDeducted, 2),
+            'payout_frequency'       => 'Monthly Settlement',
+            'payout_processing_type' => 'Admin Direct Disbursement',
+            'self_withdrawal_status' => 'disabled',
+            'tds_enabled'            => $tdsConfig['tds_enabled'],
+            'tds_rate'               => $tdsConfig['tds_rate'],
+            'tds_threshold'          => $tdsConfig['tds_threshold'],
+            'settlement_notice'      => 'Payouts are disbursed automatically every monthly billing cycle directly to your verified bank account after TDS deduction.',
         ];
     }
 

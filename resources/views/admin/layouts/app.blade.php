@@ -576,6 +576,12 @@
                         </button>
                         <ul x-show="open" x-collapse class="bg-light/30 border-l-[3px] border-primary/20 ml-6">
                             <li>
+                                <a href="{{ route('admin.astrologer-payouts.index') }}" 
+                                   class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.astrologer-payouts.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
+                                    <i class="fas fa-circle text-[6px]"></i> Astrologer Payouts & TDS
+                                </a>
+                            </li>
+                            <li>
                                 <a href="{{ route('admin.wallet-transactions.index') }}" 
                                    class="flex items-center gap-3 px-6 py-2.5 text-xs font-semibold {{ request()->routeIs('admin.wallet-transactions.*') ? 'text-primary' : 'text-gray hover:text-primary' }}">
                                     <i class="fas fa-circle text-[6px]"></i> Wallet Transactions
