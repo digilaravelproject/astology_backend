@@ -16,23 +16,27 @@ class RemedyController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $langKey = $request->query('language');
-            if (!$langKey) {
-                return response()->json(['status' => 'error', 'message' => 'Language key is required.'], 400);
+            $langKey = $request->query('language') ?? $request->header('Accept-Language');
+            $language = null;
+            if ($langKey) {
+                $language = \App\Helpers\CacheHelper::remember("language:code:{$langKey}", 86400, function () use ($langKey) {
+                    return \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+                }, -1800, 1800);
             }
-
-            $language = \App\Helpers\CacheHelper::remember("language:code:{$langKey}", 86400, function () use ($langKey) {
-                return \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
-            }, -1800, 1800);
 
             if (!$language) {
-                return response()->json(['status' => 'error', 'message' => 'Language not found.'], 404);
+                $language = \App\Helpers\CacheHelper::remember("language:default", 86400, function () {
+                    return \App\Models\Language::where('is_active', true)->first() ?? \App\Models\Language::first();
+                }, -1800, 1800);
             }
 
-            $remedies = \App\Helpers\CacheHelper::remember("remedies:lang:{$language->id}", 3600, function () use ($language) {
-                return Remedy::where('is_active', true)
-                    ->where('language_id', $language->id)
-                    ->orderBy('created_at', 'desc')
+            $cacheKey = $language ? "remedies:lang:{$language->id}" : "remedies:all_active";
+            $remedies = \App\Helpers\CacheHelper::remember($cacheKey, 3600, function () use ($language) {
+                $query = Remedy::where('is_active', true);
+                if ($language) {
+                    $query->where('language_id', $language->id);
+                }
+                return $query->orderBy('created_at', 'desc')
                     ->get()
                     ->map(function ($remedy) {
                         return [

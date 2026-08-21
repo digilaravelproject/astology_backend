@@ -16,23 +16,27 @@ class BlogController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $langKey = $request->query('language');
-            if (!$langKey) {
-                return response()->json(['status' => 'error', 'message' => 'Language key is required.'], 400);
+            $langKey = $request->query('language') ?? $request->header('Accept-Language');
+            $language = null;
+            if ($langKey) {
+                $language = \App\Helpers\CacheHelper::remember("language:code:{$langKey}", 86400, function () use ($langKey) {
+                    return \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+                }, -1800, 1800);
             }
-
-            $language = \App\Helpers\CacheHelper::remember("language:code:{$langKey}", 86400, function () use ($langKey) {
-                return \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
-            }, -1800, 1800);
 
             if (!$language) {
-                return response()->json(['status' => 'error', 'message' => 'Language not found.'], 404);
+                $language = \App\Helpers\CacheHelper::remember("language:default", 86400, function () {
+                    return \App\Models\Language::where('is_active', true)->first() ?? \App\Models\Language::first();
+                }, -1800, 1800);
             }
 
-            $blogs = \App\Helpers\CacheHelper::remember("blogs:lang:{$language->id}", 3600, function () use ($language) {
-                return Blog::where('is_active', true)
-                    ->where('language_id', $language->id)
-                    ->select(['id', 'language_id', 'title', 'subtitle', 'author', 'image', 'blog_tags', 'type', 'is_active', 'created_at'])
+            $cacheKey = $language ? "blogs:lang:{$language->id}" : "blogs:all_active";
+            $blogs = \App\Helpers\CacheHelper::remember($cacheKey, 3600, function () use ($language) {
+                $query = Blog::where('is_active', true);
+                if ($language) {
+                    $query->where('language_id', $language->id);
+                }
+                return $query->select(['id', 'language_id', 'title', 'subtitle', 'author', 'image', 'blog_tags', 'type', 'is_active', 'created_at'])
                     ->orderBy('created_at', 'desc')
                     ->get();
             });
@@ -86,21 +90,23 @@ class BlogController extends Controller
     public function search(Request $request): JsonResponse
     {
         try {
-            $langKey = $request->query('language');
-            if (!$langKey) {
-                return response()->json(['status' => 'error', 'message' => 'Language key is required.'], 400);
+            $langKey = $request->query('language') ?? $request->header('Accept-Language');
+            $language = null;
+            if ($langKey) {
+                $language = \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
             }
-
-            $language = \App\Models\Language::where('code', $langKey)->orWhere('id', $langKey)->first();
             if (!$language) {
-                return response()->json(['status' => 'error', 'message' => 'Language not found.'], 404);
+                $language = \App\Models\Language::where('is_active', true)->first() ?? \App\Models\Language::first();
             }
 
             $search = $request->query('q');
             $type = $request->query('type');
             $tags = $request->query('tags');
 
-            $query = Blog::where('is_active', true)->where('language_id', $language->id);
+            $query = Blog::where('is_active', true);
+            if ($language) {
+                $query->where('language_id', $language->id);
+            }
 
             if ($search) {
                 $query->where(function ($q) use ($search) {
