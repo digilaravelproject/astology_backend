@@ -96,6 +96,11 @@ class ApiRequirementsVerificationTest extends TestCase
     public function test_astrologer_orders_display_id_offset(): void
     {
         $astrologerUser = User::factory()->create(['user_type' => 'astrologer']);
+        $astrologerUser->astrologer()->create([
+            'status' => 'approved',
+            'chat_rate_per_minute' => 10,
+            'call_rate_per_minute' => 10,
+        ]);
         $consumer = User::factory()->create(['user_type' => 'user']);
 
         // Create 2 chat sessions

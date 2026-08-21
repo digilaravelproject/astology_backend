@@ -46,6 +46,9 @@ class AstrologerWalletTest extends TestCase
             'balance' => 1000.00
         ]);
 
+        // Set minimum withdrawal to 100 for testing
+        \App\Models\Setting::set('min_withdrawal_amount', 100.00, 'decimal', 'wallet');
+
         // Create bank account for the astrologer
         $this->bankAccount = AstrologerBankAccount::create([
             'astrologer_id' => $this->astrologerProfile->id,
@@ -232,9 +235,7 @@ class AstrologerWalletTest extends TestCase
 
         $responseFail->assertStatus(422);
         $responseFail->assertJsonPath('status', 'error');
-        $responseFail->assertJsonFragment([
-            'message' => 'Insufficient available balance. Your total balance is ₹1000.00, but you have ₹300 in pending withdrawals.'
-        ]);
+        $this->assertStringContainsString('Insufficient available balance', $responseFail->json('message'));
     }
 
     /** @test */

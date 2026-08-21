@@ -75,12 +75,31 @@ class AstrologerWalletController extends Controller
     }
 
     /**
+     * Get withdrawal configuration and limits for the authenticated astrologer.
+     */
+    public function withdrawalConfig(Request $request): JsonResponse
+    {
+        try {
+            $config = $this->walletService->getWithdrawalConfig($request->user());
+            return response()->json([
+                'status' => 'success',
+                'data' => $config,
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to fetch withdrawal configuration: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Request a withdrawal to a selected bank account.
      */
     public function withdraw(Request $request): JsonResponse
     {
         $request->validate([
-            'amount' => ['required', 'numeric', 'min:1'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
             'bank_account_id' => ['required', 'integer'],
         ]);
 
@@ -98,7 +117,12 @@ class AstrologerWalletController extends Controller
             ], 201);
         } catch (Exception $e) {
             $code = $e->getCode();
-            // Handle expected validation errors
+            if ($code === 403) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => $e->getMessage()
+                ], 403);
+            }
             if ($code === 422) {
                 return response()->json([
                     'status' => 'error',
@@ -264,6 +288,36 @@ class AstrologerWalletController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Failed to download invoice: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Download itemized withdrawal receipt / tax advice PDF for a specific transaction.
+     */
+    public function downloadWithdrawalReceipt(Request $request, $id)
+    {
+        try {
+            $user = $request->user();
+            $wallet = \App\Models\Wallet::where('user_id', $user->id)->first();
+            if (!$wallet) {
+                return response()->json(['status' => 'error', 'message' => 'Wallet not found.'], 404);
+            }
+
+            $transaction = \App\Models\WalletTransaction::where('wallet_id', $wallet->id)
+                ->where('id', $id)
+                ->first();
+
+            if (!$transaction) {
+                return response()->json(['status' => 'error', 'message' => 'Withdrawal transaction not found.'], 404);
+            }
+
+            $taxService = app(\App\Services\WalletTaxService::class);
+            return $taxService->downloadInvoicePdf($transaction);
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to download receipt: ' . $e->getMessage()
             ], 500);
         }
     }

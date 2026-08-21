@@ -640,7 +640,7 @@ class AstrologerService
                                     $start = Carbon::createFromFormat('H:i', $slot['start']);
                                     $end = Carbon::createFromFormat('H:i', $slot['end']);
                                     if ($end->greaterThan($start)) {
-                                        $mins += $end->diffInMinutes($start);
+                                        $mins += abs($start->diffInMinutes($end));
                                     }
                                 } catch (\Exception $e) {
                                     // Ignore malformed time slots

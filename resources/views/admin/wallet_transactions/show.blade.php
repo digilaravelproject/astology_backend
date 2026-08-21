@@ -36,7 +36,7 @@
                 </h2>
                 
                 <div class="space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Transaction Type</div>
                             @if($transaction->transaction_type === 'credit')
@@ -69,11 +69,46 @@
                                 </div>
                             @endif
                         </div>
+                        <div>
+                            <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Tax Invoice / Receipt No.</div>
+                            <span class="inline-block px-3 py-2 bg-light font-mono text-xs font-bold text-dark rounded-xl border border-gray-lighter">
+                                {{ $transaction->invoice_number ?? 'N/A' }}
+                            </span>
+                        </div>
                     </div>
 
-                    <div>
-                        <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Amount</div>
-                        <div class="text-5xl font-black text-dark">₹{{ number_format($transaction->amount, 2) }}</div>
+                    <!-- Financial & Tax Amounts -->
+                    <div class="p-6 bg-light/30 rounded-3xl border border-gray-lighter grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                            <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">Base Amount</span>
+                            <span class="text-xl font-bold text-dark">₹{{ number_format($transaction->base_amount ?? $transaction->amount, 2) }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">GST Rate</span>
+                            <span class="text-xl font-bold text-primary">{{ $transaction->gst_percent ? $transaction->gst_percent . '%' : '0%' }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">GST Tax</span>
+                            <span class="text-xl font-bold text-warning">₹{{ number_format($transaction->gst_amount ?? 0, 2) }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">Total / Gross</span>
+                            <span class="text-xl font-black text-dark">₹{{ number_format($transaction->total_amount ?? $transaction->amount, 2) }}</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Ledger Impact Amount</div>
+                            <div class="text-3xl font-black text-dark">₹{{ number_format($transaction->amount, 2) }}</div>
+                            <span class="text-[10px] text-gray mt-1 block">(Strict wallet balance credit/debit)</span>
+                        </div>
+                        <div>
+                            <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">Balance Progression</div>
+                            <div class="text-sm font-bold text-dark">
+                                ₹{{ number_format($transaction->balance_before ?? 0, 2) }} <i class="fas fa-arrow-right text-[10px] text-gray mx-1"></i> ₹{{ number_format($transaction->balance_after ?? 0, 2) }}
+                            </div>
+                        </div>
                     </div>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -183,6 +218,13 @@
             <!-- Quick Actions -->
             <div class="bg-white p-8 rounded-[32px] border border-gray-lighter shadow-sm space-y-3">
                 <h3 class="text-[10px] font-black text-dark uppercase tracking-widest mb-6">Quick Actions</h3>
+                
+                @if($transaction->invoice_number || $transaction->status === 'completed')
+                <a href="{{ route('admin.wallet-transactions.download-invoice', $transaction->id) }}" target="_blank" class="block w-full bg-success/10 text-success py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-success hover:text-white transition-all text-center">
+                    <i class="fas fa-file-invoice-dollar mr-2"></i> Download Tax Invoice / Receipt
+                </a>
+                @endif
+
                 <a href="{{ route('admin.wallet-transactions.index') }}" class="block w-full bg-primary/10 text-primary py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-primary/20 transition-all text-center">
                     <i class="fas fa-arrow-left mr-2"></i> Back to List
                 </a>

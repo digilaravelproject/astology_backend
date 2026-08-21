@@ -218,12 +218,13 @@ Route::prefix('admin')->group(function () {
 
         // Financial & Wallet Transactions
         Route::prefix('wallet-transactions')->group(function () {
+            Route::get('/export', [WalletTransactionController::class, 'export'])->name('admin.wallet-transactions.export');
             Route::get('/', [WalletTransactionController::class, 'index'])->name('admin.wallet-transactions.index');
             Route::get('/{id}', [WalletTransactionController::class, 'show'])->name('admin.wallet-transactions.show');
+            Route::get('/{id}/invoice', [WalletTransactionController::class, 'downloadInvoice'])->name('admin.wallet-transactions.download-invoice');
             Route::post('/{id}/update-status', [WalletTransactionController::class, 'updateStatus'])->name('admin.wallet-transactions.update-status');
             Route::post('/{id}/refund', [WalletTransactionController::class, 'refund'])->name('admin.wallet-transactions.refund');
             Route::post('/wallet/{walletId}/adjust', [WalletTransactionController::class, 'adjust'])->name('admin.wallet-transactions.adjust');
-            Route::get('/export', [WalletTransactionController::class, 'export'])->name('admin.wallet-transactions.export');
         });
 
         // Plans & Subscriptions

@@ -33,6 +33,20 @@ class SettingController extends Controller
             'min_wallet_recharge' => Setting::get('min_wallet_recharge', 100.00),
             'max_wallet_balance' => Setting::get('max_wallet_balance', 10000.00),
             'min_withdrawal_amount' => Setting::get('min_withdrawal_amount', 500.00),
+            'min_withdrawal_gst_threshold' => Setting::get('min_withdrawal_gst_threshold', 0.00),
+            'gst_enabled' => Setting::get('gst_enabled', true, 'boolean'),
+            'gst_recharge_enabled' => Setting::get('gst_recharge_enabled', true, 'boolean'),
+            'gst_withdrawal_enabled' => Setting::get('gst_withdrawal_enabled', true, 'boolean'),
+            'gst_recharge_rate' => Setting::get('gst_recharge_rate', 18.00),
+            'gst_withdrawal_rate' => Setting::get('gst_withdrawal_rate', 18.00),
+
+            // Company Tax / Billing Info
+            'company_name' => Setting::get('company_name', 'Astology Premium Services Pvt Ltd'),
+            'company_gstin' => Setting::get('company_gstin', '07AAAAA0000A1Z5'),
+            'company_pan' => Setting::get('company_pan', 'AAAAA0000A'),
+            'company_address' => Setting::get('company_address', 'Connaught Place, New Delhi, Delhi 110001'),
+            'company_state' => Setting::get('company_state', 'Delhi'),
+            'company_state_code' => Setting::get('company_state_code', '07'),
             
             'razorpay_key' => Setting::get('razorpay_key', ''),
             'razorpay_secret' => Setting::get('razorpay_secret') ? '••••••••••••••••' : '',
@@ -84,10 +98,24 @@ class SettingController extends Controller
             'ecommerce_commission_percentage' => 'nullable|numeric|min:0|max:100',
             'premium_yearly_commission_percentage' => 'nullable|numeric|min:0|max:100',
             
-            // Financial
+            // Financial & GST Rules
             'min_wallet_recharge' => 'nullable|numeric|min:0',
             'max_wallet_balance' => 'nullable|numeric|min:0',
             'min_withdrawal_amount' => 'nullable|numeric|min:0',
+            'min_withdrawal_gst_threshold' => 'nullable|numeric|min:0',
+            'gst_enabled' => 'nullable|boolean',
+            'gst_recharge_enabled' => 'nullable|boolean',
+            'gst_withdrawal_enabled' => 'nullable|boolean',
+            'gst_recharge_rate' => 'nullable|numeric|min:0|max:100',
+            'gst_withdrawal_rate' => 'nullable|numeric|min:0|max:100',
+
+            // Company Tax / Billing
+            'company_name' => 'nullable|string|max:255',
+            'company_gstin' => 'nullable|string|max:20',
+            'company_pan' => 'nullable|string|max:20',
+            'company_address' => 'nullable|string|max:500',
+            'company_state' => 'nullable|string|max:100',
+            'company_state_code' => 'nullable|string|max:10',
             
             // Payment Gateway
             'razorpay_key' => 'nullable|string',
@@ -129,6 +157,18 @@ class SettingController extends Controller
             'min_wallet_recharge' => 'wallet',
             'max_wallet_balance' => 'wallet',
             'min_withdrawal_amount' => 'wallet',
+            'min_withdrawal_gst_threshold' => 'wallet',
+            'gst_enabled' => 'tax',
+            'gst_recharge_enabled' => 'tax',
+            'gst_withdrawal_enabled' => 'tax',
+            'gst_recharge_rate' => 'tax',
+            'gst_withdrawal_rate' => 'tax',
+            'company_name' => 'tax',
+            'company_gstin' => 'tax',
+            'company_pan' => 'tax',
+            'company_address' => 'tax',
+            'company_state' => 'tax',
+            'company_state_code' => 'tax',
             'razorpay_key' => 'payment',
             'razorpay_secret' => 'payment',
             'stripe_key' => 'payment',
@@ -162,9 +202,9 @@ class SettingController extends Controller
                 }
                 
                 $type = 'string';
-                if (str_contains($key, 'percentage') || str_contains($key, 'rate') || str_contains($key, 'amount') || str_contains($key, 'recharge') || str_contains($key, 'balance')) {
+                if (str_contains($key, 'percentage') || str_contains($key, 'rate') || str_contains($key, 'amount') || str_contains($key, 'recharge') || str_contains($key, 'balance') || str_contains($key, 'threshold')) {
                     $type = 'decimal';
-                } elseif (str_contains($key, 'limit_enabled') || $key === 'chat_assistance_enabled') {
+                } elseif (str_contains($key, 'limit_enabled') || str_contains($key, 'gst_enabled') || str_contains($key, '_enabled') || $key === 'chat_assistance_enabled') {
                     $type = 'boolean';
                     $value = $request->boolean($key);
                 } elseif (str_contains($key, 'limit_') || $key === 'chat_assistance_daily_limit') {

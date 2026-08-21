@@ -597,6 +597,10 @@ class AstrologerAuthController extends Controller
             if ($request->has('id_proof_number')) {
                 $astrologerFields['id_proof_number'] = $request->input('id_proof_number') !== '' ? $request->input('id_proof_number') : null;
             }
+            if ($request->has('gst_number')) {
+                $gst = $request->input('gst_number');
+                $astrologerFields['gst_number'] = ($gst !== '' && !is_null($gst)) ? strtoupper(trim($gst)) : null;
+            }
             if ($request->has('date_of_birth')) {
                 $astrologerFields['date_of_birth'] = $request->input('date_of_birth') !== '' ? $request->input('date_of_birth') : null;
             }

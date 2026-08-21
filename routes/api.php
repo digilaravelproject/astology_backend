@@ -122,8 +122,10 @@ Route::prefix('v1')->group(function () {
             // Wallet & Financial Earnings
             Route::prefix('wallet')->group(function () {
                 Route::get('/',                             [AstrologerWalletController::class, 'show']);
+                Route::get('/withdrawal-config',            [AstrologerWalletController::class, 'withdrawalConfig']);
                 Route::get('/earnings',                     [AstrologerWalletController::class, 'earnings']);
                 Route::get('/withdrawals',                  [AstrologerWalletController::class, 'withdrawals']);
+                Route::get('/withdrawals/{id}/receipt',     [AstrologerWalletController::class, 'downloadWithdrawalReceipt']);
                 Route::post('/withdraw',                    [AstrologerWalletController::class, 'withdraw']);
                 Route::get('/weekly-rankings',              [AstrologerWalletController::class, 'weeklyRankings']);
                 Route::get('/invoices',                     [AstrologerWalletController::class, 'invoices']);
@@ -244,6 +246,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/wallet/topup/verify',         [WalletController::class, 'verifyTopup']);
             Route::get('/wallet/transactions',          [WalletController::class, 'transactions']);
             Route::get('/wallet/transactions/{id}',     [WalletController::class, 'transactionDetail']);
+            Route::get('/wallet/transactions/{id}/invoice', [WalletController::class, 'downloadInvoice']);
 
             // Reviews & Ratings
             Route::post('/reviews',                     [ReviewController::class, 'store']);

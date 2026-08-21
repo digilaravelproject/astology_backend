@@ -22,7 +22,7 @@ class AstrologerPerformanceTest extends TestCase
     public function test_returns_correct_performance_metrics(): void
     {
         // 1. Create User and Astrologer Profile
-        $user = User::factory()->create();
+        $user = User::factory()->create(['user_type' => 'astrologer']);
         $astrologer = Astrologer::factory()->create([
             'user_id' => $user->id,
             'call_rate_per_minute' => 50.00,
@@ -91,7 +91,7 @@ class AstrologerPerformanceTest extends TestCase
         ]);
 
         // Request performance endpoint
-        $response = $this->actingAs($user)->getJson('/api/v1/astrologer/performance');
+        $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/astrologer/performance');
 
         // Assert response status
         $response->assertStatus(200);

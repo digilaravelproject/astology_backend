@@ -242,10 +242,15 @@ class WalletTransactionController extends Controller
             $handle = fopen('php://output', 'w');
             fputcsv($handle, [
                 'Transaction ID',
+                'Invoice No',
                 'User Name',
                 'User Email',
                 'Type',
-                'Amount',
+                'Base Amount',
+                'GST %',
+                'GST Amount',
+                'Total Amount',
+                'Wallet Credit/Debit',
                 'Status',
                 'Description',
                 'Created At',
@@ -257,9 +262,14 @@ class WalletTransactionController extends Controller
                     foreach ($transactions as $transaction) {
                         fputcsv($handle, [
                             $transaction->id,
+                            $transaction->invoice_number ?? '-',
                             $transaction->wallet->user->name ?? '-',
                             $transaction->wallet->user->email ?? '-',
                             ucfirst($transaction->transaction_type),
+                            $transaction->base_amount ?? $transaction->amount,
+                            $transaction->gst_percent ? $transaction->gst_percent . '%' : '0%',
+                            $transaction->gst_amount ?? 0.00,
+                            $transaction->total_amount ?? $transaction->amount,
                             $transaction->amount,
                             ucfirst($transaction->status),
                             $transaction->description,
@@ -272,5 +282,15 @@ class WalletTransactionController extends Controller
         };
 
         return response()->stream($callback, 200, $headers);
+    }
+
+    /**
+     * Download Tax Invoice / Payout Receipt PDF for admin.
+     */
+    public function downloadInvoice($id)
+    {
+        $transaction = WalletTransaction::with(['wallet.user', 'wallet.astrologer'])->findOrFail($id);
+        $taxService = app(\App\Services\WalletTaxService::class);
+        return $taxService->downloadInvoicePdf($transaction);
     }
 }

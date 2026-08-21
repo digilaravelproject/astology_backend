@@ -169,9 +169,12 @@
                     </div>
                 </div>
 
-                <!-- Wallet Rules -->
-                <div x-show="tab === 'wallet'" class="space-y-6">
-                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">Wallet & Money Rules</h3>
+                <!-- Wallet & GST Rules -->
+                <div x-show="tab === 'wallet'" class="space-y-8">
+                    <div>
+                        <h3 class="text-lg font-bold text-text-primary border-b pb-3">Wallet & Financial Rules</h3>
+                        <p class="text-xs text-text-muted mt-1">Configure wallet recharge thresholds, withdrawal limits, and automated GST tax calculations.</p>
+                    </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl">
@@ -198,7 +201,118 @@
                                 <span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
                                 <input type="number" name="min_withdrawal_amount" value="{{ $settings['min_withdrawal_amount'] }}" min="1" class="w-full border border-gray-300 pl-8 pr-4 py-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                             </div>
-                            <span class="block text-[10px] text-text-muted mt-2">Minimum wallet amount required to request payout</span>
+                            <span class="block text-[10px] text-text-muted mt-2">Minimum amount required to request payout</span>
+                        </div>
+                    </div>
+
+                    <!-- GST Configuration Card -->
+                    <div class="p-6 bg-primary/5 rounded-2xl border border-primary/20 space-y-6">
+                        <div class="flex items-center justify-between border-b border-primary/10 pb-4">
+                            <div>
+                                <h4 class="text-base font-extrabold text-text-primary flex items-center gap-2">
+                                    <i class="fas fa-file-invoice-dollar text-primary"></i> GST & Tax Engine Management
+                                </h4>
+                                <p class="text-xs text-text-muted mt-0.5">Control dynamic tax application for wallet top-ups and astrologer payouts.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <input type="hidden" name="gst_enabled" value="0">
+                                <input type="checkbox" name="gst_enabled" value="1" {{ $settings['gst_enabled'] ? 'checked' : '' }} class="w-10 h-6 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-5 after:h-5 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-4 checked:bg-primary border-2 border-transparent">
+                                <span class="text-xs font-bold text-text-secondary uppercase">Global GST Master Switch</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <!-- Recharge GST -->
+                            <div class="p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-xs">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <span class="text-sm font-bold text-text-primary block">User Recharge GST</span>
+                                        <span class="text-[11px] text-text-muted">Charged on top of base recharge amount</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="hidden" name="gst_recharge_enabled" value="0">
+                                        <input type="checkbox" name="gst_recharge_enabled" value="1" {{ $settings['gst_recharge_enabled'] ? 'checked' : '' }} class="w-8 h-5 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-3 checked:bg-primary">
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 pt-2">
+                                    <label class="text-xs font-bold text-text-secondary uppercase">Recharge GST Rate</label>
+                                    <div class="flex items-center gap-1.5 ml-auto">
+                                        <input type="number" step="0.01" name="gst_recharge_rate" value="{{ $settings['gst_recharge_rate'] }}" min="0" max="100" class="w-20 border border-gray-300 px-2 py-1.5 rounded-lg text-center font-bold text-sm">
+                                        <span class="text-sm font-bold text-text-secondary">%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Withdrawal GST -->
+                            <div class="p-5 bg-white border border-gray-200 rounded-xl space-y-4 shadow-xs">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <span class="text-sm font-bold text-text-primary block">Astrologer Payout GST</span>
+                                        <span class="text-[11px] text-text-muted">Tax deducted on astrologer withdrawals</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="hidden" name="gst_withdrawal_enabled" value="0">
+                                        <input type="checkbox" name="gst_withdrawal_enabled" value="1" {{ $settings['gst_withdrawal_enabled'] ? 'checked' : '' }} class="w-8 h-5 appearance-none bg-gray-300 rounded-full relative cursor-pointer after:absolute after:top-0.5 after:left-0.5 after:w-4 after:h-4 after:bg-white after:rounded-full after:transition-all checked:after:translate-x-3 checked:bg-primary">
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 pt-2">
+                                    <label class="text-xs font-bold text-text-secondary uppercase">Payout GST Rate</label>
+                                    <div class="flex items-center gap-1.5 ml-auto">
+                                        <input type="number" step="0.01" name="gst_withdrawal_rate" value="{{ $settings['gst_withdrawal_rate'] }}" min="0" max="100" class="w-20 border border-gray-300 px-2 py-1.5 rounded-lg text-center font-bold text-sm">
+                                        <span class="text-sm font-bold text-text-secondary">%</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Withdrawal GST Trigger Threshold -->
+                        <div class="p-5 bg-white border border-gray-200 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div>
+                                <span class="text-sm font-bold text-text-primary block">Minimum Withdrawal Limit to Trigger GST</span>
+                                <span class="text-xs text-text-muted">GST deduction applies only when requested withdrawal amount is equal to or exceeds this threshold (₹0 = applies to all).</span>
+                            </div>
+                            <div class="relative">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-text-secondary">₹</span>
+                                <input type="number" step="0.01" name="min_withdrawal_gst_threshold" value="{{ $settings['min_withdrawal_gst_threshold'] }}" min="0" class="w-32 border border-gray-300 pl-7 pr-3 py-2 rounded-xl text-sm font-bold">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Company Tax & Billing Profile -->
+                    <div class="p-6 bg-light/10 border border-gray-200 rounded-2xl space-y-4">
+                        <div class="flex items-center gap-2 border-b pb-2">
+                            <i class="fas fa-building text-primary"></i>
+                            <h4 class="text-sm font-extrabold text-text-primary uppercase">Company Invoicing & Tax Profile</h4>
+                        </div>
+                        <p class="text-xs text-text-muted">These details appear on computer-generated Tax Invoices and Payout Receipts.</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Company Legal Name</label>
+                                <input type="text" name="company_name" value="{{ $settings['company_name'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Company GSTIN</label>
+                                <input type="text" name="company_gstin" value="{{ $settings['company_gstin'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Company PAN</label>
+                                <input type="text" name="company_pan" value="{{ $settings['company_pan'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm font-mono">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                            <div class="md:col-span-2">
+                                <label class="block text-xs font-bold text-text-secondary mb-1">Registered Address</label>
+                                <input type="text" name="company_address" value="{{ $settings['company_address'] }}" class="w-full border border-gray-300 px-4 py-2.5 rounded-xl text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-text-secondary mb-1">State & State Code</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input type="text" name="company_state" placeholder="e.g. Delhi" value="{{ $settings['company_state'] }}" class="w-full border border-gray-300 px-3 py-2.5 rounded-xl text-sm">
+                                    <input type="text" name="company_state_code" placeholder="Code (07)" value="{{ $settings['company_state_code'] }}" class="w-full border border-gray-300 px-3 py-2.5 rounded-xl text-sm text-center">
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
