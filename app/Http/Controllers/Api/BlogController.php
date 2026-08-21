@@ -36,9 +36,25 @@ class BlogController extends Controller
                 if ($language) {
                     $query->where('language_id', $language->id);
                 }
-                return $query->select(['id', 'language_id', 'title', 'subtitle', 'author', 'image', 'blog_tags', 'type', 'is_active', 'created_at'])
+                return $query->select(['id', 'language_id', 'title', 'subtitle', 'author', 'blog_image', 'blog_tags', 'type', 'is_active', 'created_at'])
                     ->orderBy('created_at', 'desc')
-                    ->get();
+                    ->get()
+                    ->map(function ($blog) {
+                        return [
+                            'id' => $blog->id,
+                            'language_id' => $blog->language_id,
+                            'title' => $blog->title,
+                            'subtitle' => $blog->subtitle,
+                            'author' => $blog->author,
+                            'type' => $blog->type,
+                            'blog_image' => $blog->blog_image,
+                            'blog_image_url' => $blog->blog_image_url,
+                            'image' => $blog->blog_image_url,
+                            'blog_tags' => $blog->blog_tags,
+                            'is_active' => $blog->is_active,
+                            'created_at' => $blog->created_at,
+                        ];
+                    });
             });
 
             return response()->json([
@@ -131,7 +147,23 @@ class BlogController extends Controller
                 }
             }
 
-            $blogs = $query->orderByDesc('created_at')->get();
+            $blogs = $query->orderByDesc('created_at')->get()
+                ->map(function ($blog) {
+                    return [
+                        'id' => $blog->id,
+                        'language_id' => $blog->language_id,
+                        'title' => $blog->title,
+                        'subtitle' => $blog->subtitle,
+                        'author' => $blog->author,
+                        'type' => $blog->type,
+                        'blog_image' => $blog->blog_image,
+                        'blog_image_url' => $blog->blog_image_url,
+                        'image' => $blog->blog_image_url,
+                        'blog_tags' => $blog->blog_tags,
+                        'is_active' => $blog->is_active,
+                        'created_at' => $blog->created_at,
+                    ];
+                });
 
             return response()->json([
                 'status' => 'success',
