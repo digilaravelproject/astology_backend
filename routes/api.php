@@ -171,9 +171,16 @@ Route::prefix('v1')->group(function () {
                 Route::get('/history',      [AstrologerOfferController::class, 'history']);
             });
 
-            // Push Notification Device Token
+            // Push Notification Device Token & Notification Center
             Route::post('/device-token', [DeviceTokenController::class, 'store']);
             Route::post('/remove-token', [DeviceTokenController::class, 'remove']);
+            Route::get('/notifications/count',              [NotificationController::class, 'count']);
+            Route::get('/notifications',                    [NotificationController::class, 'list']);
+            Route::get('/notifications/{id}',               [NotificationController::class, 'show']);
+            Route::put('/notifications/{id}/mark-read',      [NotificationController::class, 'markRead']);
+            Route::post('/notifications/{id}/mark-read',     [NotificationController::class, 'markRead']);
+            Route::post('/notifications/mark-all-read',      [NotificationController::class, 'markAllRead']);
+            Route::delete('/notifications/{id}',            [NotificationController::class, 'destroy']);
 
             // Session & Account Lifecycle
             Route::post('/logout',          [AstrologerAuthController::class, 'logout']);
@@ -268,14 +275,16 @@ Route::prefix('v1')->group(function () {
             Route::post('/device-token',        [DeviceTokenController::class, 'store']);
             Route::post('/remove-token',        [DeviceTokenController::class, 'remove']);
 
-            // In-App Notification Center
-            Route::get('/notifications/count',              [NotificationController::class, 'count']);
-            Route::get('/notifications',                    [NotificationController::class, 'list']);
-            Route::get('/notifications/{id}',               [NotificationController::class, 'show']);
-            Route::put('/notifications/{id}/mark-read',      [NotificationController::class, 'markRead']);
-            Route::post('/notifications/{id}/mark-read',     [NotificationController::class, 'markRead']);
-            Route::post('/notifications/mark-all-read',      [NotificationController::class, 'markAllRead']);
-            Route::delete('/notifications/{id}',            [NotificationController::class, 'destroy']);
+            // In-App Notification Center (Accessible to any authenticated account)
+            Route::withoutMiddleware(['user'])->group(function () {
+                Route::get('/notifications/count',              [NotificationController::class, 'count']);
+                Route::get('/notifications',                    [NotificationController::class, 'list']);
+                Route::get('/notifications/{id}',               [NotificationController::class, 'show']);
+                Route::put('/notifications/{id}/mark-read',      [NotificationController::class, 'markRead']);
+                Route::post('/notifications/{id}/mark-read',     [NotificationController::class, 'markRead']);
+                Route::post('/notifications/mark-all-read',      [NotificationController::class, 'markAllRead']);
+                Route::delete('/notifications/{id}',            [NotificationController::class, 'destroy']);
+            });
 
             // Matrimony Profiles
             Route::post('/matrimony/profile',                       [MatrimonyController::class, 'createProfile']);
