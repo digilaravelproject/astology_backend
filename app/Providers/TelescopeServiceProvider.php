@@ -20,8 +20,13 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
         $this->hideSensitiveRequestDetails();
 
         Telescope::filter(function (IncomingEntry $entry) {
-            // Log everything (both success and fail) for production debugging.
-            return true;
+            if ($this->app->environment('local')) {
+                return true;
+            }
+
+            return $entry->isReportableException() ||
+                   $entry->isFailedRequest() ||
+                   $entry->isFailedJob();
         });
     }
 
