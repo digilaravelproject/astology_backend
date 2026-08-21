@@ -257,6 +257,71 @@ class PushNotificationPayload
     }
 
     /**
+     * Build a Live Session notification payload with full Flutter deep-linking data contract.
+     *
+     * @param int $sessionId Live session ID
+     * @param int $astrologerId Astrologer profile ID
+     * @param string $astrologerName Astrologer display name
+     * @param string|null $astrologerAvatar Astrologer photo URL
+     * @param string $status Event state: 'live', 'scheduled', 'reminder'
+     * @param string $title Custom alert title
+     * @param string $body Custom alert body
+     * @param string|null $channelName LiveKit / Room channel identifier
+     * @param array $extra Additional custom parameters
+     * @return self
+     */
+    public static function forLiveSession(
+        int $sessionId,
+        int $astrologerId,
+        string $astrologerName,
+        ?string $astrologerAvatar = null,
+        string $status = 'live',
+        string $title = '',
+        string $body = '',
+        ?string $channelName = null,
+        array $extra = []
+    ): self {
+        $channel = $channelName ?: "live_session_{$sessionId}";
+        
+        $defaultTitle = match ($status) {
+            'scheduled' => "New Live Session Scheduled! 📅",
+            'reminder' => "Live Session Starting Soon! ⏰",
+            default => "{$astrologerName} is Live Now! 🔴",
+        };
+
+        $defaultBody = match ($status) {
+            'scheduled' => "{$astrologerName} has scheduled a live session. Don't miss it!",
+            'reminder' => "{$astrologerName} is going live in a few minutes. Get ready!",
+            default => "Join the live session now to interact directly and ask your questions.",
+        };
+
+        $data = array_merge([
+            'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
+            'screen'          => 'LIVE_STREAM_SCREEN',
+            'session_id'      => (string) $sessionId,
+            'astrologer_id'   => (string) $astrologerId,
+            'astrologer_name' => $astrologerName,
+            'channel_name'    => $channel,
+            'type'            => 'live_stream',
+            'status'          => $status,
+            'created_at'      => now()->toIso8601String(),
+        ], $extra);
+
+        return new self(
+            title: $title ?: $defaultTitle,
+            body: $body ?: $defaultBody,
+            type: 'live_stream',
+            referenceId: (string) $sessionId,
+            imageUrl: $astrologerAvatar,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            sound: 'default',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: false
+        );
+    }
+
+    /**
      * Convert to standard array for storing in database logs.
      */
     public function toArray(): array

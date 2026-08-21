@@ -289,9 +289,15 @@ class LiveSessionService
                 Log::error('Failed to broadcast LiveSessionStarted on create', ['error' => $e->getMessage()]);
             }
             try {
-                $this->notifyAllUsersAboutLive($freshSession);
+                \App\Jobs\SendLiveSessionNotificationJob::dispatch($freshSession->id, 'live');
             } catch (\Exception $e) {
-                Log::error('Failed to notify users about live', ['error' => $e->getMessage()]);
+                Log::error('Failed to dispatch live notification job', ['error' => $e->getMessage()]);
+            }
+        } else {
+            try {
+                \App\Jobs\SendLiveSessionNotificationJob::dispatch($liveSession->id, 'scheduled');
+            } catch (\Exception $e) {
+                Log::error('Failed to dispatch scheduled live notification job', ['error' => $e->getMessage()]);
             }
         }
 
@@ -457,10 +463,13 @@ class LiveSessionService
         } catch (\Exception $e) {
             Log::error('Failed to broadcast LiveSessionStarted on start', ['error' => $e->getMessage()]);
         }
-        try {
-            $this->notifyAllUsersAboutLive($freshSession);
-        } catch (\Exception $e) {
-            Log::error('Failed to notify users about live', ['error' => $e->getMessage()]);
+
+        if (!$freshSession->is_live_notified) {
+            try {
+                \App\Jobs\SendLiveSessionNotificationJob::dispatch($freshSession->id, 'live');
+            } catch (\Exception $e) {
+                Log::error('Failed to dispatch live notification job on startSession', ['error' => $e->getMessage()]);
+            }
         }
 
         return $this->formatSession($freshSession);
@@ -727,28 +736,14 @@ class LiveSessionService
     }
 
     /**
-     * Send notification to all users when astrologer goes live.
+     * Send notification to eligible audience when astrologer goes live.
      */
-    private function notifyAllUsersAboutLive(LiveSession $liveSession): void
+    private function notifyAllUsersAboutLive(LiveSession $liveSession, string $type = 'live'): void
     {
         try {
-            $astrologerUser = $liveSession->astrologer?->user;
-            if ($astrologerUser) {
-                $title = "Astrologer Live Now!";
-                $body = "{$astrologerUser->name} is now streaming live. Join the session to ask your questions!";
-                $meta = [
-                    'type' => 'live_session',
-                    'live_session_id' => $liveSession->id,
-                ];
-
-                User::chunk(100, function ($users) use ($title, $body, $meta) {
-                    foreach ($users as $user) {
-                        NotificationHelper::send($user->id, $title, $body, $meta);
-                    }
-                });
-            }
+            \App\Jobs\SendLiveSessionNotificationJob::dispatch($liveSession->id, $type);
         } catch (\Exception $e) {
-            Log::error('Failed to send live notifications: ' . $e->getMessage());
+            Log::error('Failed to dispatch live notifications job: ' . $e->getMessage());
         }
     }
 

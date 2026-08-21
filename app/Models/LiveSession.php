@@ -26,6 +26,9 @@ class LiveSession extends Model
         'max_participants',
         'current_participants',
         'viewer_count',
+        'is_scheduled_notified',
+        'is_reminder_notified',
+        'is_live_notified',
     ];
 
     protected $casts = [
@@ -39,6 +42,9 @@ class LiveSession extends Model
         'is_broadcasting' => 'boolean',
         'is_camera_on' => 'boolean',
         'is_audio_on' => 'boolean',
+        'is_scheduled_notified' => 'boolean',
+        'is_reminder_notified' => 'boolean',
+        'is_live_notified' => 'boolean',
     ];
 
     public function participants(): HasMany

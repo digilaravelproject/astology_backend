@@ -15,6 +15,9 @@ Schedule::command('app:cleanup-chat-assistance')->daily();
 // FCM & Push Notification Maintenance
 Schedule::command('fcm:prune-devices')->daily();
 
+// Live Session Reminders Scheduler
+Schedule::command('live:send-scheduled-reminders')->everyMinute();
+
 // Queue worker safety net (ensures queued push jobs process even if a standalone worker temporarily pauses)
 Schedule::command('queue:work --stop-when-empty --tries=3 --timeout=60')
     ->everyMinute()
