@@ -365,7 +365,7 @@ class WalletGstAndWithdrawalTest extends TestCase
         ]);
 
         $transaction = \App\Models\WalletTransaction::create([
-            'wallet_id' => $this->userWallet->id,
+            'wallet_id' => $this->astrologerWallet->id,
             'transaction_type' => 'credit',
             'amount' => 500.00,
             'base_amount' => 500.00,
