@@ -44,7 +44,9 @@ use App\Http\Controllers\Admin\{
     AdminFcmSettingController,
     OfferController as AdminOfferController,
     AdminPackageController,
-    AstrologerPayoutController as AdminAstrologerPayoutController
+    AstrologerPayoutController as AdminAstrologerPayoutController,
+    AstrologerPerformanceController,
+    LiveAstrologerMonitorController
 };
 
 /*
@@ -147,8 +149,8 @@ Route::prefix('admin')->group(function () {
         Route::get('users-referrals', function () { return view('admin.users.referrals'); })->name('admin.users.referrals');
 
         // Astrologer Management
-        Route::get('astrologers/performance', function () { return view('admin.astrologers.performance'); })->name('admin.astrologers.performance');
-        Route::get('astrologers/live', function () { return view('admin.astrologers.live'); })->name('admin.astrologers.live');
+        Route::get('astrologers/performance', [AstrologerPerformanceController::class, 'index'])->name('admin.astrologers.performance');
+        Route::get('astrologers/live', [LiveAstrologerMonitorController::class, 'index'])->name('admin.astrologers.live');
         Route::get('astrologers/pricing', [AstrologerPricingController::class, 'index'])->name('admin.astrologers.pricing');
         Route::post('astrologers/pricing', [AstrologerPricingController::class, 'update'])->name('admin.astrologers.pricing.update');
 
