@@ -278,14 +278,90 @@
                     </div>
                 </div>
 
+                <!-- Sound Profile Controls Section -->
+                <div class="border-t border-b border-gray-100 py-5 my-2 space-y-4">
+                    <div class="flex items-center gap-2">
+                        <i class="fas fa-volume-up text-amber-500 text-sm"></i>
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider text-text-primary">Sound & Alert Controls</h3>
+                    </div>
+                    <p class="text-xs text-text-muted">Manage which notification types trigger audio chimes on mobile devices.</p>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Chat Request / Initiate Sound -->
+                        <div class="p-3.5 bg-light/30 rounded-xl border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <div class="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                                    <i class="fas fa-comment-dots text-primary text-xs"></i>
+                                    Chat Initiate / Request Sound
+                                </div>
+                                <div class="text-[11px] text-text-muted mt-0.5">Alert for new incoming session requests</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                                <input type="hidden" name="chat_request_sound" value="0">
+                                <input type="checkbox" name="chat_request_sound" value="1" class="sr-only peer" {{ ($setting->chat_request_sound ?? true) ? 'checked' : '' }}>
+                                <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- Individual Chat Messages Sound -->
+                        <div class="p-3.5 bg-light/30 rounded-xl border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <div class="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                                    <i class="fas fa-envelope text-blue-500 text-xs"></i>
+                                    Individual Chat Message Sound
+                                </div>
+                                <div class="text-[11px] text-text-muted mt-0.5">Sound on every regular message (OFF = Silent banner)</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                                <input type="hidden" name="chat_message_sound" value="0">
+                                <input type="checkbox" name="chat_message_sound" value="1" class="sr-only peer" {{ ($setting->chat_message_sound ?? false) ? 'checked' : '' }}>
+                                <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- Call Sound -->
+                        <div class="p-3.5 bg-light/30 rounded-xl border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <div class="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                                    <i class="fas fa-phone-alt text-purple-500 text-xs"></i>
+                                    Incoming Call Sound
+                                </div>
+                                <div class="text-[11px] text-text-muted mt-0.5">Ringtone for audio & video calls</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                                <input type="hidden" name="call_sound" value="0">
+                                <input type="checkbox" name="call_sound" value="1" class="sr-only peer" {{ ($setting->call_sound ?? true) ? 'checked' : '' }}>
+                                <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                        </div>
+
+                        <!-- Live Stream Sound -->
+                        <div class="p-3.5 bg-light/30 rounded-xl border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <div class="text-xs font-bold text-text-primary flex items-center gap-1.5">
+                                    <i class="fas fa-video text-rose-500 text-xs"></i>
+                                    Live Stream Notification Sound
+                                </div>
+                                <div class="text-[11px] text-text-muted mt-0.5">Chime for instant & scheduled live sessions</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
+                                <input type="hidden" name="live_stream_sound" value="0">
+                                <input type="checkbox" name="live_stream_sound" value="1" class="sr-only peer" {{ ($setting->live_stream_sound ?? true) ? 'checked' : '' }}>
+                                <div class="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <!-- Default Sound -->
                     <div>
                         <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
-                            Default Sound
+                            Default Sound Name
                         </label>
                         <input type="text" name="default_sound" value="{{ old('default_sound', $setting->default_sound ?? 'default') }}"
                                class="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-text-primary focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <span class="text-[11px] text-text-muted mt-1 block">Default: 'default' or custom sound file name</span>
                     </div>
                 </div>
 

@@ -17,6 +17,10 @@ class AdminFcmSetting extends Model
         'service_account_json_path',
         'is_active',
         'default_sound',
+        'chat_message_sound',
+        'chat_request_sound',
+        'call_sound',
+        'live_stream_sound',
         'call_channel_id',
         'chat_channel_id',
         'live_channel_id',
@@ -25,6 +29,10 @@ class AdminFcmSetting extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'chat_message_sound' => 'boolean',
+        'chat_request_sound' => 'boolean',
+        'call_sound' => 'boolean',
+        'live_stream_sound' => 'boolean',
     ];
 
     /**
@@ -47,6 +55,10 @@ class AdminFcmSetting extends Model
                 'service_account_json_path' => null,
                 'is_active' => true,
                 'default_sound' => 'default',
+                'chat_message_sound' => false,
+                'chat_request_sound' => true,
+                'call_sound' => true,
+                'live_stream_sound' => true,
                 'call_channel_id' => 'call_channel',
                 'chat_channel_id' => 'chat_channel',
                 'default_channel_id' => 'astology_notifications',

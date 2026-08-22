@@ -278,7 +278,22 @@ class FcmChannelDriver
             default => $this->setting?->default_channel_id ?? 'astology_notifications',
         };
 
-        $sound = !empty($payload->sound) ? $payload->sound : ($this->setting?->default_sound ?? 'default');
+        // Determine Sound configuration dynamically based on Admin FCM Settings
+        $isSoundEnabled = match ($payload->type) {
+            'chat' => (bool) ($this->setting?->chat_message_sound ?? false),
+            'session_request', 'chat_request', 'call_request', 'CHAT_REQUEST', 'CALL_REQUEST' => (bool) ($this->setting?->chat_request_sound ?? true),
+            'call' => (bool) ($this->setting?->call_sound ?? true),
+            'live_stream', 'live' => (bool) ($this->setting?->live_stream_sound ?? true),
+            default => true,
+        };
+
+        if ($payload->sound === 'silent') {
+            $isSoundEnabled = false;
+        }
+
+        $sound = !empty($payload->sound) && $payload->sound !== 'default' && $payload->sound !== 'silent'
+            ? $payload->sound
+            : ($this->setting?->default_sound ?? 'default');
 
         // All string key-values for data block
         $dataMap = [];
@@ -289,6 +304,9 @@ class FcmChannelDriver
         // Add standard keys to data map
         $dataMap['type'] = (string) $payload->type;
         $dataMap['click_action'] = (string) $payload->clickAction;
+        $dataMap['play_sound'] = $isSoundEnabled ? '1' : '0';
+        $dataMap['sound'] = $isSoundEnabled ? (string) $sound : '';
+
         if ($payload->referenceId) {
             $dataMap['reference_id'] = (string) $payload->referenceId;
         }
@@ -323,7 +341,7 @@ class FcmChannelDriver
         if (!$payload->isDataOnly) {
             $androidNotif = [
                 'notification_priority'   => 'PRIORITY_HIGH',
-                'default_vibrate_timings' => true,
+                'default_vibrate_timings' => $isSoundEnabled,
                 'visibility'              => 'PUBLIC',
                 'click_action'            => $payload->clickAction,
             ];
@@ -332,10 +350,12 @@ class FcmChannelDriver
                 $androidNotif['channel_id'] = $channelId;
             }
 
-            if ($sound === 'default') {
-                $androidNotif['default_sound'] = true;
-            } else {
-                $androidNotif['sound'] = $sound;
+            if ($isSoundEnabled) {
+                if ($sound === 'default') {
+                    $androidNotif['default_sound'] = true;
+                } else {
+                    $androidNotif['sound'] = $sound;
+                }
             }
 
             if ($payload->imageUrl) {
@@ -346,16 +366,21 @@ class FcmChannelDriver
         }
 
         // Apple APNs configuration
+        $apsPayload = [
+            'content-available' => 1,
+            'badge'             => 1,
+        ];
+
+        if ($isSoundEnabled) {
+            $apsPayload['sound'] = $sound === 'default' ? 'default' : "{$sound}.caf";
+        }
+
         $message['apns'] = [
             'headers' => [
                 'apns-priority' => ($payload->priority === 'high' || $payload->type === 'call') ? '10' : '10',
             ],
             'payload' => [
-                'aps' => [
-                    'sound'             => $sound === 'default' ? 'default' : "{$sound}.caf",
-                    'content-available' => 1,
-                    'badge'             => 1,
-                ],
+                'aps' => $apsPayload,
             ],
         ];
 
