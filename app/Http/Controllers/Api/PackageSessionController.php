@@ -260,7 +260,7 @@ class PackageSessionController extends Controller
         $request->validate([
             'sub_session_id' => 'required|integer|exists:package_sub_sessions,id',
             'channel_type'   => 'required|in:call,chat',
-            'action'         => 'required|in:end_channel_only,end_complete_session',
+            'action'         => 'required|in:end_channel_only,end_complete_session,channel_only,complete_session',
         ]);
 
         try {

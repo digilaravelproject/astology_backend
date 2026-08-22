@@ -282,7 +282,7 @@ class PackageSessionEngineService
             $astrologerId = $purchase->astrologer_id;
             $now = now();
 
-            if ($action === 'end_channel_only') {
+            if (in_array($action, ['end_channel_only', 'channel_only'])) {
                 // Option 1: "End Call Only" or "End Chat Only"
                 if ($channelType === 'call') {
                     $subSession->call_status = 'disconnected';
