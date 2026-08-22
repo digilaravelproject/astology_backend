@@ -165,24 +165,13 @@ class PackageSessionEngineService
             $user = $purchase->user;
             $now = now();
 
-            // 1. Terminate the previous subchannel without ending the parent package session ($0.00 charge)
+            // 1. If switching FROM call, disconnect the audio/video call gracefully ($0.00 charge)
             if ($fromChannel === 'call' && $subSession->call_session_id) {
                 $subSession->call_status = 'disconnected';
                 $call = CallSession::find($subSession->call_session_id);
                 if ($call && $call->status !== 'completed') {
                     $call->update(['status' => 'completed', 'ended_at' => $now, 'rate_per_minute' => 0.00, 'total_cost' => 0.00]);
                     broadcast(new CallEnded($call, [
-                        'is_package'     => true,
-                        'sub_session_id' => $subSession->id,
-                        'action'         => 'switch_channel',
-                    ]));
-                }
-            } elseif ($fromChannel === 'chat' && $subSession->chat_session_id) {
-                $subSession->chat_status = 'closed';
-                $chat = ChatSession::find($subSession->chat_session_id);
-                if ($chat && $chat->status !== 'completed') {
-                    $chat->update(['status' => 'completed', 'ended_at' => $now, 'rate_per_minute' => 0.00, 'total_cost' => 0.00]);
-                    broadcast(new ChatEnded($chat, [
                         'is_package'     => true,
                         'sub_session_id' => $subSession->id,
                         'action'         => 'switch_channel',
@@ -196,37 +185,50 @@ class PackageSessionEngineService
                 $subSession->session_state = 'in_progress';
             }
 
-            // 3. Initiate and link the new subchannel (Zero-Rate guaranteed)
+            // 3. Initiate or preserve the target subchannel (Zero-Rate guaranteed)
             $newSessionData = [];
             if ($toChannel === 'call') {
-                $linkedCall = $this->callService->initiateCall($userId, $astrologerId, true);
-                $subSession->call_session_id = $linkedCall->id;
-                $subSession->call_status = 'ringing';
+                // If call is not already ongoing, initiate a zero-cost package call
+                if (!$subSession->call_session_id || in_array($subSession->call_status, ['idle', 'disconnected', 'none'])) {
+                    $linkedCall = $this->callService->initiateCall($userId, $astrologerId, true);
+                    $subSession->call_session_id = $linkedCall->id;
+                    $subSession->call_status = 'ringing';
+                    $newSessionData['call_session'] = $linkedCall;
+
+                    if ($user) {
+                        broadcast(new CallInitiated($linkedCall, [
+                            'id'            => $user->id,
+                            'name'          => $user->name,
+                            'profile_photo' => \App\Helpers\MediaHelper::getFullUrl($user->profile_photo),
+                            'offer'         => $options['offer'] ?? 'audio',
+                            'is_package'    => true,
+                            'sub_session_id'=> $subSession->id,
+                        ]));
+                    }
+                }
+                // Keep chat active in background so user and astrologer can share charts/messages while on call
                 $subSession->mode = 'call';
-                $newSessionData['call_session'] = $linkedCall;
-
-                if ($user) {
-                    broadcast(new CallInitiated($linkedCall, [
-                        'id'            => $user->id,
-                        'name'          => $user->name,
-                        'profile_photo' => \App\Helpers\MediaHelper::getFullUrl($user->profile_photo),
-                        'offer'         => $options['offer'] ?? 'audio',
-                        'is_package'    => true,
-                        'sub_session_id'=> $subSession->id,
-                    ]));
-                }
             } elseif ($toChannel === 'chat') {
-                $question = $options['question'] ?? null;
-                $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
-                $subSession->chat_session_id = $linkedChat->id;
-                $subSession->chat_status = 'active';
-                $subSession->mode = 'chat';
-                $newSessionData['chat_session'] = $linkedChat;
+                // If chat is not already active, initiate or reuse existing chat thread
+                if (!$subSession->chat_session_id || in_array($subSession->chat_status, ['idle', 'closed', 'none'])) {
+                    $question = $options['question'] ?? null;
+                    $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
+                    $subSession->chat_session_id = $linkedChat->id;
+                    $subSession->chat_status = 'active';
+                    $newSessionData['chat_session'] = $linkedChat;
 
-                if ($user) {
-                    broadcast(new ChatInitiated($linkedChat, $user));
-                    broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'initiated'));
+                    if ($user) {
+                        broadcast(new ChatInitiated($linkedChat, $user));
+                        broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'initiated'));
+                    }
+                } else {
+                    $subSession->chat_status = 'active';
+                    $chat = ChatSession::find($subSession->chat_session_id);
+                    if ($chat && $chat->status !== 'ongoing' && $chat->status !== 'accepted') {
+                        $chat->update(['status' => 'ongoing', 'ended_at' => null]);
+                    }
                 }
+                $subSession->mode = 'chat';
             }
 
             $subSession->save();
