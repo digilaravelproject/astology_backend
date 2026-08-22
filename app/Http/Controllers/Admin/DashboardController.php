@@ -133,7 +133,7 @@ class DashboardController extends Controller
                     'provider_name' => $s->provider->name ?? 'Astrologer #' . $s->provider_id,
                     'amount'        => (float) $s->total_cost,
                     'status'        => 'Completed',
-                    'created_at'    => $s->completed_at ?? $s->updated_at,
+                    'created_at'    => $s->ended_at ?? $s->updated_at ?? $s->created_at,
                 ]);
 
             $recentChats = ChatSession::with(['consumer', 'provider'])
@@ -150,7 +150,7 @@ class DashboardController extends Controller
                     'provider_name' => $s->provider->name ?? 'Astrologer #' . $s->provider_id,
                     'amount'        => (float) $s->total_cost,
                     'status'        => 'Completed',
-                    'created_at'    => $s->completed_at ?? $s->updated_at,
+                    'created_at'    => $s->ended_at ?? $s->updated_at ?? $s->created_at,
                 ]);
 
             $recentOrders = $recentCalls->merge($recentChats)
@@ -161,23 +161,50 @@ class DashboardController extends Controller
             $recentOrders = collect();
         }
 
-        // 8. Top 5 Astrologers by Real Earnings
+        // 8. Top 5 Astrologers by Real Earnings (Strict MySQL & Subquery Safe)
         $topAstrologers = collect();
         try {
-            $topAstrologers = User::select('users.id', 'users.name', 'users.profile_photo')
-                ->selectRaw('COUNT(CASE WHEN call_sessions.status = "completed" THEN 1 END) + COUNT(CASE WHEN chat_sessions.status = "completed" THEN 1 END) as total_sessions')
-                ->selectRaw('COALESCE(SUM(CASE WHEN call_sessions.status = "completed" THEN call_sessions.total_cost ELSE 0 END), 0) + COALESCE(SUM(CASE WHEN chat_sessions.status = "completed" THEN chat_sessions.total_cost ELSE 0 END), 0) as total_earned')
-                ->leftJoin('call_sessions', 'users.id', '=', 'call_sessions.provider_id')
-                ->leftJoin('chat_sessions', 'users.id', '=', 'chat_sessions.provider_id')
-                ->where('users.user_type', 'astrologer')
-                ->groupBy('users.id', 'users.name', 'users.profile_photo')
-                ->orderByDesc('total_earned')
-                ->take(5)
+            $callEarnings = DB::table('call_sessions')
+                ->select('provider_id', DB::raw('COUNT(*) as call_count'), DB::raw('SUM(total_cost) as call_earned'))
+                ->where('status', 'completed')
+                ->groupBy('provider_id')
                 ->get()
-                ->map(function ($astrologer) {
-                    $astrologer->formatted_earnings = $this->formatCurrency((float) $astrologer->total_earned);
-                    return $astrologer;
-                });
+                ->keyBy('provider_id');
+
+            $chatEarnings = DB::table('chat_sessions')
+                ->select('provider_id', DB::raw('COUNT(*) as chat_count'), DB::raw('SUM(total_cost) as chat_earned'))
+                ->where('status', 'completed')
+                ->groupBy('provider_id')
+                ->get()
+                ->keyBy('provider_id');
+
+            $providerIds = $callEarnings->keys()->merge($chatEarnings->keys())->unique()->filter();
+
+            if ($providerIds->isNotEmpty()) {
+                $users = User::whereIn('id', $providerIds)->get()->keyBy('id');
+
+                $topAstrologers = $providerIds->map(function ($pid) use ($callEarnings, $chatEarnings, $users) {
+                    $user = $users->get($pid);
+                    if (!$user) return null;
+
+                    $cCount   = (int) ($callEarnings->get($pid)->call_count ?? 0);
+                    $cEarned  = (float) ($callEarnings->get($pid)->call_earned ?? 0);
+                    $chCount  = (int) ($chatEarnings->get($pid)->chat_count ?? 0);
+                    $chEarned = (float) ($chatEarnings->get($pid)->chat_earned ?? 0);
+
+                    $totalSessions = $cCount + $chCount;
+                    $totalEarned   = $cEarned + $chEarned;
+
+                    return (object) [
+                        'id'                 => $user->id,
+                        'name'               => $user->name ?? 'Astrologer',
+                        'profile_photo'      => $user->profile_photo,
+                        'total_sessions'     => $totalSessions,
+                        'total_earned'       => $totalEarned,
+                        'formatted_earnings' => $this->formatCurrency($totalEarned),
+                    ];
+                })->filter()->sortByDesc('total_earned')->take(5)->values();
+            }
         } catch (\Exception $e) {
             $topAstrologers = collect();
         }
