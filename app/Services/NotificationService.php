@@ -113,13 +113,27 @@ class NotificationService
             }
         }
 
-        // Fetch all active tokens
+        // Fetch all active tokens from user_devices
         $tokens = UserDevice::whereIn('user_id', $userIds)
             ->active()
             ->pluck('fcm_token')
             ->filter()
             ->unique()
             ->toArray();
+
+        // Fallback to legacy fcm_token on users table if any
+        try {
+            $legacyTokens = User::whereIn('id', $userIds)
+                ->whereNotNull('fcm_token')
+                ->where('fcm_token', '!=', '')
+                ->pluck('fcm_token')
+                ->filter()
+                ->unique()
+                ->toArray();
+            $tokens = array_values(array_unique(array_filter(array_merge($tokens, $legacyTokens))));
+        } catch (\Throwable $e) {
+            $tokens = array_values(array_unique(array_filter($tokens)));
+        }
 
         // Dispatch in chunks of 500 tokens
         if (!empty($tokens)) {

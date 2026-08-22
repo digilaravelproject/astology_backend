@@ -87,6 +87,14 @@ class SendLiveSessionNotificationJob implements ShouldQueue
             ->pluck('user_id')
             ->toArray();
 
+            // Fallback for public sessions: If astrologer has no followers/chat history yet, notify all active users with registered devices
+            if (empty($targetUserIds) && ($session->session_type === 'public' || empty($session->session_type))) {
+                $targetUserIds = \App\Models\User::where('id', '!=', $astrologerUserId)
+                    ->where('user_type', '!=', 'astrologer')
+                    ->pluck('id')
+                    ->toArray();
+            }
+
             if (empty($targetUserIds)) {
                 Log::info("SendLiveSessionNotificationJob: No eligible audience found for Astrologer #{$astrologerId} LiveSession #{$session->id}.");
                 return;

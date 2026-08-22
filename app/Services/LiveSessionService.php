@@ -628,6 +628,14 @@ class LiveSessionService
             Log::error('Failed to broadcast AstrologerBroadcastStarted', ['error' => $e->getMessage()]);
         }
 
+        if (!$liveSession->is_live_notified) {
+            try {
+                \App\Jobs\SendLiveSessionNotificationJob::dispatch($liveSession->id, 'live');
+            } catch (\Exception $e) {
+                Log::error('Failed to dispatch live notification job on startBroadcast', ['error' => $e->getMessage()]);
+            }
+        }
+
         return [
             'already_active' => false,
             'data' => [
