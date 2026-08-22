@@ -46,7 +46,8 @@ use App\Http\Controllers\Admin\{
     AdminPackageController,
     AstrologerPayoutController as AdminAstrologerPayoutController,
     AstrologerPerformanceController,
-    LiveAstrologerMonitorController
+    LiveAstrologerMonitorController,
+    ReportAnalyticsController
 };
 
 /*
@@ -333,8 +334,8 @@ Route::prefix('admin')->group(function () {
         // Feedbacks & Reviews Moderation
         Route::resource('feedbacks', AdminFeedbackController::class)->names('admin.feedbacks')->only(['index', 'show', 'destroy']);
 
-        // Reports & Analytics
-        Route::get('reports', function () { return view('admin.reports.index'); })->name('admin.reports.index');
+        // Reports & Analytics (Intelligence Center)
+        Route::get('reports', [ReportAnalyticsController::class, 'index'])->name('admin.reports.index');
 
         // Platform & System Settings
         Route::get('settings', [SettingController::class, 'index'])->name('admin.settings.index');
