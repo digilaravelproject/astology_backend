@@ -104,6 +104,11 @@ class GiftController extends Controller
                 $status = 'completed';
             }
 
+            $adminCommissionRate = (float) \App\Models\Setting::get('gift_admin_commission_percentage', 50.00);
+            $astrologerSharePct = max(0, min(100, 100 - $adminCommissionRate));
+            $astrologerEarning = round(($amount * $astrologerSharePct) / 100, 2);
+            $adminEarning = round($amount - $astrologerEarning, 2);
+
             $transaction = GiftTransaction::create([
                 'user_id' => $user->id,
                 'astrologer_id' => $astrologer->id,
@@ -114,27 +119,38 @@ class GiftController extends Controller
                 'provider_payment_id' => $validated['razorpay_payment_id'] ?? null,
                 'status' => $status,
                 'meta' => [
-                    'sender_name' => $user->name,
-                    'astrologer_name' => optional($astrologer->user)->name,
-                    'gift_title' => $gift->title,
+                    'sender_name'                 => $user->name,
+                    'astrologer_name'             => optional($astrologer->user)->name,
+                    'gift_title'                  => $gift->title,
+                    'gift_total_amount'           => (float) $amount,
+                    'astrologer_earning'          => (float) $astrologerEarning,
+                    'admin_earning'               => (float) $adminEarning,
+                    'astrologer_share_percentage' => (float) $astrologerSharePct,
+                    'admin_commission_percentage' => (float) $adminCommissionRate,
                 ],
             ]);
 
             if ($astrologer->user) {
-                $this->creditAstrologerWallet($astrologer->user->id, $amount, $transaction->id);
+                $this->creditAstrologerWallet($astrologer->user->id, $astrologerEarning, $transaction->id, [
+                    'gift_total_amount'           => (float) $amount,
+                    'astrologer_earning'          => (float) $astrologerEarning,
+                    'astrologer_share_percentage' => (float) $astrologerSharePct,
+                    'admin_commission_percentage' => (float) $adminCommissionRate,
+                ]);
 
                 // Dispatch Push & In-App Notification to Astrologer
                 try {
                     \App\Services\NotificationHelper::send(
                         userId: $astrologer->user->id,
                         title: 'Gift Received! 🎁',
-                        body: "{$user->name} sent you a {$gift->title} worth ₹" . number_format($amount, 2) . "!",
+                        body: "{$user->name} sent you a {$gift->title} worth ₹" . number_format($amount, 2) . " (Credited: ₹" . number_format($astrologerEarning, 2) . ")!",
                         meta: [
                             'type'         => 'gift',
                             'gift_id'      => (string) $gift->id,
                             'sender_id'    => (string) $user->id,
                             'sender_name'  => $user->name,
                             'amount'       => (string) $amount,
+                            'credited'     => (string) $astrologerEarning,
                             'screen_route' => '/wallet',
                         ]
                     );
@@ -157,7 +173,7 @@ class GiftController extends Controller
         }
     }
 
-    protected function creditAstrologerWallet(int $userId, float $amount, int $transactionId): void
+    protected function creditAstrologerWallet(int $userId, float $amount, int $transactionId, array $meta = []): void
     {
         $wallet = Wallet::where('user_id', $userId)->lockForUpdate()->first();
         if (!$wallet) {
@@ -180,6 +196,7 @@ class GiftController extends Controller
             'balance_after'    => (float) $wallet->balance,
             'reference_type'   => GiftTransaction::class,
             'reference_id'     => $transactionId,
+            'meta'             => $meta,
         ]);
     }
 

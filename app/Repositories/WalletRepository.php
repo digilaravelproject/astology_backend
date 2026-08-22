@@ -424,22 +424,35 @@ class WalletRepository
             'reference_id' => $superChat->id,
         ]);
 
-        // Process credit
+        // Process credit with commission split
+        $adminCommissionRate = (float) \App\Models\Setting::get('gift_admin_commission_percentage', 50.00);
+        $astrologerSharePct = max(0, min(100, 100 - $adminCommissionRate));
+        $astrologerEarning = round(($amount * $astrologerSharePct) / 100, 2);
+        $adminEarning = round($amount - $astrologerEarning, 2);
+
         $astroBalanceBefore = $astrologerWallet->balance;
-        $astrologerWallet->balance += $amount;
+        $astrologerWallet->balance += $astrologerEarning;
         $astrologerWallet->save();
 
+        $creditMeta = array_merge($meta, [
+            'total_amount'                => (float) $amount,
+            'astrologer_earning'          => (float) $astrologerEarning,
+            'admin_earning'               => (float) $adminEarning,
+            'astrologer_share_percentage' => (float) $astrologerSharePct,
+            'admin_commission_percentage' => (float) $adminCommissionRate,
+        ]);
+
         $creditTxn = WalletTransaction::create([
-            'wallet_id' => $astrologerWallet->id,
+            'wallet_id'        => $astrologerWallet->id,
             'transaction_type' => 'credit',
-            'amount' => $amount,
-            'status' => 'completed',
-            'description' => $description,
-            'meta' => $meta,
-            'balance_before' => $astroBalanceBefore,
-            'balance_after' => $astrologerWallet->balance,
-            'reference_type' => 'App\Models\SuperChat',
-            'reference_id' => $superChat->id,
+            'amount'           => $astrologerEarning,
+            'status'           => 'completed',
+            'description'      => "{$description} (Share {$astrologerSharePct}%)",
+            'meta'             => $creditMeta,
+            'balance_before'   => $astroBalanceBefore,
+            'balance_after'    => $astrologerWallet->balance,
+            'reference_type'   => 'App\Models\SuperChat',
+            'reference_id'     => $superChat->id,
         ]);
 
         return [
