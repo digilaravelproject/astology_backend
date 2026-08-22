@@ -216,6 +216,7 @@ class PackageSessionEngineService
                     $subSession->chat_session_id = $linkedChat->id;
                     $subSession->chat_status = 'active';
                     $newSessionData['chat_session'] = $linkedChat;
+                    $newSessionData['chat_session_id'] = $linkedChat->id;
 
                     if ($user) {
                         broadcast(new ChatInitiated($linkedChat, $user));
@@ -224,8 +225,12 @@ class PackageSessionEngineService
                 } else {
                     $subSession->chat_status = 'active';
                     $chat = ChatSession::find($subSession->chat_session_id);
-                    if ($chat && $chat->status !== 'ongoing' && $chat->status !== 'accepted') {
-                        $chat->update(['status' => 'ongoing', 'ended_at' => null]);
+                    if ($chat) {
+                        if ($chat->status !== 'ongoing' && $chat->status !== 'accepted') {
+                            $chat->update(['status' => 'ongoing', 'ended_at' => null]);
+                        }
+                        $newSessionData['chat_session'] = $chat;
+                        $newSessionData['chat_session_id'] = $chat->id;
                     }
                 }
                 $subSession->mode = 'chat';
@@ -242,6 +247,9 @@ class PackageSessionEngineService
                 'action_performed'   => 'switch_channel',
                 'from_channel'       => $fromChannel,
                 'to_channel'         => $toChannel,
+                'sub_session_id'     => $subSession->id,
+                'chat_session_id'    => $subSession->chat_session_id,
+                'call_session_id'    => $subSession->call_session_id,
                 'sub_session'        => $subSession->fresh(),
                 'banner_data'        => $bannerData,
                 'remaining_seconds'  => $remaining,
