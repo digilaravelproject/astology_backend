@@ -68,25 +68,56 @@ class ReportAnalyticsController extends Controller
             }
 
             // 2. Financial Metrics & GPV Calculations
-            $walletRechargeRevenue = (float) WalletTransaction::where('transaction_type', WalletTransaction::TYPE_CREDIT)
-                ->where('status', WalletTransaction::STATUS_COMPLETED)
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->sum('amount');
+            $walletRechargeRevenue = 0.0;
+            try {
+                $walletRechargeRevenue = (float) WalletTransaction::where('transaction_type', WalletTransaction::TYPE_CREDIT)
+                    ->where('status', WalletTransaction::STATUS_COMPLETED)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->sum('amount');
+            } catch (Exception $e) {
+                Log::warning("WalletTransaction sum error: " . $e->getMessage());
+            }
 
-            $packageSalesRevenue = (float) PackagePurchase::where('status', '!=', 'cancelled')
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->sum('purchase_price');
+            $packageSalesRevenue = 0.0;
+            try {
+                $packageSalesRevenue = (float) PackagePurchase::where('status', '!=', 'cancelled')
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->sum('purchase_price');
+            } catch (Exception $e) {
+                Log::warning("PackagePurchase sum error: " . $e->getMessage());
+            }
 
-            $chatConsultationSpend = (float) ChatSession::where('status', 'completed')
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->sum('total_cost');
+            $chatConsultationSpend = 0.0;
+            try {
+                $chatConsultationSpend = (float) ChatSession::where('status', 'completed')
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->sum('total_cost');
+            } catch (Exception $e) {
+                Log::warning("ChatSession sum error: " . $e->getMessage());
+            }
 
-            $callConsultationSpend = (float) CallSession::where('status', 'completed')
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->sum('total_cost');
+            $callConsultationSpend = 0.0;
+            try {
+                $callConsultationSpend = (float) CallSession::where('status', 'completed')
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->sum('total_cost');
+            } catch (Exception $e) {
+                Log::warning("CallSession sum error: " . $e->getMessage());
+            }
 
-            $liveGiftsSpend = (float) GiftTransaction::whereBetween('created_at', [$startDate, $endDate])->sum('amount');
-            $superChatSpend = (float) SuperChat::whereBetween('created_at', [$startDate, $endDate])->sum('amount');
+            $liveGiftsSpend = 0.0;
+            try {
+                $liveGiftsSpend = (float) GiftTransaction::whereBetween('created_at', [$startDate, $endDate])->sum('amount');
+            } catch (Exception $e) {
+                Log::warning("GiftTransaction sum error: " . $e->getMessage());
+            }
+
+            $superChatSpend = 0.0;
+            try {
+                $superChatSpend = (float) SuperChat::whereBetween('created_at', [$startDate, $endDate])->sum('amount');
+            } catch (Exception $e) {
+                Log::warning("SuperChat sum error: " . $e->getMessage());
+            }
 
             // Gross Platform Value (Total Inflow / Consultation Value)
             $netGPV = $walletRechargeRevenue + $packageSalesRevenue;
@@ -94,37 +125,51 @@ class ReportAnalyticsController extends Controller
                 $netGPV = $chatConsultationSpend + $callConsultationSpend + $packageSalesRevenue + $liveGiftsSpend;
             }
 
-            $totalPaidOrders = WalletTransaction::where('transaction_type', WalletTransaction::TYPE_CREDIT)
-                ->where('status', WalletTransaction::STATUS_COMPLETED)
-                ->whereBetween('created_at', [$startDate, $endDate])
-                ->count();
-            $totalPackageOrders = PackagePurchase::whereBetween('created_at', [$startDate, $endDate])->count();
+            $totalPaidOrders = 0;
+            try {
+                $totalPaidOrders = WalletTransaction::where('transaction_type', WalletTransaction::TYPE_CREDIT)
+                    ->where('status', WalletTransaction::STATUS_COMPLETED)
+                    ->whereBetween('created_at', [$startDate, $endDate])
+                    ->count();
+            } catch (Exception $e) {}
+
+            $totalPackageOrders = 0;
+            try {
+                $totalPackageOrders = PackagePurchase::whereBetween('created_at', [$startDate, $endDate])->count();
+            } catch (Exception $e) {}
+
             $totalOrderCount = max(1, $totalPaidOrders + $totalPackageOrders);
             $avgBasket = round($netGPV / $totalOrderCount, 2);
 
             // Active Users & Daily Active Telemetry
-            $activeUsersCount = User::where('role', 'user')
+            $activeUsersCount = User::where('user_type', 'user')
                 ->where(function ($q) use ($startDate, $endDate) {
                     $q->whereBetween('updated_at', [$startDate, $endDate])
                       ->orWhereBetween('created_at', [$startDate, $endDate]);
                 })->count();
 
-            $totalUsers = max(1, User::where('role', 'user')->count());
-            $churnedUsers = User::where('role', 'user')
+            $totalUsers = max(1, User::where('user_type', 'user')->count());
+            $churnedUsers = User::where('user_type', 'user')
                 ->where('updated_at', '<', $now->copy()->subDays(30))
                 ->count();
             $churnRate = round(($churnedUsers / $totalUsers) * 100, 1);
 
             // Astrologer Load & Queue Telemetry
-            $totalAstrologers = max(1, Astrologer::where('is_approved', true)->count());
-            $busyAstrologersCount = Astrologer::where('is_approved', true)
-                ->where(function ($q) {
-                    $q->where('is_chat_busy', true)->orWhere('is_call_busy', true);
-                })->count();
-            $astroLoadPercentage = round(($busyAstrologersCount / $totalAstrologers) * 100);
+            $totalAstrologers = max(1, Astrologer::where('status', 'approved')->count());
+            $busyAstrologerUserIds = ChatSession::whereIn('status', ['ongoing', 'accepted'])->pluck('provider_id')
+                ->merge(CallSession::whereIn('status', ['ongoing', 'accepted', 'ringing'])->pluck('provider_id'))
+                ->unique();
+            $busyAstrologersCount = $busyAstrologerUserIds->count();
+            $astroLoadPercentage = min(100, round(($busyAstrologersCount / $totalAstrologers) * 100));
 
             // Rating Average
-            $ratingAvg = round((float) AstrologerReview::whereBetween('created_at', [$startDate, $endDate])->avg('rating') ?: 4.8, 2);
+            $ratingAvg = 4.8;
+            try {
+                $avg = AstrologerReview::whereBetween('created_at', [$startDate, $endDate])->avg('rating');
+                if ($avg) {
+                    $ratingAvg = round((float) $avg, 2);
+                }
+            } catch (Exception $e) {}
 
             // Revenue Distribution Percentages
             $totalConsultationRevenue = $chatConsultationSpend + $callConsultationSpend;
@@ -133,16 +178,20 @@ class ReportAnalyticsController extends Controller
             $otherRevenuePercent = max(0, round(100 - ($liveConsultationPercent + $packageRevenuePercent), 1));
 
             // 3. Settlement Pipeline (Real Astrologer Payouts)
-            $settlements = AstrologerPayout::with(['astrologer.user'])
-                ->orderBy('created_at', 'desc')
-                ->limit(10)
-                ->get();
+            $settlements = collect();
+            try {
+                $settlements = AstrologerPayout::with(['astrologer.user'])
+                    ->orderBy('created_at', 'desc')
+                    ->limit(10)
+                    ->get();
+            } catch (Exception $e) {
+                Log::warning("AstrologerPayout fetch error: " . $e->getMessage());
+            }
 
-            // Fallback if no payouts exist yet: show top earning astrologers
+            // Fallback if no payouts exist yet: show astrologers list
             if ($settlements->isEmpty()) {
                 $topEarners = Astrologer::with('user')
-                    ->where('is_approved', true)
-                    ->orderBy('wallet_balance', 'desc')
+                    ->where('status', 'approved')
                     ->limit(6)
                     ->get();
             } else {
@@ -161,41 +210,51 @@ class ReportAnalyticsController extends Controller
             $dropRate = $totalSessionsCount > 0 ? round(($missedOrCancelledCount / $totalSessionsCount) * 100, 1) : 2.1;
 
             // Fetch Real Recent Logistics Sessions (Combined Chat & Call)
-            $recentChats = ChatSession::with(['consumer', 'provider'])
-                ->orderBy('created_at', 'desc')
-                ->limit(6)
-                ->get()
-                ->map(function ($chat) {
-                    $duration = ($chat->duration_minutes ?: ($chat->started_at && $chat->ended_at ? $chat->started_at->diffInMinutes($chat->ended_at) : 0));
-                    return [
-                        'id'        => '#CHAT-' . $chat->id,
-                        'type'      => 'Chat',
-                        'user'      => $chat->consumer?->name ?? 'User #' . $chat->consumer_id,
-                        'astro'     => $chat->provider?->name ?? 'Astrologer #' . $chat->provider_id,
-                        'duration'  => $duration > 0 ? $duration . ' min' : 'Active',
-                        'status'    => ucfirst($chat->status),
-                        'cost'      => '₹ ' . number_format($chat->total_cost, 2),
-                        'date'      => $chat->created_at->format('d M, h:i A'),
-                    ];
-                });
+            $recentChats = collect();
+            try {
+                $recentChats = ChatSession::with(['consumer', 'provider'])
+                    ->orderBy('created_at', 'desc')
+                    ->limit(6)
+                    ->get()
+                    ->map(function ($chat) {
+                        $duration = ($chat->duration_minutes ?: ($chat->started_at && $chat->ended_at ? $chat->started_at->diffInMinutes($chat->ended_at) : 0));
+                        return [
+                            'id'        => '#CHAT-' . $chat->id,
+                            'type'      => 'Chat',
+                            'user'      => $chat->consumer?->name ?? 'User #' . $chat->consumer_id,
+                            'astro'     => $chat->provider?->name ?? 'Astrologer #' . $chat->provider_id,
+                            'duration'  => $duration > 0 ? $duration . ' min' : 'Active',
+                            'status'    => ucfirst($chat->status),
+                            'cost'      => '₹ ' . number_format($chat->total_cost, 2),
+                            'date'      => $chat->created_at->format('d M, h:i A'),
+                        ];
+                    });
+            } catch (Exception $e) {
+                Log::warning("ChatSession logistics query error: " . $e->getMessage());
+            }
 
-            $recentCalls = CallSession::with(['consumer', 'provider'])
-                ->orderBy('created_at', 'desc')
-                ->limit(6)
-                ->get()
-                ->map(function ($call) {
-                    $duration = ($call->duration_minutes ?: ($call->started_at && $call->ended_at ? $call->started_at->diffInMinutes($call->ended_at) : 0));
-                    return [
-                        'id'        => '#CALL-' . $call->id,
-                        'type'      => 'Call',
-                        'user'      => $call->consumer?->name ?? 'User #' . $call->consumer_id,
-                        'astro'     => $call->provider?->name ?? 'Astrologer #' . $call->provider_id,
-                        'duration'  => $duration > 0 ? $duration . ' min' : 'Active',
-                        'status'    => ucfirst($call->status),
-                        'cost'      => '₹ ' . number_format($call->total_cost, 2),
-                        'date'      => $call->created_at->format('d M, h:i A'),
-                    ];
-                });
+            $recentCalls = collect();
+            try {
+                $recentCalls = CallSession::with(['consumer', 'provider'])
+                    ->orderBy('created_at', 'desc')
+                    ->limit(6)
+                    ->get()
+                    ->map(function ($call) {
+                        $duration = ($call->duration_minutes ?: ($call->started_at && $call->ended_at ? $call->started_at->diffInMinutes($call->ended_at) : 0));
+                        return [
+                            'id'        => '#CALL-' . $call->id,
+                            'type'      => 'Call',
+                            'user'      => $call->consumer?->name ?? 'User #' . $call->consumer_id,
+                            'astro'     => $call->provider?->name ?? 'Astrologer #' . $call->provider_id,
+                            'duration'  => $duration > 0 ? $duration . ' min' : 'Active',
+                            'status'    => ucfirst($call->status),
+                            'cost'      => '₹ ' . number_format($call->total_cost, 2),
+                            'date'      => $call->created_at->format('d M, h:i A'),
+                        ];
+                    });
+            } catch (Exception $e) {
+                Log::warning("CallSession logistics query error: " . $e->getMessage());
+            }
 
             $logistics = $recentChats->concat($recentCalls)->sortByDesc('date')->take(8);
 
@@ -203,7 +262,7 @@ class ReportAnalyticsController extends Controller
             $growthMonths = [];
             for ($m = 11; $m >= 0; $m--) {
                 $monthDate = $now->copy()->subMonths($m);
-                $count = User::where('role', 'user')
+                $count = User::where('user_type', 'user')
                     ->whereYear('created_at', $monthDate->year)
                     ->whereMonth('created_at', $monthDate->month)
                     ->count();
@@ -214,12 +273,17 @@ class ReportAnalyticsController extends Controller
                 ];
             }
 
-            // Conversion & Referral Metrics
+            // Conversion & Repeat Metrics
             $usersWithConsultation = DB::table('chat_sessions')->distinct('consumer_id')->count('consumer_id');
             $conversionRate = round(($usersWithConsultation / $totalUsers) * 100, 2);
 
-            $referredUsers = User::whereNotNull('referred_by')->count();
-            $referralVelocity = round(($referredUsers / $totalUsers) * 100, 1);
+            $repeatUsersCount = DB::table('chat_sessions')
+                ->select('consumer_id')
+                ->groupBy('consumer_id')
+                ->havingRaw('COUNT(*) > 1')
+                ->get()
+                ->count();
+            $referralVelocity = round(($repeatUsersCount / max(1, $usersWithConsultation)) * 100, 1);
 
             return view('admin.reports.index', compact(
                 'period',
