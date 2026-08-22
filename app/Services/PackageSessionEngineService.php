@@ -213,14 +213,22 @@ class PackageSessionEngineService
                 if (!$subSession->chat_session_id || in_array($subSession->chat_status, ['idle', 'closed', 'none'])) {
                     $question = $options['question'] ?? null;
                     $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
+                    
+                    // Auto-activate chat session immediately (no redundant accept needed since already authenticated & in-call)
+                    $linkedChat->update([
+                        'status'      => 'ongoing',
+                        'started_at'  => $subSession->started_at ?? now(),
+                        'accepted_at' => now(),
+                    ]);
+
                     $subSession->chat_session_id = $linkedChat->id;
                     $subSession->chat_status = 'active';
-                    $newSessionData['chat_session'] = $linkedChat;
+                    $newSessionData['chat_session'] = $linkedChat->fresh();
                     $newSessionData['chat_session_id'] = $linkedChat->id;
 
                     if ($user) {
                         broadcast(new ChatInitiated($linkedChat, $user));
-                        broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'initiated'));
+                        broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ongoing'));
                     }
                 } else {
                     $subSession->chat_status = 'active';
