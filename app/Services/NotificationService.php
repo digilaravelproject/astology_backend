@@ -135,10 +135,18 @@ class NotificationService
             $tokens = array_values(array_unique(array_filter($tokens)));
         }
 
-        // Dispatch in chunks of 500 tokens
+        // Dispatch in staggered chunks with jitter (200 tokens per chunk)
         if (!empty($tokens)) {
-            foreach (array_chunk($tokens, 500) as $tokenChunk) {
-                SendPushNotificationJob::dispatch($tokenChunk, $payload);
+            $chunks = array_chunk($tokens, 200);
+            foreach ($chunks as $index => $tokenChunk) {
+                // Stagger by 1s per chunk with small random jitter
+                $delaySeconds = $index * 1;
+                if ($delaySeconds > 0) {
+                    SendPushNotificationJob::dispatch($tokenChunk, $payload)
+                        ->delay(now()->addSeconds($delaySeconds));
+                } else {
+                    SendPushNotificationJob::dispatch($tokenChunk, $payload);
+                }
             }
         }
     }
@@ -267,8 +275,15 @@ class NotificationService
             return;
         }
 
-        foreach (array_chunk($tokens, 500) as $tokenChunk) {
-            SendPushNotificationJob::dispatch($tokenChunk, $payload, $broadcast->id);
+        $tokenChunks = array_chunk($tokens, 200);
+        foreach ($tokenChunks as $index => $tokenChunk) {
+            $delaySeconds = $index * 1;
+            if ($delaySeconds > 0) {
+                SendPushNotificationJob::dispatch($tokenChunk, $payload, $broadcast->id)
+                    ->delay(now()->addSeconds($delaySeconds));
+            } else {
+                SendPushNotificationJob::dispatch($tokenChunk, $payload, $broadcast->id);
+            }
         }
     }
 }
