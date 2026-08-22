@@ -31,20 +31,6 @@
         </div>
     </div>
 
-    <!-- Alert / Toast Messages -->
-    @if(session('success'))
-        <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3 text-emerald-800 shadow-xs">
-            <i class="fas fa-check-circle text-lg text-emerald-600"></i>
-            <span class="text-sm font-semibold">{{ session('success') }}</span>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="p-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-3 text-rose-800 shadow-xs">
-            <i class="fas fa-exclamation-circle text-lg text-rose-600"></i>
-            <span class="text-sm font-semibold">{{ session('error') }}</span>
-        </div>
-    @endif
 
     <!-- Test Connection Result Live Card -->
     <div x-show="testResult !== null" x-cloak x-transition
