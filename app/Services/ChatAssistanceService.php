@@ -198,8 +198,10 @@ class ChatAssistanceService
 
     /**
      * Retrieve messages history with pagination.
+     * In mobile chat apps, Page 1 MUST return the MOST RECENT messages (today's chat)
+     * ordered chronologically for rendering.
      */
-    public function getMessagesForSession($sessionId, $userId, $perPage = 50)
+    public function getMessagesForSession($sessionId, $userId, $perPage = 50, $direction = 'asc')
     {
         $session = ChatAssistanceSession::findOrFail($sessionId);
 
@@ -207,9 +209,27 @@ class ChatAssistanceService
             throw new Exception("Unauthorized access to this chat history.", 403);
         }
 
-        return ChatAssistanceMessage::where('chat_assistance_session_id', $sessionId)
-            ->oldest()
+        // Fetch latest messages first so Page 1 contains the most recent messages (e.g. today's chat)
+        $paginator = ChatAssistanceMessage::where('chat_assistance_session_id', $sessionId)
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
             ->paginate($perPage);
+
+        // Reverse for display so Page 1 renders chronologically (oldest -> newest within the slice)
+        $items = ($direction === 'desc')
+            ? $paginator->getCollection()->values()
+            : $paginator->getCollection()->reverse()->values();
+
+        return new \Illuminate\Pagination\LengthAwarePaginator(
+            $items,
+            $paginator->total(),
+            $paginator->perPage(),
+            $paginator->currentPage(),
+            [
+                'path' => \Illuminate\Pagination\LengthAwarePaginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ]
+        );
     }
 
     /**
@@ -302,8 +322,12 @@ class ChatAssistanceService
         $sessions = ChatAssistanceSession::with([
                 'consumer:id,name,profile_photo',
                 'provider:id,name,profile_photo',
+                'provider.astrologer',
                 'latestMessage'
             ])
+            ->withCount(['messages as unread_count' => function ($query) use ($userId) {
+                $query->where('receiver_id', $userId)->where('is_read', false);
+            }])
             ->where(function ($query) use ($userId) {
                 $query->where('consumer_id', $userId)
                       ->orWhere('provider_id', $userId);
@@ -311,7 +335,7 @@ class ChatAssistanceService
             ->latest('updated_at')
             ->paginate($perPage);
 
-        $sessions->getCollection()->transform(function ($session) {
+        $sessions->getCollection()->transform(function ($session) use ($userId) {
             $session->chat_assistance_session_id = $session->id;
             if ($session->consumer) {
                 $session->consumer->profile_photo = MediaHelper::getFullUrl($session->consumer->profile_photo);
@@ -327,6 +351,12 @@ class ChatAssistanceService
                 $session->provider->orders_count = $totalOrders;
                 $session->provider->orders_formatted = "{$totalOrders}+ orders";
             }
+
+            // Provide aliases for maximum mobile client compatibility
+            $session->astrologer = $session->provider;
+            $session->user = $session->consumer;
+            $session->other_user = ($session->consumer_id == $userId) ? $session->provider : $session->consumer;
+
             return $session;
         });
 

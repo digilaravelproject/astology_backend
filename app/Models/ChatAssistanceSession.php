@@ -19,14 +19,24 @@ class ChatAssistanceSession extends Model
         return $this->belongsTo(User::class, 'consumer_id');
     }
 
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'consumer_id');
+    }
+
     public function provider()
+    {
+        return $this->belongsTo(User::class, 'provider_id');
+    }
+
+    public function astrologer()
     {
         return $this->belongsTo(User::class, 'provider_id');
     }
 
     public function messages()
     {
-        return $this->hasMany(ChatAssistanceMessage::class);
+        return $this->hasMany(ChatAssistanceMessage::class, 'chat_assistance_session_id');
     }
 
     public function latestMessage()
