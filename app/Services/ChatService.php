@@ -477,7 +477,10 @@ class ChatService
                             
                             $subSession->update([
                                 'ended_at' => $endTime,
-                                'duration_used' => $durationUsed
+                                'duration_used' => $durationUsed,
+                                'session_state' => 'terminated',
+                                'chat_status' => 'closed',
+                                'call_status' => 'disconnected',
                             ]);
                             
                             $purchase->remaining_duration -= $durationUsed;
@@ -489,6 +492,9 @@ class ChatService
                             
                             // Broadcast package sub-session ended event
                             broadcast(new \App\Events\PackageSubSessionEnded($subSession, $purchase->remaining_duration, $userId));
+                            
+                            // Broadcast termination state to both sides
+                            broadcast(new \App\Events\PackageSessionStateUpdated($subSession->toBannerArray(0), $purchase->user_id, $purchase->astrologer_id));
                             
                             // Broadcast termination if exhausted
                             if ($purchase->status === 'exhausted') {
@@ -505,8 +511,21 @@ class ChatService
                     'total_cost' => $totalCost,
                 ]);
 
+                // Clean up any stale or hanging sessions between these two users so they never auto-reopen
+                \App\Models\ChatSession::where('consumer_id', $session->consumer_id)
+                    ->where('provider_id', $session->provider_id)
+                    ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
+                    ->where('id', '!=', $sessionId)
+                    ->update([
+                        'status'   => 'cancelled',
+                        'ended_at' => $endTime,
+                    ]);
+
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
+                
+                \App\Models\User::whereIn('id', [$session->consumer_id, $session->provider_id])
+                    ->update(['is_busy' => false, 'busy_session_id' => null]);
                 
                 $session->refresh();
                 return $session;

@@ -283,8 +283,21 @@ class NormalChatService
                 'total_cost' => $totalCost,
             ]);
 
+            // Clean up any stale or hanging sessions between these two users so they never auto-reopen
+            ChatSession::where('consumer_id', $consumerId)
+                ->where('provider_id', $providerId)
+                ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
+                ->where('id', '!=', $sessionId)
+                ->update([
+                    'status'   => 'cancelled',
+                    'ended_at' => $endTime,
+                ]);
+
             $this->presenceService->setFree($consumerId);
             $this->presenceService->setFree($providerId);
+
+            User::whereIn('id', [$consumerId, $providerId])
+                ->update(['is_busy' => false, 'busy_session_id' => null]);
 
             $session->refresh();
             return $session;
