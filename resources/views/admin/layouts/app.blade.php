@@ -11,89 +11,73 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
-        .admin-content { min-width: 0; }
+        html, body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        .admin-content {
+            min-width: 0;
+            width: 100%;
+        }
 
         .admin-content img,
         .admin-content video,
         .admin-content canvas,
-        .admin-content svg { max-width: 100%; }
+        .admin-content svg {
+            max-width: 100%;
+            height: auto;
+        }
 
-        .admin-content div:has(> table) {
+        /* Smooth touch scrolling for all table containers */
+        .admin-content div:has(> table),
+        .table-responsive {
             max-width: 100%;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
 
-        @media (max-width: 767px) {
-            body { overflow-x: hidden; }
-            .admin-header { height: 64px; padding-inline: 12px; }
-            .admin-brand { min-width: 0; gap: 8px; font-size: 15px; line-height: 1.15; }
-            .admin-brand img { width: 36px; height: 36px; flex: none; }
-            .admin-main-shell { padding-top: 64px; }
-            .admin-sidebar { top: 64px; height: calc(100vh - 64px); width: min(280px, 86vw); }
-            .admin-main { width: 100%; min-width: 0; overflow-x: hidden; }
-            .admin-main-inner { width: 100%; min-width: 0; padding: 16px 12px; }
+        /* Custom subtle scrollbar */
+        .admin-content ::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+        .admin-content ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .admin-content ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        .admin-content ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
 
-            .admin-content { font-size: 14px; }
-            .admin-content h1 { font-size: 1.5rem; line-height: 1.25; overflow-wrap: anywhere; }
-            .admin-content h2 { font-size: 1.25rem; line-height: 1.3; overflow-wrap: anywhere; }
-            .admin-content h3 { font-size: 1.1rem; line-height: 1.35; overflow-wrap: anywhere; }
+        @media (max-width: 767px) {
+            .admin-header { height: 60px; padding-inline: 12px; }
+            .admin-brand { min-width: 0; gap: 8px; font-size: 15px; }
+            .admin-brand img { width: 32px; height: 32px; flex: none; }
+            .admin-main-shell { padding-top: 60px; }
+            .admin-sidebar { top: 60px; height: calc(100vh - 60px); width: min(280px, 86vw); }
+            .admin-main { width: 100%; min-width: 0; overflow-x: hidden; margin-left: 0 !important; }
+            .admin-main-inner { width: 100%; min-width: 0; padding: 14px 12px; }
+
+            .admin-content { font-size: 13px; }
+            .admin-content h1 { font-size: 1.35rem; line-height: 1.25; overflow-wrap: anywhere; }
+            .admin-content h2 { font-size: 1.2rem; line-height: 1.3; overflow-wrap: anywhere; }
+            .admin-content h3 { font-size: 1.05rem; line-height: 1.35; overflow-wrap: anywhere; }
 
             .admin-content [class~="gap-10"],
-            .admin-content [class~="gap-8"] { gap: 20px; }
+            .admin-content [class~="gap-8"] { gap: 16px; }
 
             .admin-content [class~="mb-10"],
-            .admin-content [class~="mb-8"] { margin-bottom: 20px; }
-
-            .admin-content > .flex,
-            .admin-content form.flex,
-            .admin-content [class*="border-b"][class*="justify-between"] {
-                flex-wrap: wrap;
-                gap: 12px;
-            }
-
-            .admin-content form.flex > div,
-            .admin-content form.flex > input,
-            .admin-content form.flex > select {
-                width: 100%;
-                min-width: 0 !important;
-                flex-basis: 100%;
-            }
-
-            .admin-content [class~="grid-cols-2"],
-            .admin-content [class~="grid-cols-3"],
-            .admin-content [class~="grid-cols-4"],
-            .admin-content [class~="grid-cols-5"],
-            .admin-content [class~="grid-cols-6"] {
-                grid-template-columns: minmax(0, 1fr);
-            }
-
-            .admin-content [class~="p-8"] { padding: 16px; }
-            .admin-content [class~="p-10"] { padding: 16px; }
-            .admin-content [class~="p-6"] { padding: 14px; }
-            .admin-content [class~="px-8"],
-            .admin-content [class~="px-10"] { padding-left: 16px; padding-right: 16px; }
+            .admin-content [class~="mb-8"] { margin-bottom: 16px; }
 
             .admin-content div:has(> table) {
                 width: 100%;
                 max-width: calc(100vw - 24px);
             }
-
-            .admin-content table { min-width: 680px; }
-
-            .admin-content table th,
-            .admin-content table td { white-space: nowrap; }
-
-            .admin-content input,
-            .admin-content select,
-            .admin-content textarea,
-            .admin-content button { max-width: 100%; }
-
-            .admin-content input:not([type="checkbox"]):not([type="radio"]),
-            .admin-content select,
-            .admin-content textarea { width: 100%; min-width: 0; }
-
-            .admin-content [class*="rounded-["] { border-radius: 18px; }
         }
     </style>
 </head>

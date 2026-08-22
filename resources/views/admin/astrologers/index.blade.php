@@ -41,16 +41,16 @@
 
     <!-- Astrologers Table -->
     <div class="bg-white rounded-2xl shadow-sm border border-gray-lighter overflow-hidden">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse">
+        <div class="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+            <table class="w-full text-left border-collapse min-w-[640px]">
                 <thead class="bg-light/50 border-b border-gray-lighter">
                     <tr>
-                        <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Astrologer</th>
-                        <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Expertise & Exp.</th>
-                        <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider text-center">Languages</th>
-                        <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider text-center">Joined</th>
-                        <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Status</th>
-                        <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider text-right">Actions</th>
+                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-[11px] font-black text-gray uppercase tracking-wider">Astrologer</th>
+                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-[11px] font-black text-gray uppercase tracking-wider">Expertise & Exp.</th>
+                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-[11px] font-black text-gray uppercase tracking-wider text-center">Languages</th>
+                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-[11px] font-black text-gray uppercase tracking-wider text-center">Joined</th>
+                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-[11px] font-black text-gray uppercase tracking-wider">Status</th>
+                        <th class="px-4 sm:px-6 py-4 text-[10px] sm:text-[11px] font-black text-gray uppercase tracking-wider text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-lighter">
@@ -60,24 +60,27 @@
                             $expertise = $profile?->areas_of_expertise ? implode(', ', $profile->areas_of_expertise) : '-';
                             $languages = $profile?->languages ?? [];
                             $status = $profile?->status ?? 'pending';
+                            $rawAstroPhoto = $astro->profile_photo ?: $profile?->profile_photo;
+                            $astroPhotoUrl = \App\Helpers\MediaHelper::getFullUrl($rawAstroPhoto);
+                            $fallbackAvatar = 'https://ui-avatars.com/api/?name=' . urlencode($astro->name) . '&background=E8C461&color=fff&bold=true';
                         @endphp
                         <tr class="hover:bg-light/30 transition-colors group">
-                            <td class="px-6 py-4">
+                            <td class="px-4 sm:px-6 py-4">
                                 <div class="flex items-center gap-3">
-                                    <div class="w-12 h-12 rounded-2xl bg-linear-to-br from-primary/10 to-primary/30 p-1 border border-primary/20">
-                                        <img src="https://ui-avatars.com/api/?name={{ urlencode($astro->name) }}&background=E8C461&color=fff&bold=true&rounded=true" class="w-full h-full object-cover rounded-xl" alt="">
+                                    <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-linear-to-br from-primary/10 to-primary/30 p-0.5 border border-primary/20 overflow-hidden shrink-0">
+                                        <img src="{{ $astroPhotoUrl ?: $fallbackAvatar }}" onerror="this.onerror=null; this.src='{{ $fallbackAvatar }}';" class="w-full h-full object-cover rounded-xl" alt="{{ $astro->name }}">
                                     </div>
-                                    <div>
-                                        <div class="text-sm font-black text-dark group-hover:text-primary transition-colors">{{ $astro->name }}</div>
-                                        <div class="text-[11px] font-bold text-gray-light">ID: #USR-{{ $astro->id }}</div>
+                                    <div class="min-w-0">
+                                        <div class="text-xs sm:text-sm font-black text-dark group-hover:text-primary transition-colors truncate">{{ $astro->name }}</div>
+                                        <div class="text-[10px] sm:text-[11px] font-bold text-gray-light">ID: #USR-{{ $astro->id }}</div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
                                 <div class="text-xs font-black text-dark">{{ $expertise }}</div>
                                 <div class="text-[10px] font-bold text-gray uppercase">{{ $profile?->years_of_experience ? $profile->years_of_experience . ' Years' : '-' }} Exp</div>
                             </td>
-                            <td class="px-6 py-4 text-center">
+                            <td class="px-4 sm:px-6 py-4 text-center">
                                 <div class="flex flex-wrap justify-center gap-1">
                                     @foreach($languages as $lang)
                                         @if($lang)
@@ -86,8 +89,8 @@
                                     @endforeach
                                 </div>
                             </td>
-                            <td class="px-6 py-4 text-center text-xs font-semibold text-gray">{{ $astro->created_at?->format('d M Y') }}</td>
-                            <td class="px-6 py-4">
+                            <td class="px-4 sm:px-6 py-4 text-center text-xs font-semibold text-gray whitespace-nowrap">{{ $astro->created_at?->format('d M Y') }}</td>
+                            <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
                                 @if($status === 'approved')
                                     <span class="px-2.5 py-1 bg-success/10 text-success text-[10px] font-black rounded-lg uppercase tracking-widest border border-success/20">Approved</span>
                                 @elseif($status === 'pending')
@@ -98,27 +101,20 @@
                                     <span class="px-2.5 py-1 bg-gray-lighter text-gray text-[10px] font-black rounded-lg uppercase tracking-widest">Inactive</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 text-right">
-                                <div class="flex justify-end gap-2 translate-x-2 group-hover:translate-x-0 transition-transform">
-                                    <a href="{{ route('admin.astrologers.show', $astro->id) }}" class="w-9 h-9 rounded-xl bg-info/10 text-info hover:bg-info hover:text-white transition-all flex items-center justify-center transform active:scale-90" title="View">
-                                        <i class="fas fa-eye text-xs"></i>
+                            <td class="px-4 sm:px-6 py-4 text-right whitespace-nowrap">
+                                <div class="flex items-center justify-end gap-2">
+                                    <a href="{{ route('admin.astrologers.show', $astro->id) }}" class="w-8 h-8 rounded-lg bg-light text-gray hover:text-dark hover:bg-gray-200 transition-all flex items-center justify-center text-xs shadow-xs" title="View Profile">
+                                        <i class="fas fa-eye"></i>
                                     </a>
-                                    <a href="{{ route('admin.astrologers.edit', $astro->id) }}" class="w-9 h-9 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all flex items-center justify-center transform active:scale-90" title="Edit">
-                                        <i class="fas fa-edit text-xs"></i>
+                                    <a href="{{ route('admin.astrologers.edit', $astro->id) }}" class="w-8 h-8 rounded-lg bg-light text-gray hover:text-primary hover:bg-primary/10 transition-all flex items-center justify-center text-xs shadow-xs" title="Edit Astrologer">
+                                        <i class="fas fa-edit"></i>
                                     </a>
-                                    <form action="{{ route('admin.astrologers.destroy', $astro->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this astrologer?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="w-9 h-9 rounded-xl bg-danger/10 text-danger hover:bg-danger hover:text-white transition-all flex items-center justify-center transform active:scale-90" title="Delete">
-                                            <i class="fas fa-trash text-xs"></i>
-                                        </button>
-                                    </form>
                                 </div>
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-6 py-10 text-center text-gray">No astrologers found.</td>
+                            <td colspan="6" class="px-6 py-10 text-center text-gray text-xs italic">No astrologers found matching your criteria.</td>
                         </tr>
                     @endforelse
                 </tbody>
