@@ -151,7 +151,7 @@
                         <h3 class="text-xl font-black text-dark uppercase tracking-tighter">Settlement Pipeline</h3>
                         <p class="text-[10px] text-gray font-bold uppercase tracking-widest mt-1">Astrologer payout & withdrawal tracking</p>
                     </div>
-                    <a href="{{ route('admin.astrologers.payouts.index') }}" class="w-10 h-10 rounded-xl bg-light flex items-center justify-center text-gray hover:text-dark hover:bg-light/80 transition-all">
+                    <a href="{{ route('admin.astrologer-payouts.index') }}" class="w-10 h-10 rounded-xl bg-light flex items-center justify-center text-gray hover:text-dark hover:bg-light/80 transition-all">
                         <i class="fas fa-arrow-up-right-from-square text-xs"></i>
                     </a>
                 </div>
@@ -209,7 +209,7 @@
                         </tbody>
                     </table>
                 </div>
-                <a href="{{ route('admin.astrologers.payouts.index') }}" class="block w-full mt-6 py-4 border-2 border-dashed border-gray-lighter text-dark text-[10px] font-black uppercase text-center rounded-[24px] hover:border-primary/30 hover:bg-primary/5 transition-all">
+                <a href="{{ route('admin.astrologer-payouts.index') }}" class="block w-full mt-6 py-4 border-2 border-dashed border-gray-lighter text-dark text-[10px] font-black uppercase text-center rounded-[24px] hover:border-primary/30 hover:bg-primary/5 transition-all">
                     Review All Settlements & Payouts <i class="fas fa-arrow-right ml-1"></i>
                 </a>
             </div>
