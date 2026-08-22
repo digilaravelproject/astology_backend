@@ -86,8 +86,17 @@ class DashboardController extends Controller
 
         $liveNow = $liveCalls + $liveChats + $liveStreams;
 
-        $pendingPayouts = (float) Wallet::where('user_type', 'astrologer')->sum('balance');
-        $totalWalletBalance = (float) Wallet::sum('balance');
+        $pendingPayouts = 0;
+        try {
+            $pendingPayouts = (float) Wallet::join('users', 'wallets.user_id', '=', 'users.id')
+                ->where('users.user_type', 'astrologer')
+                ->sum('wallets.balance');
+        } catch (\Throwable $e) {}
+
+        $totalWalletBalance = 0;
+        try {
+            $totalWalletBalance = (float) Wallet::sum('balance');
+        } catch (\Throwable $e) {}
 
         // 6. 7-Day Revenue & Orders Trend for Chart.js
         $chartLabels = [];
