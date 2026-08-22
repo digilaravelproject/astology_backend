@@ -26,6 +26,7 @@ class SettingController extends Controller
             // Commission
             'global_commission_percentage' => Setting::get('global_commission_percentage', 20.00),
             'global_package_commission_rate' => Setting::get('global_package_commission_rate', 50.00),
+            'gift_admin_commission_percentage' => Setting::get('gift_admin_commission_percentage', 50.00),
             'ecommerce_commission_percentage' => Setting::get('ecommerce_commission_percentage', 15.00),
             'premium_yearly_commission_percentage' => Setting::get('premium_yearly_commission_percentage', 10.00),
             
@@ -100,6 +101,7 @@ class SettingController extends Controller
             // Commission
             'global_commission_percentage' => 'nullable|numeric|min:0|max:100',
             'global_package_commission_rate' => 'nullable|numeric|min:0|max:100',
+            'gift_admin_commission_percentage' => 'nullable|numeric|min:0|max:100',
             'ecommerce_commission_percentage' => 'nullable|numeric|min:0|max:100',
             'premium_yearly_commission_percentage' => 'nullable|numeric|min:0|max:100',
             
@@ -160,6 +162,7 @@ class SettingController extends Controller
             'seo_meta_description' => 'general',
             'global_commission_percentage' => 'commission',
             'global_package_commission_rate' => 'commission',
+            'gift_admin_commission_percentage' => 'commission',
             'ecommerce_commission_percentage' => 'commission',
             'premium_yearly_commission_percentage' => 'commission',
             'min_wallet_recharge' => 'wallet',

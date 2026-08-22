@@ -5,7 +5,10 @@
     tab: 'general',
     showAddModal: false,
     showEditModal: false,
-    currentOperator: { id: '', name: '', email: '', phone: '', role: 'admin', is_active: 1 }
+    currentOperator: { id: '', name: '', email: '', phone: '', role: 'admin', is_active: 1 },
+    consultationAdminFee: {{ (float) ($settings['global_commission_percentage'] ?? 55) }},
+    packageAstroShare: {{ (float) ($settings['global_package_commission_rate'] ?? 45) }},
+    giftAdminFee: {{ (float) ($settings['gift_admin_commission_percentage'] ?? 50) }}
 }">
     <!-- Page Header -->
     <div class="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-gray-lighter pb-6">
@@ -120,35 +123,143 @@
 
                 <!-- Commission Rates -->
                 <div x-show="tab === 'commission'" class="space-y-6">
-                    <h3 class="text-lg font-bold text-text-primary border-b pb-3">Commission Rules</h3>
+                    <div class="border-b pb-3">
+                        <h3 class="text-lg font-bold text-text-primary">Commission Rules & Revenue Split</h3>
+                        <p class="text-xs text-text-muted mt-1">Define platform fees and astrologer payouts. Live visual split preview calculates automatic payouts instantly.</p>
+                    </div>
                     
-                    <div class="p-6 bg-primary/5 rounded-2xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div>
-                            <h4 class="text-base font-bold text-text-primary mb-1">Standard Platform Fee</h4>
-                            <p class="text-xs text-text-muted">The percentage the platform keeps from chat, call, and video session earnings.</p>
+                    <!-- 1. Chat & Call Consultations -->
+                    <div class="p-6 bg-gradient-to-r from-primary/5 via-primary/[0.02] to-transparent rounded-2xl border border-primary/15 space-y-4">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-primary/10 text-primary uppercase tracking-wide">Standard Consultations</span>
+                                    <span class="text-xs font-semibold text-text-muted">Chat, Audio & Video Calls</span>
+                                </div>
+                                <h4 class="text-base font-bold text-text-primary">Platform / Admin Fee (Platform Share)</h4>
+                                <p class="text-xs text-text-muted">The percentage the platform keeps from consultation charges when no special offer is active.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <input type="number" 
+                                           name="global_commission_percentage" 
+                                           x-model.number="consultationAdminFee" 
+                                           min="0" max="100" step="0.1"
+                                           class="w-28 border border-gray-300 px-3 py-2 rounded-xl text-center text-lg font-extrabold text-primary focus:ring-2 focus:ring-primary focus:border-primary shadow-xs">
+                                </div>
+                                <span class="text-lg font-extrabold text-text-secondary">%</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <input type="number" name="global_commission_percentage" value="{{ $settings['global_commission_percentage'] }}" min="0" max="100" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center text-base font-bold">
-                            <span class="text-lg font-bold text-text-secondary">%</span>
+
+                        <!-- Live Real-Time Split Preview -->
+                        <div class="pt-3 border-t border-primary/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="flex items-center justify-between px-4 py-2.5 bg-red-50/70 border border-red-200/60 rounded-xl">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-shield-alt text-red-600 text-sm"></i>
+                                    <span class="text-xs font-bold text-red-900">Admin Keeps:</span>
+                                </div>
+                                <span class="text-sm font-extrabold text-red-700" x-text="`${consultationAdminFee}% (₹${(consultationAdminFee).toFixed(2)} on ₹100)`"></span>
+                            </div>
+                            <div class="flex items-center justify-between px-4 py-2.5 bg-emerald-50/70 border border-emerald-200/60 rounded-xl">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-user-check text-emerald-600 text-sm"></i>
+                                    <span class="text-xs font-bold text-emerald-900">Astrologer Gets:</span>
+                                </div>
+                                <span class="text-sm font-extrabold text-emerald-700" x-text="`${Math.max(0, 100 - consultationAdminFee)}% (₹${Math.max(0, 100 - consultationAdminFee).toFixed(2)} on ₹100)`"></span>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="p-6 bg-primary/5 rounded-2xl border border-primary/10 flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div>
-                            <h4 class="text-base font-bold text-text-primary mb-1">Prepaid Package - Default Astrologer Share</h4>
-                            <p class="text-xs text-text-muted">Fallback commission percentage credited to the astrologer for prepaid packages (if no custom override is set).</p>
+                    <!-- 2. Prepaid Packages -->
+                    <div class="p-6 bg-gradient-to-r from-emerald-500/5 via-emerald-500/[0.02] to-transparent rounded-2xl border border-emerald-500/20 space-y-4">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-100 text-emerald-800 uppercase tracking-wide">Prepaid Packages</span>
+                                    <span class="text-xs font-semibold text-text-muted">Multi-Minute Minutes Bundles</span>
+                                </div>
+                                <h4 class="text-base font-bold text-text-primary">Default Astrologer Share (Astrologer Payout)</h4>
+                                <p class="text-xs text-text-muted">Fallback percentage credited to astrologer wallet on prepaid package minutes.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <input type="number" 
+                                           name="global_package_commission_rate" 
+                                           x-model.number="packageAstroShare" 
+                                           min="0" max="100" step="0.1"
+                                           class="w-28 border border-gray-300 px-3 py-2 rounded-xl text-center text-lg font-extrabold text-emerald-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 shadow-xs">
+                                </div>
+                                <span class="text-lg font-extrabold text-text-secondary">%</span>
+                            </div>
                         </div>
-                        <div class="flex items-center gap-3">
-                            <input type="number" name="global_package_commission_rate" value="{{ $settings['global_package_commission_rate'] }}" min="0" max="100" class="w-24 border border-gray-300 px-3 py-2 rounded-xl text-center text-base font-bold">
-                            <span class="text-lg font-bold text-text-secondary">%</span>
+
+                        <!-- Live Real-Time Split Preview -->
+                        <div class="pt-3 border-t border-emerald-500/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="flex items-center justify-between px-4 py-2.5 bg-emerald-50/70 border border-emerald-200/60 rounded-xl">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-user-check text-emerald-600 text-sm"></i>
+                                    <span class="text-xs font-bold text-emerald-900">Astrologer Gets:</span>
+                                </div>
+                                <span class="text-sm font-extrabold text-emerald-700" x-text="`${packageAstroShare}% (₹${(packageAstroShare).toFixed(2)} on ₹100)`"></span>
+                            </div>
+                            <div class="flex items-center justify-between px-4 py-2.5 bg-red-50/70 border border-red-200/60 rounded-xl">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-shield-alt text-red-600 text-sm"></i>
+                                    <span class="text-xs font-bold text-red-900">Admin Keeps:</span>
+                                </div>
+                                <span class="text-sm font-extrabold text-red-700" x-text="`${Math.max(0, 100 - packageAstroShare)}% (₹${Math.max(0, 100 - packageAstroShare).toFixed(2)} on ₹100)`"></span>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- 3. Gifts & Live Stream Super Chat -->
+                    <div class="p-6 bg-gradient-to-r from-amber-500/5 via-amber-500/[0.02] to-transparent rounded-2xl border border-amber-500/20 space-y-4">
+                        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-100 text-amber-800 uppercase tracking-wide">Gifts & Live Streams</span>
+                                    <span class="text-xs font-semibold text-text-muted">Virtual Tipping & Super Chats</span>
+                                </div>
+                                <h4 class="text-base font-bold text-text-primary">Gifts & Super Chat Platform Fee</h4>
+                                <p class="text-xs text-text-muted">Platform commission fee deducted from virtual gifts & live super chat tips.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="relative">
+                                    <input type="number" 
+                                           name="gift_admin_commission_percentage" 
+                                           x-model.number="giftAdminFee" 
+                                           min="0" max="100" step="0.1"
+                                           class="w-28 border border-gray-300 px-3 py-2 rounded-xl text-center text-lg font-extrabold text-amber-700 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 shadow-xs">
+                                </div>
+                                <span class="text-lg font-extrabold text-text-secondary">%</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Real-Time Split Preview -->
+                        <div class="pt-3 border-t border-amber-500/10 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div class="flex items-center justify-between px-4 py-2.5 bg-red-50/70 border border-red-200/60 rounded-xl">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-shield-alt text-red-600 text-sm"></i>
+                                    <span class="text-xs font-bold text-red-900">Admin Keeps:</span>
+                                </div>
+                                <span class="text-sm font-extrabold text-red-700" x-text="`${giftAdminFee}% (₹${(giftAdminFee).toFixed(2)} on ₹100)`"></span>
+                            </div>
+                            <div class="flex items-center justify-between px-4 py-2.5 bg-emerald-50/70 border border-emerald-200/60 rounded-xl">
+                                <div class="flex items-center gap-2">
+                                    <i class="fas fa-gift text-emerald-600 text-sm"></i>
+                                    <span class="text-xs font-bold text-emerald-900">Astrologer Gets:</span>
+                                </div>
+                                <span class="text-sm font-extrabold text-emerald-700" x-text="`${Math.max(0, 100 - giftAdminFee)}% (₹${Math.max(0, 100 - giftAdminFee).toFixed(2)} on ₹100)`"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Marketplace & Subscriptions -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div class="p-5 bg-light/20 border border-gray-200 rounded-2xl flex items-center justify-between">
+                        <div class="p-5 bg-light/20 border border-gray-200 rounded-2xl flex items-center justify-between gap-4">
                             <div>
-                                <span class="block text-sm font-bold text-text-primary">Shop/Marketplace Sales Commission</span>
-                                <span class="block text-xs text-text-muted mt-0.5">Platform share for Selling physical items</span>
+                                <span class="block text-sm font-bold text-text-primary">Shop/Marketplace Platform Fee</span>
+                                <span class="block text-xs text-text-muted mt-0.5">Admin share kept from physical store item sales</span>
                             </div>
                             <div class="flex items-center gap-2">
                                 <input type="number" name="ecommerce_commission_percentage" value="{{ $settings['ecommerce_commission_percentage'] }}" min="0" max="100" class="w-20 border border-gray-300 px-2 py-2 rounded-xl text-center font-bold text-sm">
@@ -156,10 +267,10 @@
                             </div>
                         </div>
 
-                        <div class="p-5 bg-light/20 border border-gray-200 rounded-2xl flex items-center justify-between">
+                        <div class="p-5 bg-light/20 border border-gray-200 rounded-2xl flex items-center justify-between gap-4">
                             <div>
-                                <span class="block text-sm font-bold text-text-primary">Premium Subscription Plan Commission</span>
-                                <span class="block text-xs text-text-muted mt-0.5">Platform share for yearly subscription packages</span>
+                                <span class="block text-sm font-bold text-text-primary">Premium Subscription Platform Fee</span>
+                                <span class="block text-xs text-text-muted mt-0.5">Admin share kept from yearly VIP memberships</span>
                             </div>
                             <div class="flex items-center gap-2">
                                 <input type="number" name="premium_yearly_commission_percentage" value="{{ $settings['premium_yearly_commission_percentage'] }}" min="0" max="100" class="w-20 border border-gray-300 px-2 py-2 rounded-xl text-center font-bold text-sm">
