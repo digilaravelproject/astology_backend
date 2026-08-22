@@ -267,7 +267,7 @@ class AstrologerWalletController extends Controller
             <tr class="heading-row">
                 <td>Service / Consultation Details</td>
                 <td class="text-center" style="width: 25%;">Date</td>
-                <td class="text-right" style="width: 25%;">Astrologer Share (₹)</td>
+                <td class="text-right" style="width: 25%;">Astrologer Share (Rs.)</td>
             </tr>';
 
             if ($transactions->isEmpty()) {
@@ -282,23 +282,23 @@ class AstrologerWalletController extends Controller
                             <span style="font-size: 11px; color: #64748b;">' . htmlspecialchars($tx->description ?? 'Astrology Consultation') . '</span>
                         </td>
                         <td class="text-center">' . $tx->created_at->format('d M Y') . '</td>
-                        <td class="text-right font-bold">₹' . number_format($tx->amount, 2) . '</td>
+                        <td class="text-right font-bold">Rs. ' . number_format($tx->amount, 2) . '</td>
                     </tr>';
                 }
             }
 
             $html .= '<tr class="total-row" style="border-top: 2px solid #e2e8f0;">
-                <td colspan="3" style="color: #1e293b;">Gross Earnings: ₹' . number_format($totalEarnings, 2) . '</td>
+                <td colspan="3" style="color: #1e293b;">Gross Earnings: Rs. ' . number_format($totalEarnings, 2) . '</td>
             </tr>';
 
             if ($totalTdsDeducted > 0) {
                 $html .= '<tr class="total-row">
-                    <td colspan="3" style="color: #dc2626;">Less: TDS Deducted (Tax at Source): - ₹' . number_format($totalTdsDeducted, 2) . '</td>
+                    <td colspan="3" style="color: #dc2626;">Less: TDS Deducted (Tax at Source): - Rs. ' . number_format($totalTdsDeducted, 2) . '</td>
                 </tr>';
             }
 
             $html .= '<tr class="total-row" style="border-top: 1px solid #ddd; font-size: 15px;">
-                <td colspan="3" style="color: #16a34a;">Net Disbursed / Payable: ₹' . number_format($netPayable, 2) . '</td>
+                <td colspan="3" style="color: #16a34a;">Net Disbursed / Payable: Rs. ' . number_format($netPayable, 2) . '</td>
             </tr>
         </table>';
 
@@ -311,14 +311,14 @@ class AstrologerWalletController extends Controller
                     <td>Payout Reference</td>
                     <td class="text-center">Mode & UTR</td>
                     <td class="text-center">Settled Date</td>
-                    <td class="text-right">Net Transferred (₹)</td>
+                    <td class="text-right">Net Transferred (Rs.)</td>
                 </tr>';
                 foreach ($payouts as $p) {
                     $html .= '<tr class="item-row">
                         <td><strong>' . htmlspecialchars($p->payout_number) . '</strong></td>
                         <td class="text-center">' . htmlspecialchars($p->payment_mode) . ($p->utr_number ? ' (' . htmlspecialchars($p->utr_number) . ')' : '') . '</td>
                         <td class="text-center">' . $p->payment_date->format('d M Y') . '</td>
-                        <td class="text-right font-bold" style="color: #16a34a;">₹' . number_format($p->net_paid_amount, 2) . '</td>
+                        <td class="text-right font-bold" style="color: #16a34a;">Rs. ' . number_format($p->net_paid_amount, 2) . '</td>
                     </tr>';
                 }
                 $html .= '</table>

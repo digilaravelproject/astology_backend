@@ -263,7 +263,7 @@ class WalletTaxService
                     <th style="width: 50%;">Settlement Description</th>
                     <th class="text-center" style="width: 15%;">Payment Mode</th>
                     <th class="text-center" style="width: 15%;">UTR / Ref</th>
-                    <th class="text-right" style="width: 20%;">Gross Amount (₹)</th>
+                    <th class="text-right" style="width: 20%;">Gross Amount (Rs.)</th>
                 </tr>
             </thead>
             <tbody>
@@ -274,7 +274,7 @@ class WalletTaxService
                     </td>
                     <td class="text-center font-bold">' . htmlspecialchars($paymentMode) . '</td>
                     <td class="text-center font-bold" style="font-family: monospace;">' . htmlspecialchars($utrNumber ?? 'N/A') . '</td>
-                    <td class="text-right font-bold">₹' . number_format($grossAmount, 2) . '</td>
+                    <td class="text-right font-bold">Rs. ' . number_format($grossAmount, 2) . '</td>
                 </tr>
             </tbody>
         </table>
@@ -282,27 +282,27 @@ class WalletTaxService
         <table class="summary-table">
             <tr>
                 <td class="font-bold">Gross Settlement Value:</td>
-                <td class="text-right font-bold">₹' . number_format($grossAmount, 2) . '</td>
+                <td class="text-right font-bold">Rs. ' . number_format($grossAmount, 2) . '</td>
             </tr>';
 
             if ($tdsAmount > 0) {
                 $html .= '
             <tr>
                 <td style="color: #dc2626; font-weight: bold;">Less: TDS Deducted (' . number_format($tdsPercent, 2) . '%):</td>
-                <td class="text-right font-bold" style="color: #dc2626;">- ₹' . number_format($tdsAmount, 2) . '</td>
+                <td class="text-right font-bold" style="color: #dc2626;">- Rs. ' . number_format($tdsAmount, 2) . '</td>
             </tr>';
             } else {
                 $html .= '
             <tr>
                 <td>TDS Deducted (0% / Exempt):</td>
-                <td class="text-right">₹0.00</td>
+                <td class="text-right">Rs. 0.00</td>
             </tr>';
             }
 
             $html .= '
             <tr class="total-row">
                 <td>Net Disbursed to Astrologer:</td>
-                <td class="text-right">₹' . number_format($netPaidAmount, 2) . '</td>
+                <td class="text-right">Rs. ' . number_format($netPaidAmount, 2) . '</td>
             </tr>
         </table>
 
@@ -317,7 +317,7 @@ class WalletTaxService
                     <th style="width: 50%;">Description</th>
                     <th class="text-center" style="width: 15%;">SAC</th>
                     <th class="text-center" style="width: 15%;">Tax Rate</th>
-                    <th class="text-right" style="width: 20%;">Amount (₹)</th>
+                    <th class="text-right" style="width: 20%;">Amount (Rs.)</th>
                 </tr>
             </thead>
             <tbody>
@@ -328,7 +328,7 @@ class WalletTaxService
                     </td>
                     <td class="text-center">998399</td>
                     <td class="text-center">' . number_format($gstPercent, 2) . '%</td>
-                    <td class="text-right font-bold">₹' . number_format($baseAmount, 2) . '</td>
+                    <td class="text-right font-bold">Rs. ' . number_format($baseAmount, 2) . '</td>
                 </tr>
             </tbody>
         </table>
@@ -336,25 +336,25 @@ class WalletTaxService
         <table class="summary-table">
             <tr>
                 <td class="font-bold">Base / Taxable Value:</td>
-                <td class="text-right">₹' . number_format($baseAmount, 2) . '</td>
+                <td class="text-right">Rs. ' . number_format($baseAmount, 2) . '</td>
             </tr>';
 
             if ($gstAmount > 0) {
                 $html .= '
             <tr>
                 <td>CGST (' . $halfPercent . '%):</td>
-                <td class="text-right">₹' . number_format($cgstAmount, 2) . '</td>
+                <td class="text-right">Rs. ' . number_format($cgstAmount, 2) . '</td>
             </tr>
             <tr>
                 <td>SGST (' . $halfPercent . '%):</td>
-                <td class="text-right">₹' . number_format($sgstAmount, 2) . '</td>
+                <td class="text-right">Rs. ' . number_format($sgstAmount, 2) . '</td>
             </tr>';
             }
 
             $html .= '
             <tr class="total-row">
                 <td>Total Amount:</td>
-                <td class="text-right">₹' . number_format($totalAmount, 2) . '</td>
+                <td class="text-right">Rs. ' . number_format($totalAmount, 2) . '</td>
             </tr>
         </table>
 

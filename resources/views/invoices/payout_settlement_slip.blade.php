@@ -74,7 +74,7 @@
                     <th style="width: 55%;">Settlement Description</th>
                     <th class="text-center" style="width: 15%;">Payment Mode</th>
                     <th class="text-center" style="width: 15%;">UTR / Ref No</th>
-                    <th class="text-right" style="width: 15%;">Gross Amount</th>
+                    <th class="text-right" style="width: 15%;">Gross Amount (Rs.)</th>
                 </tr>
             </thead>
             <tbody>
@@ -87,7 +87,7 @@
                     </td>
                     <td class="text-center font-bold">{{ $payout->payment_mode }}</td>
                     <td class="text-center font-bold" style="font-family: monospace;">{{ $payout->utr_number ?? 'N/A' }}</td>
-                    <td class="text-right font-bold">₹{{ number_format($payout->gross_amount, 2) }}</td>
+                    <td class="text-right font-bold">Rs. {{ number_format($payout->gross_amount, 2) }}</td>
                 </tr>
             </tbody>
         </table>
@@ -95,22 +95,22 @@
         <table class="summary-table">
             <tr>
                 <td class="font-bold">Gross Settlement Value:</td>
-                <td class="text-right font-bold">₹{{ number_format($payout->gross_amount, 2) }}</td>
+                <td class="text-right font-bold">Rs. {{ number_format($payout->gross_amount, 2) }}</td>
             </tr>
             @if($payout->tds_amount > 0)
             <tr>
                 <td style="color: #dc2626;">Less: TDS Deducted ({{ number_format($payout->tds_percent, 2) }}%):</td>
-                <td class="text-right font-bold" style="color: #dc2626;">- ₹{{ number_format($payout->tds_amount, 2) }}</td>
+                <td class="text-right font-bold" style="color: #dc2626;">- Rs. {{ number_format($payout->tds_amount, 2) }}</td>
             </tr>
             @else
             <tr>
                 <td>TDS Deducted (0% / Exempt):</td>
-                <td class="text-right">₹0.00</td>
+                <td class="text-right">Rs. 0.00</td>
             </tr>
             @endif
             <tr class="total-row">
                 <td>Net Disbursed to Astrologer:</td>
-                <td class="text-right">₹{{ number_format($payout->net_paid_amount, 2) }}</td>
+                <td class="text-right">Rs. {{ number_format($payout->net_paid_amount, 2) }}</td>
             </tr>
         </table>
 
