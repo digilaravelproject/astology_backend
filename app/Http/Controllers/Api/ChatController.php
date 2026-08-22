@@ -190,12 +190,19 @@ class ChatController extends Controller
     public function getMessages(Request $request, $sessionId)
     {
         try {
+            $sessionId = (int) $sessionId;
+            if ($sessionId <= 0) {
+                return ApiResponse::error('Invalid or missing chat session ID', 404);
+            }
+
             $userId = $request->user()->id;
             $perPage = min((int) $request->query('per_page', 30), 100);
             $messages = $this->chatService->getMessagesForSession($sessionId, $userId, $perPage);
             return ApiResponse::success($messages, 'Messages retrieved');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return ApiResponse::error('Chat session not found', 404);
         } catch (Exception $e) {
-            $code = $e->getCode() == 403 ? 403 : 500;
+            $code = $e->getCode() == 403 ? 403 : ($e->getCode() == 404 ? 404 : 500);
             return ApiResponse::error($e->getMessage(), $code);
         }
     }
