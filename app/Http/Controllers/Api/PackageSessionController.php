@@ -217,6 +217,42 @@ class PackageSessionController extends Controller
     }
 
     /**
+     * Atomically switch channel (Chat <-> Call) within active package session.
+     */
+    public function switchChannel(Request $request)
+    {
+        $request->validate([
+            'sub_session_id' => 'required|integer|exists:package_sub_sessions,id',
+            'from_channel'   => 'required|in:call,chat',
+            'to_channel'     => 'required|in:call,chat|different:from_channel',
+            'offer'          => 'nullable|string',
+            'question'       => 'nullable|string',
+        ]);
+
+        try {
+            $engine = app(\App\Services\PackageSessionEngineService::class);
+            $result = $engine->switchChannel(
+                $request->sub_session_id,
+                $request->from_channel,
+                $request->to_channel,
+                $request->user()->id,
+                $request->all()
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Switched to ' . ucfirst($request->to_channel) . ' successfully.',
+                'data'    => $result,
+            ], 200);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
      * Terminate a specific subchannel with modal options (End Call Only vs End Complete Session).
      */
     public function terminateChannel(Request $request)

@@ -177,6 +177,7 @@ Route::prefix('v1')->group(function () {
             Route::prefix('packages')->group(function () {
                 Route::get('/active-banner',              [PackageSessionController::class, 'activeBanner']);
                 Route::post('/session/spawn-channel',     [PackageSessionController::class, 'spawnChannel']);
+                Route::post('/session/switch-channel',    [PackageSessionController::class, 'switchChannel']);
                 Route::post('/session/terminate-channel', [PackageSessionController::class, 'terminateChannel']);
                 Route::post('/session/heartbeat',         [PackageSessionController::class, 'heartbeat']);
                 Route::post('/session/end',               [PackageSessionController::class, 'endSession']);
@@ -331,6 +332,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('/session/start',             [PackageSessionController::class, 'startSession']);
                 Route::post('/session/end',               [PackageSessionController::class, 'endSession']);
                 Route::post('/session/spawn-channel',     [PackageSessionController::class, 'spawnChannel']);
+                Route::post('/session/switch-channel',    [PackageSessionController::class, 'switchChannel']);
                 Route::post('/session/terminate-channel', [PackageSessionController::class, 'terminateChannel']);
                 Route::post('/session/heartbeat',         [PackageSessionController::class, 'heartbeat']);
             });

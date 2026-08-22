@@ -36,9 +36,9 @@ class CallService
     /**
      * Initiate a call session with rate validation and balance check.
      */
-    public function initiateCall($consumerId, $providerId)
+    public function initiateCall($consumerId, $providerId, bool $isPackageCall = false)
     {
-        return DB::transaction(function () use ($consumerId, $providerId) {
+        return DB::transaction(function () use ($consumerId, $providerId, $isPackageCall) {
             try {
                 if ($this->blockService->isBlockedBidirectional((int) $consumerId, (int) $providerId)) {
                     throw new Exception("You cannot initiate a call with this user because of block status.");
@@ -52,7 +52,14 @@ class CallService
 
                 $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
                 $pricing = $pricingCalculator->calculate($astrologer, 'call');
-                $rate = $pricing['customer_rate'];
+                $rate = (float) $pricing['customer_rate'];
+
+                // Check if user has an active prepaid package with this astrologer
+                $hasActivePackage = $isPackageCall || \App\Models\PackagePurchase::where('user_id', $consumerId)
+                    ->where('astrologer_id', $providerId)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->exists();
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -70,51 +77,46 @@ class CallService
                     ->exists();
                 $isBusy = $isChatBusy || $isCallBusy || $hasWaitingQueue;
 
-                // Dynamic check for consumer
-                $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['accepted', 'ongoing'])
-                    ->exists();
-                $isConsumerCallBusy = \App\Models\CallSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
-                    ->exists();
-                if ($isConsumerChatBusy || $isConsumerCallBusy) {
-                    throw new Exception("You are already in an active session.");
-                }
+                // Dynamic check for consumer (bypassed if switching within an active package session)
+                if (!$hasActivePackage) {
+                    $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
+                        ->whereIn('status', ['accepted', 'ongoing'])
+                        ->exists();
+                    $isConsumerCallBusy = \App\Models\CallSession::where('consumer_id', $consumerId)
+                        ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+                        ->exists();
+                    if ($isConsumerChatBusy || $isConsumerCallBusy) {
+                        throw new Exception("You are already in an active session.");
+                    }
 
-                // Prevent duplicate pending or waiting requests
-                $existingChatPending = \App\Models\ChatSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['initiated', 'waiting'])
-                    ->exists();
-                $existingCallPending = \App\Models\CallSession::where('consumer_id', $consumerId)
-                    ->whereIn('status', ['initiated', 'ringing', 'waiting'])
-                    ->exists();
-                if ($existingChatPending || $existingCallPending) {
-                    throw new Exception("You already have a pending or waiting request.");
+                    // Prevent duplicate pending or waiting requests
+                    $existingChatPending = \App\Models\ChatSession::where('consumer_id', $consumerId)
+                        ->whereIn('status', ['initiated', 'waiting'])
+                        ->exists();
+                    $existingCallPending = \App\Models\CallSession::where('consumer_id', $consumerId)
+                        ->whereIn('status', ['initiated', 'ringing', 'waiting'])
+                        ->exists();
+                    if ($existingChatPending || $existingCallPending) {
+                        throw new Exception("You already have a pending or waiting request.");
+                    }
                 }
 
                 // Check minimum balance (5 minutes minimum to start)
                 $balance = $this->walletService->getBalance($consumerId);
 
-                // Skip minimum balance check if user has an active prepaid package with this astrologer.
-                // Package users have already pre-paid, so wallet check is not applicable.
-                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $consumerId)
-                    ->where('astrologer_id', $providerId)
-                    ->where('status', 'active')
-                    ->where('remaining_duration', '>', 0)
-                    ->exists();
-
                 if (!$hasActivePackage && $balance < $rate * 5) {
                     throw new Exception("Insufficient balance. You need minimum " . ($rate * 5) . " in your wallet to start this call.");
                 }
 
-                $status = $isBusy ? 'waiting' : 'initiated';
+                $status = ($isBusy && !$hasActivePackage) ? 'waiting' : 'initiated';
+                $effectiveRate = $hasActivePackage ? 0.00 : $rate;
 
                 $session = $this->callRepo->create([
-                    'consumer_id' => $consumerId,
-                    'provider_id' => $providerId,
-                    'call_type'   => 'audio',
-                    'status' => $status,
-                    'rate_per_minute' => $rate,
+                    'consumer_id'     => $consumerId,
+                    'provider_id'     => $providerId,
+                    'call_type'       => 'audio',
+                    'status'          => $status,
+                    'rate_per_minute' => $effectiveRate,
                 ]);
 
                 if ($status === 'initiated') {
@@ -156,7 +158,17 @@ class CallService
                     ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->where('id', '!=', $sessionId)
                     ->exists();
-                if ($isChatBusy || $isCallBusy) {
+                
+                // If this is a package session, we allow the in-session channel transition
+                $isPrepaid = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
+                    || (float) $session->rate_per_minute <= 0
+                    || \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
+                        ->where('astrologer_id', $session->provider_id)
+                        ->where('status', 'active')
+                        ->where('remaining_duration', '>', 0)
+                        ->exists();
+
+                if (!$isPrepaid && ($isChatBusy || $isCallBusy)) {
                     throw new Exception("You are already in an active session.");
                 }
                 
@@ -171,18 +183,9 @@ class CallService
                 $this->presenceService->setBusy($providerId, $sessionId);
                 
                 // Start billing ticker ONLY if consumer does NOT have an active prepaid package for this astrologer.
-                // If an active package purchase exists, billing is prepaid — no per-minute tick needed.
-                $hasActivePackage = \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
-                    ->where('astrologer_id', $session->provider_id)
-                    ->where('status', 'active')
-                    ->where('remaining_duration', '>', 0)
-                    ->exists();
-
-                if ($hasActivePackage) {
-                    $subSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)
-                        ->whereNull('started_at')
-                        ->first();
-                    if ($subSession) {
+                if ($isPrepaid) {
+                    $subSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->first();
+                    if ($subSession && is_null($subSession->started_at)) {
                         app(\App\Services\SessionTimerService::class)->activateSubSessionTimer($subSession->id);
                     }
                 } else {
@@ -229,8 +232,6 @@ class CallService
                 $this->presenceService->setFree($session->provider_id);
 
                 // Close any orphaned PackageSubSession linked to this rejected call.
-                // Without this, the sub-session stays open (started_at=null, ended_at=null)
-                // and blocks the user from starting a new package session.
                 \App\Models\PackageSubSession::where('call_session_id', $sessionId)
                     ->whereNull('ended_at')
                     ->update(['ended_at' => now()]);
@@ -277,8 +278,14 @@ class CallService
                 $endTime = now();
                 $durationSeconds = $session->started_at ? $session->started_at->diffInSeconds($endTime) : 0;
                 
-                // Skip charging if this is a prepaid package session
-                $isPackageSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists();
+                // Skip charging if this is a prepaid package session or rate is 0.00
+                $isPackageSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
+                    || (float) $session->rate_per_minute <= 0
+                    || \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
+                        ->where('astrologer_id', $session->provider_id)
+                        ->where('status', 'active')
+                        ->exists();
+
                 $finalCost = $isPackageSession ? 0.00 : $this->calculateCost($durationSeconds, $session->rate_per_minute);
                 
                 // Calculate unbilled amount

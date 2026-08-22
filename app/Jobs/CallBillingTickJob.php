@@ -36,6 +36,21 @@ class CallBillingTickJob implements ShouldQueue
                     throw new Exception("Session is not ongoing or not found.");
                 }
 
+                // 🛡️ PREPAID / PACKAGE SESSION FAIL-SAFE GUARD:
+                // Under NO circumstance should a prepaid package session trigger a per-minute wallet debit!
+                $isPrepaid = \App\Models\PackageSubSession::where('call_session_id', $this->sessionId)->exists()
+                    || (float) $session->rate_per_minute <= 0
+                    || \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
+                        ->where('astrologer_id', $session->provider_id)
+                        ->where('status', 'active')
+                        ->where('remaining_duration', '>', 0)
+                        ->exists();
+
+                if ($isPrepaid) {
+                    \Illuminate\Support\Facades\Log::info("CallBillingTickJob: Session #{$this->sessionId} is prepaid package. Skipping wallet debit.");
+                    return;
+                }
+
                 // Lock both wallets in consistent order (MIN user_id first) to prevent AB-BA deadlock
                 $consumerId = $session->consumer_id;
                 $providerId = $session->provider_id;

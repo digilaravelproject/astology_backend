@@ -95,7 +95,7 @@ class PackageSessionEngineService
             if ($channelType === 'call') {
                 // If call is not already active, spawn WebRTC call session
                 if (!$subSession->call_session_id || in_array($subSession->call_status, ['idle', 'disconnected', 'none'])) {
-                    $linkedCall = $this->callService->initiateCall($userId, $astrologerId);
+                    $linkedCall = $this->callService->initiateCall($userId, $astrologerId, true);
                     $subSession->call_session_id = $linkedCall->id;
                     $subSession->call_status = 'ringing';
 
@@ -114,7 +114,7 @@ class PackageSessionEngineService
                 // If chat is not already active, spawn Chat session
                 if (!$subSession->chat_session_id || in_array($subSession->chat_status, ['idle', 'closed', 'none'])) {
                     $question = $options['question'] ?? null;
-                    $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question);
+                    $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
                     $subSession->chat_session_id = $linkedChat->id;
                     $subSession->chat_status = 'active';
 
@@ -139,6 +139,111 @@ class PackageSessionEngineService
                 'banner_data'        => $bannerData,
                 'remaining_seconds'  => $remaining,
             ];
+        });
+    }
+
+    /**
+     * Atomically switch from one subchannel to another (e.g. Chat -> Call or Call -> Chat).
+     * Guaranteed 100% free of charge and zero wallet deduction under database row locks.
+     */
+    public function switchChannel(int $subSessionId, string $fromChannel, string $toChannel, int $actorId, array $options = []): array
+    {
+        return DB::transaction(function () use ($subSessionId, $fromChannel, $toChannel, $actorId, $options) {
+            $subSession = PackageSubSession::with(['purchase.user', 'purchase.astrologer.astrologer'])->lockForUpdate()->findOrFail($subSessionId);
+            $purchase = $subSession->purchase;
+
+            if ($purchase->user_id !== $actorId && $purchase->astrologer_id !== $actorId) {
+                throw new Exception("Unauthorized to modify this package session.", 403);
+            }
+
+            if ($subSession->session_state === 'terminated' || $purchase->status === 'exhausted') {
+                throw new Exception("This package session is already ended or exhausted.", 422);
+            }
+
+            $userId = $purchase->user_id;
+            $astrologerId = $purchase->astrologer_id;
+            $user = $purchase->user;
+            $now = now();
+
+            // 1. Terminate the previous subchannel without ending the parent package session ($0.00 charge)
+            if ($fromChannel === 'call' && $subSession->call_session_id) {
+                $subSession->call_status = 'disconnected';
+                $call = CallSession::find($subSession->call_session_id);
+                if ($call && $call->status !== 'completed') {
+                    $call->update(['status' => 'completed', 'ended_at' => $now, 'rate_per_minute' => 0.00, 'total_cost' => 0.00]);
+                    broadcast(new CallEnded($call, [
+                        'is_package'     => true,
+                        'sub_session_id' => $subSession->id,
+                        'action'         => 'switch_channel',
+                    ]));
+                }
+            } elseif ($fromChannel === 'chat' && $subSession->chat_session_id) {
+                $subSession->chat_status = 'closed';
+                $chat = ChatSession::find($subSession->chat_session_id);
+                if ($chat && $chat->status !== 'completed') {
+                    $chat->update(['status' => 'completed', 'ended_at' => $now, 'rate_per_minute' => 0.00, 'total_cost' => 0.00]);
+                    broadcast(new ChatEnded($chat, [
+                        'is_package'     => true,
+                        'sub_session_id' => $subSession->id,
+                        'action'         => 'switch_channel',
+                    ]));
+                }
+            }
+
+            // 2. Ensure timer is initialized
+            if (is_null($subSession->started_at)) {
+                $subSession->started_at = now();
+                $subSession->session_state = 'in_progress';
+            }
+
+            // 3. Initiate and link the new subchannel (Zero-Rate guaranteed)
+            $newSessionData = [];
+            if ($toChannel === 'call') {
+                $linkedCall = $this->callService->initiateCall($userId, $astrologerId, true);
+                $subSession->call_session_id = $linkedCall->id;
+                $subSession->call_status = 'ringing';
+                $subSession->mode = 'call';
+                $newSessionData['call_session'] = $linkedCall;
+
+                if ($user) {
+                    broadcast(new CallInitiated($linkedCall, [
+                        'id'            => $user->id,
+                        'name'          => $user->name,
+                        'profile_photo' => \App\Helpers\MediaHelper::getFullUrl($user->profile_photo),
+                        'offer'         => $options['offer'] ?? 'audio',
+                        'is_package'    => true,
+                        'sub_session_id'=> $subSession->id,
+                    ]));
+                }
+            } elseif ($toChannel === 'chat') {
+                $question = $options['question'] ?? null;
+                $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
+                $subSession->chat_session_id = $linkedChat->id;
+                $subSession->chat_status = 'active';
+                $subSession->mode = 'chat';
+                $newSessionData['chat_session'] = $linkedChat;
+
+                if ($user) {
+                    broadcast(new ChatInitiated($linkedChat, $user));
+                    broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'initiated'));
+                }
+            }
+
+            $subSession->save();
+
+            $remaining = $this->getRemainingSeconds($subSession, $purchase);
+            $bannerData = $subSession->toBannerArray($remaining);
+
+            broadcast(new PackageSessionStateUpdated($bannerData, $userId, $astrologerId));
+
+            return array_merge([
+                'action_performed'   => 'switch_channel',
+                'from_channel'       => $fromChannel,
+                'to_channel'         => $toChannel,
+                'sub_session'        => $subSession->fresh(),
+                'banner_data'        => $bannerData,
+                'remaining_seconds'  => $remaining,
+            ], $newSessionData);
         });
     }
 
