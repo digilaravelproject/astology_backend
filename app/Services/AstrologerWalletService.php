@@ -398,6 +398,8 @@ class AstrologerWalletService
         });
 
         $invoices = [];
+        $astrologerId = $user->astrologer?->id;
+
         foreach ($grouped as $yearMonth => $txs) {
             $parsedDate = Carbon::parse($yearMonth . '-01');
             $monthName = $parsedDate->format('F Y');
@@ -405,10 +407,18 @@ class AstrologerWalletService
             $month = $parsedDate->format('m');
 
             $grossEarnings = (float) $txs->sum('amount');
-            $netPayable = $grossEarnings;
 
             $startDate = $parsedDate->copy()->startOfMonth();
             $endDate = $parsedDate->copy()->endOfMonth();
+
+            $monthlyPayouts = $astrologerId ? \App\Models\AstrologerPayout::where('astrologer_id', $astrologerId)
+                ->where('status', 'completed')
+                ->whereBetween('payment_date', [$startDate, $endDate])
+                ->get() : collect();
+
+            $totalTdsForMonth = (float) $monthlyPayouts->sum('tds_amount');
+            $totalNetDisbursed = (float) $monthlyPayouts->sum('net_paid_amount');
+            $netPayable = max(0, $grossEarnings - $totalTdsForMonth);
 
             $withdrawnForMonth = (float) WalletTransaction::where('wallet_id', $wallet->id)
                 ->where('transaction_type', 'debit')
@@ -423,6 +433,7 @@ class AstrologerWalletService
             $invoices[] = [
                 'month_name' => $monthName,
                 'gross_earnings' => round($grossEarnings, 2),
+                'tds_deducted' => round($totalTdsForMonth, 2),
                 'net_payable' => round($netPayable, 2),
                 'total_withdrawn' => round($withdrawnForMonth, 2),
                 'status' => 'Paid',
@@ -434,6 +445,14 @@ class AstrologerWalletService
         $currentYearMonth = Carbon::now()->format('Y-m');
         $currentMonthTxs = $grouped->get($currentYearMonth);
         $currentMonthEarnings = $currentMonthTxs ? (float) $currentMonthTxs->sum('amount') : 0.00;
+
+        $currentMonthPayouts = $astrologerId ? \App\Models\AstrologerPayout::where('astrologer_id', $astrologerId)
+            ->where('status', 'completed')
+            ->whereBetween('payment_date', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
+            ->get() : collect();
+
+        $currentMonthTds = (float) $currentMonthPayouts->sum('tds_amount');
+        $currentMonthNet = max(0, $currentMonthEarnings - $currentMonthTds);
 
         $currentMonthWithdrawals = (float) WalletTransaction::where('wallet_id', $wallet->id)
             ->where('transaction_type', 'debit')
@@ -453,7 +472,8 @@ class AstrologerWalletService
             'current_month' => [
                 'month_name' => Carbon::now()->format('F Y'),
                 'gross_earnings' => round($currentMonthEarnings, 2),
-                'net_payable' => round($currentMonthEarnings, 2),
+                'tds_deducted' => round($currentMonthTds, 2),
+                'net_payable' => round($currentMonthNet, 2),
                 'total_withdrawn' => round($currentMonthWithdrawals, 2),
                 'status' => 'Paid',
             ],

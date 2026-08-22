@@ -77,7 +77,35 @@
                         </div>
                     </div>
 
+                    @php
+                        $isPayout = (is_array($transaction->meta) && (isset($transaction->meta['payout_number']) || isset($transaction->meta['tds_amount'])));
+                        $grossAmount = (float) ($transaction->meta['gross_amount'] ?? $transaction->total_amount ?? $transaction->amount);
+                        $tdsPercent = (float) ($transaction->meta['tds_percent'] ?? 0.00);
+                        $tdsAmount = (float) ($transaction->meta['tds_amount'] ?? 0.00);
+                        $netPaidAmount = (float) ($transaction->meta['net_paid_amount'] ?? $transaction->base_amount ?? ($grossAmount - $tdsAmount));
+                    @endphp
+
                     <!-- Financial & Tax Amounts -->
+                    @if($isPayout)
+                    <div class="p-6 bg-gradient-to-r from-primary/5 to-transparent rounded-3xl border border-primary/15 grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div>
+                            <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">Gross Settlement</span>
+                            <span class="text-xl font-black text-dark">₹{{ number_format($grossAmount, 2) }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">TDS Rate</span>
+                            <span class="text-xl font-bold text-danger">{{ number_format($tdsPercent, 2) }}%</span>
+                        </div>
+                        <div>
+                            <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">TDS Deducted</span>
+                            <span class="text-xl font-bold text-danger">-₹{{ number_format($tdsAmount, 2) }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">Net Paid / Disbursed</span>
+                            <span class="text-xl font-black text-success">₹{{ number_format($netPaidAmount, 2) }}</span>
+                        </div>
+                    </div>
+                    @else
                     <div class="p-6 bg-light/30 rounded-3xl border border-gray-lighter grid grid-cols-2 sm:grid-cols-4 gap-4">
                         <div>
                             <span class="text-[9px] font-black text-gray uppercase tracking-widest block mb-1">Base Amount</span>
@@ -96,6 +124,7 @@
                             <span class="text-xl font-black text-dark">₹{{ number_format($transaction->total_amount ?? $transaction->amount, 2) }}</span>
                         </div>
                     </div>
+                    @endif
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
@@ -182,9 +211,33 @@
                 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     @foreach($transaction->meta as $key => $value)
-                        <div class="bg-light/30 p-6 rounded-2xl border border-gray-lighter">
+                        @php
+                            $decoded = is_string($value) ? json_decode($value, true) : null;
+                            $isArrayVal = is_array($value) || (is_array($decoded) && json_last_error() === JSON_ERROR_NONE);
+                            $finalVal = is_array($value) ? $value : ($decoded ?? $value);
+                        @endphp
+                        
+                        <div class="bg-light/30 p-6 rounded-2xl border border-gray-lighter {{ $isArrayVal ? 'md:col-span-2' : '' }}">
                             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-2">{{ ucfirst(str_replace('_', ' ', $key)) }}</div>
-                            <p class="text-dark font-medium break-words">{{ is_array($value) ? json_encode($value) : $value }}</p>
+                            
+                            @if($isArrayVal)
+                                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                                    @foreach($finalVal as $subKey => $subVal)
+                                        <div class="bg-white p-3.5 rounded-xl border border-gray-lighter">
+                                            <span class="block text-[9px] font-bold text-gray uppercase tracking-wider mb-0.5">{{ ucfirst(str_replace('_', ' ', $subKey)) }}</span>
+                                            <span class="block text-sm font-black text-dark break-words">{{ is_array($subVal) ? json_encode($subVal) : $subVal }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @elseif(in_array($key, ['gross_amount', 'tds_amount', 'net_paid_amount', 'amount', 'fee', 'charge']))
+                                <p class="text-dark font-black text-base">₹{{ number_format((float)$value, 2) }}</p>
+                            @elseif($key === 'tds_percent')
+                                <p class="text-danger font-black text-base">{{ number_format((float)$value, 2) }}%</p>
+                            @elseif($key === 'processed_by_admin')
+                                <p class="text-dark font-bold">{{ \App\Models\Admin::find($value)?->name ?? "Admin #{$value}" }}</p>
+                            @else
+                                <p class="text-dark font-bold break-words">{{ $value }}</p>
+                            @endif
                         </div>
                     @endforeach
                 </div>

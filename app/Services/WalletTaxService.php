@@ -185,13 +185,25 @@ class WalletTaxService
         $sgstAmount = round($gstAmount - $cgstAmount, 2);
         $halfPercent = round($gstPercent / 2, 2);
 
+        $isPayout = (is_array($transaction->meta) && (isset($transaction->meta['payout_number']) || isset($transaction->meta['tds_amount'])));
         $isCredit = $transaction->transaction_type === 'credit';
-        $title = $isCredit ? 'TAX INVOICE / RECHARGE RECEIPT' : 'PAYOUT & TAX DEDUCTION ADVICE';
-        $itemDescription = $isCredit
-            ? 'Wallet Balance Recharge (Astrology Consultation Credits)'
-            : 'Astrologer Earnings Payout (Professional Spiritual Consultation Services)';
+        $title = $isPayout ? 'PAYOUT & TDS DEDUCTION ADVICE' : ($isCredit ? 'TAX INVOICE / RECHARGE RECEIPT' : 'FINANCIAL TRANSACTION RECEIPT');
+        $itemDescription = $isPayout 
+            ? 'Monthly Astrologer Consultation Settlement (Professional Services)'
+            : ($isCredit ? 'Wallet Balance Recharge (Astrology Consultation Credits)' : 'Wallet Debit / Service Charge');
 
-        return '<!DOCTYPE html>
+        // Payout specific fields
+        $grossAmount = (float) ($transaction->meta['gross_amount'] ?? $transaction->total_amount ?? $transaction->amount);
+        $tdsPercent = (float) ($transaction->meta['tds_percent'] ?? 0.00);
+        $tdsAmount = (float) ($transaction->meta['tds_amount'] ?? 0.00);
+        $netPaidAmount = (float) ($transaction->meta['net_paid_amount'] ?? ($grossAmount - $tdsAmount));
+        $paymentMode = $transaction->meta['payment_mode'] ?? ($transaction->payment_provider ? strtoupper($transaction->payment_provider) : 'Digital Gateway');
+        $utrNumber = $transaction->meta['utr_number'] ?? null;
+        
+        $bankDetailsRaw = $transaction->meta['bank_details'] ?? null;
+        $bankDetails = is_string($bankDetailsRaw) ? json_decode($bankDetailsRaw, true) : (is_array($bankDetailsRaw) ? $bankDetailsRaw : []);
+
+        $html = '<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -211,6 +223,7 @@ class WalletTaxService
                     <div class="invoice-badge">' . htmlspecialchars($title) . '</div>
                     <div style="font-size: 14px; font-weight: 800; color: #0f172a;">#' . htmlspecialchars($invoiceNo) . '</div>
                     <div style="font-size: 11px; color: #64748b; margin-top: 3px;">Date: ' . htmlspecialchars($dateFormatted) . '</div>
+                    <div style="font-size: 11px; color: #64748b;">Status: <strong style="color: #16a34a;">' . strtoupper($transaction->status) . '</strong></div>
                 </td>
             </tr>
         </table>
@@ -218,12 +231,14 @@ class WalletTaxService
         <table class="info-grid">
             <tr>
                 <td class="info-box">
-                    <div class="info-label">Customer / Recipient Details</div>
+                    <div class="info-label">' . ($isPayout ? 'Payee (Astrologer Partner)' : 'Customer / Recipient Details') . '</div>
                     <div class="info-content">
-                        <strong>' . htmlspecialchars($user->name ?? 'Customer') . '</strong><br>
+                        <strong>' . htmlspecialchars($user->name ?? 'User') . '</strong><br>
                         ' . ($user->email ? htmlspecialchars($user->email) . '<br>' : '') . '
                         ' . ($user->phone ? 'Phone: +91 ' . htmlspecialchars($user->phone) . '<br>' : '') . '
                         ' . ($astrologer && $astrologer->gst_number ? 'GSTIN: <strong>' . htmlspecialchars($astrologer->gst_number) . '</strong><br>' : '') . '
+                        ' . ($astrologer && $astrologer->id_proof_number ? 'PAN / ID: <strong>' . htmlspecialchars($astrologer->id_proof_number) . '</strong><br>' : '') . '
+                        ' . (!empty($bankDetails['bank_name']) ? 'Bank: <strong>' . htmlspecialchars($bankDetails['bank_name']) . '</strong> (A/C: ' . htmlspecialchars($bankDetails['account_number'] ?? 'N/A') . ', IFSC: ' . htmlspecialchars($bankDetails['ifsc_code'] ?? 'N/A') . ')<br>' : '') . '
                         User Type: ' . ucfirst(htmlspecialchars($user->user_type ?? 'User')) . '
                     </div>
                 </td>
@@ -231,15 +246,71 @@ class WalletTaxService
                     <div class="info-label">Transaction Information</div>
                     <div class="info-content">
                         Transaction ID: <strong>TX-' . $transaction->id . '</strong><br>
-                        Status: <strong style="color: #16a34a;">' . strtoupper($transaction->status) . '</strong><br>
-                        Payment Mode: ' . strtoupper($transaction->payment_provider ?? 'Digital Gateway') . '<br>
+                        Payment Mode: <strong>' . htmlspecialchars($paymentMode) . '</strong><br>
+                        ' . ($utrNumber ? 'UTR / Ref No: <strong style="font-family: monospace;">' . htmlspecialchars($utrNumber) . '</strong><br>' : '') . '
                         ' . ($transaction->provider_payment_id ? 'Gateway Payment Ref: ' . htmlspecialchars($transaction->provider_payment_id) . '<br>' : '') . '
                         SAC / HSN Code: <strong>998399</strong>
                     </div>
                 </td>
             </tr>
+        </table>';
+
+        if ($isPayout) {
+            $html .= '
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Settlement Description</th>
+                    <th class="text-center" style="width: 15%;">Payment Mode</th>
+                    <th class="text-center" style="width: 15%;">UTR / Ref</th>
+                    <th class="text-right" style="width: 20%;">Gross Amount (₹)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <strong>' . htmlspecialchars($itemDescription) . '</strong><br>
+                        <span style="font-size: 11px; color: #64748b;">Ref: ' . htmlspecialchars($transaction->description ?? 'Payout Settlement') . '</span>
+                    </td>
+                    <td class="text-center font-bold">' . htmlspecialchars($paymentMode) . '</td>
+                    <td class="text-center font-bold" style="font-family: monospace;">' . htmlspecialchars($utrNumber ?? 'N/A') . '</td>
+                    <td class="text-right font-bold">₹' . number_format($grossAmount, 2) . '</td>
+                </tr>
+            </tbody>
         </table>
 
+        <table class="summary-table">
+            <tr>
+                <td class="font-bold">Gross Settlement Value:</td>
+                <td class="text-right font-bold">₹' . number_format($grossAmount, 2) . '</td>
+            </tr>';
+
+            if ($tdsAmount > 0) {
+                $html .= '
+            <tr>
+                <td style="color: #dc2626; font-weight: bold;">Less: TDS Deducted (' . number_format($tdsPercent, 2) . '%):</td>
+                <td class="text-right font-bold" style="color: #dc2626;">- ₹' . number_format($tdsAmount, 2) . '</td>
+            </tr>';
+            } else {
+                $html .= '
+            <tr>
+                <td>TDS Deducted (0% / Exempt):</td>
+                <td class="text-right">₹0.00</td>
+            </tr>';
+            }
+
+            $html .= '
+            <tr class="total-row">
+                <td>Net Disbursed to Astrologer:</td>
+                <td class="text-right">₹' . number_format($netPaidAmount, 2) . '</td>
+            </tr>
+        </table>
+
+        <div class="payment-meta">
+            <strong>Tax & Compliance Note:</strong> Tax Deducted at Source (TDS) has been deducted in accordance with Section 194J / 194C of the Indian Income Tax Act, 1961. The deducted TDS will be remitted to the Income Tax Department and reflected in your Form 26AS.
+        </div>';
+        } else {
+            $html .= '
         <table class="items-table">
             <thead>
                 <tr>
@@ -268,8 +339,8 @@ class WalletTaxService
                 <td class="text-right">₹' . number_format($baseAmount, 2) . '</td>
             </tr>';
 
-        if ($gstAmount > 0) {
-            $html .= '
+            if ($gstAmount > 0) {
+                $html .= '
             <tr>
                 <td>CGST (' . $halfPercent . '%):</td>
                 <td class="text-right">₹' . number_format($cgstAmount, 2) . '</td>
@@ -278,9 +349,9 @@ class WalletTaxService
                 <td>SGST (' . $halfPercent . '%):</td>
                 <td class="text-right">₹' . number_format($sgstAmount, 2) . '</td>
             </tr>';
-        }
+            }
 
-        $html .= '
+            $html .= '
             <tr class="total-row">
                 <td>Total Amount:</td>
                 <td class="text-right">₹' . number_format($totalAmount, 2) . '</td>
@@ -289,8 +360,10 @@ class WalletTaxService
 
         <div class="payment-meta">
             <strong>Notes & Tax Summary:</strong> This is a computer-generated tax invoice and requires no physical signature. In accordance with Section 31 of the CGST Act 2017, taxes are charged as applicable.
-        </div>
+        </div>';
+        }
 
+        $html .= '
         <div class="footer">
             Thank you for choosing ' . htmlspecialchars($settings['company_name']) . '! For billing inquiries, contact ' . htmlspecialchars($settings['company_email']) . '.
         </div>
