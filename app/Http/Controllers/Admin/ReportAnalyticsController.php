@@ -75,7 +75,7 @@ class ReportAnalyticsController extends Controller
 
             $packageSalesRevenue = (float) PackagePurchase::where('status', '!=', 'cancelled')
                 ->whereBetween('created_at', [$startDate, $endDate])
-                ->sum('price');
+                ->sum('purchase_price');
 
             $chatConsultationSpend = (float) ChatSession::where('status', 'completed')
                 ->whereBetween('created_at', [$startDate, $endDate])
