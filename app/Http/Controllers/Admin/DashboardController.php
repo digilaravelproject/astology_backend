@@ -133,7 +133,6 @@ class DashboardController extends Controller
                 ->orderByDesc('updated_at')
                 ->take(5)
                 ->get()
-                ->toBase()
                 ->map(fn($s) => [
                     'id'            => 'CALL-' . $s->id,
                     'type'          => 'Call',
@@ -150,7 +149,6 @@ class DashboardController extends Controller
                 ->orderByDesc('updated_at')
                 ->take(5)
                 ->get()
-                ->toBase()
                 ->map(fn($s) => [
                     'id'            => 'CHAT-' . $s->id,
                     'type'          => 'Chat',
