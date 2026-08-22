@@ -296,15 +296,22 @@ class PushNotificationPayload
         };
 
         $data = array_merge([
-            'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
-            'screen'          => 'LIVE_STREAM_SCREEN',
-            'session_id'      => (string) $sessionId,
-            'astrologer_id'   => (string) $astrologerId,
-            'astrologer_name' => $astrologerName,
-            'channel_name'    => $channel,
-            'type'            => 'live_stream',
-            'status'          => $status,
-            'created_at'      => now()->toIso8601String(),
+            'click_action'      => 'FLUTTER_NOTIFICATION_CLICK',
+            'screen'            => 'LIVE_STREAM_SCREEN',
+            'screen_route'      => '/live-stream',
+            'route'             => 'live_session',
+            'session_id'        => (string) $sessionId,
+            'live_session_id'   => (string) $sessionId,
+            'id'                => (string) $sessionId,
+            'astrologer_id'     => (string) $astrologerId,
+            'astrologer_name'   => $astrologerName,
+            'astrologer_avatar' => $astrologerAvatar ?? '',
+            'channel_name'      => $channel,
+            'room_uuid'         => $channel,
+            'type'              => 'live_stream',
+            'notification_type' => 'live_session',
+            'status'            => $status,
+            'created_at'        => now()->toIso8601String(),
         ], $extra);
 
         return new self(

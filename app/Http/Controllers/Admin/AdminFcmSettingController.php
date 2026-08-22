@@ -54,18 +54,27 @@ class AdminFcmSettingController extends Controller
             'default_sound'      => 'nullable|string|max:100',
             'call_channel_id'    => 'nullable|string|max:100',
             'chat_channel_id'    => 'nullable|string|max:100',
+            'live_channel_id'    => 'nullable|string|max:100',
             'default_channel_id' => 'nullable|string|max:100',
         ]);
 
         $setting = AdminFcmSetting::current();
-        $setting->update([
+        $updateData = [
             'project_id'         => $request->input('project_id'),
             'is_active'          => $request->boolean('is_active', true),
             'default_sound'      => $request->input('default_sound', 'default'),
             'call_channel_id'    => $request->input('call_channel_id', 'call_channel'),
             'chat_channel_id'    => $request->input('chat_channel_id', 'chat_channel'),
             'default_channel_id' => $request->input('default_channel_id', 'astology_notifications'),
-        ]);
+        ];
+
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasColumn('admin_fcm_settings', 'live_channel_id')) {
+                $updateData['live_channel_id'] = $request->input('live_channel_id', 'live_session_channel');
+            }
+        } catch (\Throwable $e) {}
+
+        $setting->update($updateData);
 
         return redirect()->back()->with('success', 'Firebase settings updated successfully.');
     }

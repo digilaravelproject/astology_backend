@@ -19,6 +19,7 @@ class AdminFcmSetting extends Model
         'default_sound',
         'call_channel_id',
         'chat_channel_id',
+        'live_channel_id',
         'default_channel_id',
     ];
 
@@ -32,19 +33,41 @@ class AdminFcmSetting extends Model
     public static function current(): self
     {
         return Cache::remember('admin_fcm_setting:singleton', 3600, function () {
-            return self::firstOrCreate(
-                ['id' => 1],
-                [
-                    'project_id' => null,
-                    'service_account_json_path' => null,
-                    'is_active' => true,
-                    'default_sound' => 'default',
-                    'call_channel_id' => 'call_channel',
-                    'chat_channel_id' => 'chat_channel',
-                    'default_channel_id' => 'astology_notifications',
-                ]
-            );
+            try {
+                $setting = self::find(1);
+                if ($setting) {
+                    return $setting;
+                }
+            } catch (\Throwable $e) {
+                // Ignore and proceed to create
+            }
+
+            $defaults = [
+                'project_id' => null,
+                'service_account_json_path' => null,
+                'is_active' => true,
+                'default_sound' => 'default',
+                'call_channel_id' => 'call_channel',
+                'chat_channel_id' => 'chat_channel',
+                'default_channel_id' => 'astology_notifications',
+            ];
+
+            try {
+                if (\Illuminate\Support\Facades\Schema::hasColumn('admin_fcm_settings', 'live_channel_id')) {
+                    $defaults['live_channel_id'] = 'live_session_channel';
+                }
+            } catch (\Throwable $e) {}
+
+            return self::firstOrCreate(['id' => 1], $defaults);
         });
+    }
+
+    /**
+     * Safe accessor for live_channel_id
+     */
+    public function getLiveChannelIdAttribute($value): string
+    {
+        return $value ?: 'live_session_channel';
     }
 
     /**

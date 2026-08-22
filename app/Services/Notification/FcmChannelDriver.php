@@ -274,6 +274,7 @@ class FcmChannelDriver
         $channelId = match ($payload->type) {
             'call' => $this->setting?->call_channel_id ?? 'call_channel',
             'chat' => $this->setting?->chat_channel_id ?? 'chat_channel',
+            'live_stream', 'live' => $this->setting?->live_channel_id ?? 'live_session_channel',
             default => $this->setting?->default_channel_id ?? 'astology_notifications',
         };
 

@@ -257,15 +257,28 @@
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <!-- Live Session Channel ID -->
+                    <div>
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
+                            Live Session Notification Channel ID
+                        </label>
+                        <input type="text" name="live_channel_id" value="{{ old('live_channel_id', $setting->live_channel_id ?? 'live_session_channel') }}"
+                                class="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-text-primary focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <span class="text-[11px] text-text-muted mt-1 block">Used for Live Stream & scheduled live alerts</span>
+                    </div>
+
                     <!-- Default Channel ID -->
                     <div>
                         <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
                             Default Channel ID
                         </label>
                         <input type="text" name="default_channel_id" value="{{ old('default_channel_id', $setting->default_channel_id ?? 'astology_notifications') }}"
-                               class="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-text-primary focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                                class="w-full px-4 py-3 text-sm bg-white border border-gray-300 rounded-xl text-text-primary focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <span class="text-[11px] text-text-muted mt-1 block">Used for general announcements and promotions</span>
                     </div>
+                </div>
 
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
                     <!-- Default Sound -->
                     <div>
                         <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
