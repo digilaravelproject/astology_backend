@@ -283,8 +283,9 @@ class CallController extends Controller
             ->latest()
             ->first();
 
-            $isPackageSession = false;
+            $isPrepaid = false;
             $remainingDurationSeconds = null;
+            $packageInfo = null;
 
             if ($session) {
                 $subSession = \App\Models\PackageSubSession::where('call_session_id', $session->id)
@@ -292,7 +293,7 @@ class CallController extends Controller
                     ->first();
 
                 if ($subSession) {
-                    $isPackageSession = true;
+                    $isPrepaid = true;
                     $purchase = $subSession->purchase;
                     if ($purchase) {
                         $remainingDurationSeconds = (int) $purchase->remaining_duration;
@@ -301,14 +302,30 @@ class CallController extends Controller
                             $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
                         }
                     }
+
+                    $packageInfo = [
+                        'package_purchase_id'        => (int) $subSession->package_purchase_id,
+                        'package_sub_session_id'     => (int) $subSession->id,
+                        'remaining_duration_seconds' => $remainingDurationSeconds,
+                    ];
                 }
+
+                $session->billing_mode       = $isPrepaid ? 'prepaid' : 'normal';
+                $session->is_normal          = !$isPrepaid;
+                $session->is_prepaid         = $isPrepaid;
+                $session->is_package_session = $isPrepaid;
+                $session->package_info       = $packageInfo;
             }
 
             return ApiResponse::success(
                 [
-                    'session' => $session,
-                    'is_package_session' => $isPackageSession,
-                    'session_type' => 'call',
+                    'session'                    => $session,
+                    'billing_mode'               => $isPrepaid ? 'prepaid' : 'normal',
+                    'is_normal'                  => !$isPrepaid,
+                    'is_prepaid'                 => $isPrepaid,
+                    'is_package_session'         => $isPrepaid,
+                    'session_type'               => 'call',
+                    'package_info'               => $packageInfo,
                     'remaining_duration_seconds' => $remainingDurationSeconds,
                 ],
                 'Current active call session retrieved successfully'

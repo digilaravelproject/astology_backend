@@ -388,8 +388,9 @@ class ChatController extends Controller
             $userId = $request->user()->id;
             $session = $this->chatService->getActiveSession($userId);
 
-            $isPackageSession = false;
+            $isPrepaid = false;
             $remainingDurationSeconds = null;
+            $packageInfo = null;
 
             if ($session) {
                 $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
@@ -397,7 +398,7 @@ class ChatController extends Controller
                     ->first();
 
                 if ($subSession) {
-                    $isPackageSession = true;
+                    $isPrepaid = true;
                     $purchase = $subSession->purchase;
                     if ($purchase) {
                         $remainingDurationSeconds = (int) $purchase->remaining_duration;
@@ -406,13 +407,29 @@ class ChatController extends Controller
                             $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
                         }
                     }
+
+                    $packageInfo = [
+                        'package_purchase_id'        => (int) $subSession->package_purchase_id,
+                        'package_sub_session_id'     => (int) $subSession->id,
+                        'remaining_duration_seconds' => $remainingDurationSeconds,
+                    ];
                 }
+
+                $session->billing_mode       = $isPrepaid ? 'prepaid' : 'normal';
+                $session->is_normal          = !$isPrepaid;
+                $session->is_prepaid         = $isPrepaid;
+                $session->is_package_session = $isPrepaid;
+                $session->package_info       = $packageInfo;
             }
             
             return ApiResponse::success([
-                'session' => $session,
-                'is_package_session' => $isPackageSession,
-                'session_type' => 'chat',
+                'session'                    => $session,
+                'billing_mode'               => $isPrepaid ? 'prepaid' : 'normal',
+                'is_normal'                  => !$isPrepaid,
+                'is_prepaid'                 => $isPrepaid,
+                'is_package_session'         => $isPrepaid,
+                'session_type'               => 'chat',
+                'package_info'               => $packageInfo,
                 'remaining_duration_seconds' => $remainingDurationSeconds,
             ], 'Current active session retrieved successfully');
         } catch (Exception $e) {
@@ -453,15 +470,16 @@ class ChatController extends Controller
                 ], 200);
             }
 
-            $isPackageSession = false;
+            $isPrepaid = false;
             $remainingDurationSeconds = null;
+            $packageInfo = null;
 
             $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
                 ->whereNull('ended_at')
                 ->first();
 
             if ($subSession) {
-                $isPackageSession = true;
+                $isPrepaid = true;
                 $purchase = $subSession->purchase;
                 if ($purchase) {
                     $remainingDurationSeconds = (int) $purchase->remaining_duration;
@@ -470,16 +488,32 @@ class ChatController extends Controller
                         $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
                     }
                 }
+
+                $packageInfo = [
+                    'package_purchase_id'        => (int) $subSession->package_purchase_id,
+                    'package_sub_session_id'     => (int) $subSession->id,
+                    'remaining_duration_seconds' => $remainingDurationSeconds,
+                ];
             }
+
+            $session->billing_mode       = $isPrepaid ? 'prepaid' : 'normal';
+            $session->is_normal          = !$isPrepaid;
+            $session->is_prepaid         = $isPrepaid;
+            $session->is_package_session = $isPrepaid;
+            $session->package_info       = $packageInfo;
 
             return response()->json([
                 'success' => true,
                 'status' => 'success',
                 'message' => 'Current chat session retrieved successfully',
                 'data' => [
-                    'session' => $session,
-                    'is_package_session' => $isPackageSession,
-                    'session_type' => 'chat',
+                    'session'                    => $session,
+                    'billing_mode'               => $isPrepaid ? 'prepaid' : 'normal',
+                    'is_normal'                  => !$isPrepaid,
+                    'is_prepaid'                 => $isPrepaid,
+                    'is_package_session'         => $isPrepaid,
+                    'session_type'               => 'chat',
+                    'package_info'               => $packageInfo,
                     'remaining_duration_seconds' => $remainingDurationSeconds,
                 ]
             ], 200);
