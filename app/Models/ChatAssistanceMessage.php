@@ -9,6 +9,8 @@ class ChatAssistanceMessage extends Model
 {
     use HasLocalTimezoneSerialization;
 
+    protected $touches = ['chatAssistanceSession'];
+
     protected $fillable = [
         'chat_assistance_session_id',
         'sender_id',

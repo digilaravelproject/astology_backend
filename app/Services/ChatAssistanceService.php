@@ -125,7 +125,7 @@ class ChatAssistanceService
         $message = DB::transaction(function () use ($session, $senderId, $receiverId, $isAstrologer, $data, $callSessionId) {
             if ($isAstrologer) {
                 // Astrologer outgoing reply check
-                $limitConfig = Setting::get('chat_assistance_daily_limit', 5);
+                $limitConfig = (int) Setting::get('chat_assistance_daily_limit', 5);
                 $today = Carbon::today()->toDateString();
 
                 $limitRecord = ChatAssistanceAstrologerLimit::where('astrologer_id', $senderId)
@@ -175,6 +175,9 @@ class ChatAssistanceService
                 'is_delivered' => false,
             ]);
 
+            // Update session timestamp
+            $session->touch();
+
             // Log corresponding event
             $eventName = ($message->type === 'image') ? 'image_shared' : 'message_sent';
             $eventMetadata = ['message_id' => $message->id];
@@ -194,9 +197,9 @@ class ChatAssistanceService
     }
 
     /**
-     * Retrieve messages history (only from the last 3 days).
+     * Retrieve messages history with pagination.
      */
-    public function getMessagesForSession($sessionId, $userId)
+    public function getMessagesForSession($sessionId, $userId, $perPage = 50)
     {
         $session = ChatAssistanceSession::findOrFail($sessionId);
 
@@ -204,13 +207,9 @@ class ChatAssistanceService
             throw new Exception("Unauthorized access to this chat history.", 403);
         }
 
-        // Only get messages from the last 3 days
-        $threeDaysAgo = Carbon::now()->subDays(3);
-
         return ChatAssistanceMessage::where('chat_assistance_session_id', $sessionId)
-            ->where('created_at', '>=', $threeDaysAgo)
             ->oldest()
-            ->paginate(30);
+            ->paginate($perPage);
     }
 
     /**
@@ -218,14 +217,14 @@ class ChatAssistanceService
      */
     public function getAstrologerLimitStatus($astrologerId)
     {
-        $limitConfig = Setting::get('chat_assistance_daily_limit', 5);
+        $limitConfig = (int) Setting::get('chat_assistance_daily_limit', 5);
         $today = Carbon::today()->toDateString();
 
         $limitRecord = ChatAssistanceAstrologerLimit::where('astrologer_id', $astrologerId)
             ->where('date', $today)
             ->first();
 
-        $used = $limitRecord ? $limitRecord->reply_count : 0;
+        $used = $limitRecord ? (int) $limitRecord->reply_count : 0;
         $remaining = max(0, $limitConfig - $used);
 
         return [
@@ -305,8 +304,10 @@ class ChatAssistanceService
                 'provider:id,name,profile_photo',
                 'latestMessage'
             ])
-            ->where('consumer_id', $userId)
-            ->orWhere('provider_id', $userId)
+            ->where(function ($query) use ($userId) {
+                $query->where('consumer_id', $userId)
+                      ->orWhere('provider_id', $userId);
+            })
             ->latest('updated_at')
             ->paginate($perPage);
 

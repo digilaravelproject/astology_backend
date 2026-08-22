@@ -120,7 +120,8 @@ class ChatAssistanceController extends Controller
     {
         try {
             $userId = $request->user()->id;
-            $messages = $this->chatAssistanceService->getMessagesForSession($sessionId, $userId);
+            $perPage = min((int) $request->query('per_page', 50), 100);
+            $messages = $this->chatAssistanceService->getMessagesForSession($sessionId, $userId, $perPage);
             
             $responseData = $messages->toArray();
             $responseData['chat_assistance_session_id'] = (int) $sessionId;
