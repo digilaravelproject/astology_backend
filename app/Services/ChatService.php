@@ -200,17 +200,18 @@ class ChatService
                 // Fetch latest consumer profile details
                 $consumer = User::findOrFail($session->consumer_id);
 
-                // Format consumer details as system message
-                $detailsMsg = $this->formatUserDetailsMessage($consumer, $session);
-
-                // Store system message
-                $systemMessage = \App\Models\Message::create([
-                    'chat_session_id' => $session->id,
-                    'sender_id' => $session->consumer_id,
-                    'receiver_id' => $session->provider_id,
-                    'message' => $detailsMsg,
-                    'type' => 'system',
-                ]);
+                $systemMessage = null;
+                // Format & store consumer birth details ONLY if not already sent to this astrologer in the last 24 hours
+                if ($this->shouldSendBirthDetails($session->consumer_id, $session->provider_id)) {
+                    $detailsMsg = $this->formatUserDetailsMessage($consumer, $session);
+                    $systemMessage = \App\Models\Message::create([
+                        'chat_session_id' => $session->id,
+                        'sender_id' => $session->consumer_id,
+                        'receiver_id' => $session->provider_id,
+                        'message' => $detailsMsg,
+                        'type' => 'system',
+                    ]);
+                }
 
                 // Check for astrologer's active default message
                 $defaultMessage = \App\Models\AstrologerDefaultMessage::where('astrologer_id', $providerId)
@@ -257,6 +258,37 @@ class ChatService
                 throw $e;
             }
         }, 3);
+    }
+
+    /**
+     * Check if user birth details have already been sent to this astrologer within the last 24 hours.
+     */
+    private function shouldSendBirthDetails($consumerId, $providerId): bool
+    {
+        $recentSessionIds = \App\Models\ChatSession::where(function ($q) use ($consumerId, $providerId) {
+                $q->where('consumer_id', $consumerId)->where('provider_id', $providerId);
+            })
+            ->where('created_at', '>=', now()->subHours(24))
+            ->pluck('id');
+
+        if ($recentSessionIds->isNotEmpty()) {
+            $alreadySent = \App\Models\Message::whereIn('chat_session_id', $recentSessionIds)
+                ->where('sender_id', $consumerId)
+                ->where('receiver_id', $providerId)
+                ->where('type', 'system')
+                ->where(function ($q) {
+                    $q->where('message', 'like', '%Birth Details%')
+                      ->orWhere('message', 'like', '%Kundli & Consultation Details%');
+                })
+                ->where('created_at', '>=', now()->subHours(24))
+                ->exists();
+
+            if ($alreadySent) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function formatUserDetailsMessage($consumer, $session)
