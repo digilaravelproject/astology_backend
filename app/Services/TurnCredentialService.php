@@ -35,20 +35,38 @@ class TurnCredentialService
 
         $ttl = (int) config('services.turn.ttl', self::DEFAULT_TTL);
         $secret = config('services.turn.secret');
+        $username = config('services.turn.username');
+        $credential = config('services.turn.credential');
 
-        if ($secret) {
-            $iceServers[] = $this->buildTimeLimitedTurnServer($turnUrl, $secret, $ttl);
-        } else {
-            $username = config('services.turn.username');
-            $credential = config('services.turn.credential');
+        $cleanUrl = preg_replace('/\?transport=.*$/', '', $turnUrl);
 
-            if ($username && $credential) {
-                $iceServers[] = [
-                    'urls'       => $turnUrl,
-                    'username'   => $username,
-                    'credential' => $credential,
-                ];
-            }
+        // 1. Static User Auth Priority (matches server /etc/turnserver.conf user=livekit:livekit_secret_2024)
+        if ($username && $credential && empty($secret)) {
+            $iceServers[] = [
+                'urls'       => $cleanUrl,
+                'username'   => $username,
+                'credential' => $credential,
+            ];
+            $iceServers[] = [
+                'urls'       => $cleanUrl . '?transport=tcp',
+                'username'   => $username,
+                'credential' => $credential,
+            ];
+        } elseif ($secret) {
+            // 2. Dynamic HMAC ephemeral auth (when use-auth-secret is configured in coturn)
+            $iceServers[] = $this->buildTimeLimitedTurnServer($cleanUrl, $secret, $ttl);
+            $iceServers[] = $this->buildTimeLimitedTurnServer($cleanUrl . '?transport=tcp', $secret, $ttl);
+        } elseif ($username && $credential) {
+            $iceServers[] = [
+                'urls'       => $cleanUrl,
+                'username'   => $username,
+                'credential' => $credential,
+            ];
+            $iceServers[] = [
+                'urls'       => $cleanUrl . '?transport=tcp',
+                'username'   => $username,
+                'credential' => $credential,
+            ];
         }
 
         return $iceServers;

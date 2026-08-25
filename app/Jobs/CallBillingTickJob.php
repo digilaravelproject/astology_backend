@@ -28,13 +28,18 @@ class CallBillingTickJob implements ShouldQueue
 
     public function handle(WalletService $walletService, CallService $callService)
     {
+        $isInsufficientBalance = false;
+        $sessionOngoing = false;
+
         try {
-            \Illuminate\Support\Facades\DB::transaction(function () use ($walletService) {
+            \Illuminate\Support\Facades\DB::transaction(function () use ($walletService, &$isInsufficientBalance, &$sessionOngoing) {
                 // Lock the session
                 $session = CallSession::where('id', $this->sessionId)->lockForUpdate()->first();
                 if (!$session || $session->status !== 'ongoing') {
-                    throw new Exception("Session is not ongoing or not found.");
+                    return; // Session is already finished or not active
                 }
+
+                $sessionOngoing = true;
 
                 // 🛡️ PREPAID / PACKAGE SESSION FAIL-SAFE GUARD:
                 // Under NO circumstance should a prepaid package session trigger a per-minute wallet debit!
@@ -61,18 +66,26 @@ class CallBillingTickJob implements ShouldQueue
                     $providerWallet = \App\Models\Wallet::where('user_id', $providerId)->lockForUpdate()->first();
                     $consumerWallet = \App\Models\Wallet::where('user_id', $consumerId)->lockForUpdate()->first();
                 }
+
                 if (!$consumerWallet || $consumerWallet->balance < $session->rate_per_minute) {
+                    $isInsufficientBalance = true;
                     throw new Exception("Insufficient balance for call session tick.");
                 }
 
                 // Perform debit (throws exception on failure)
                 $walletService->debitBalanceOnly($session->consumer_id, $session->rate_per_minute);
 
-                // Calculate provider share based on active offer or global fallback
-                $provider = \App\Models\User::with('astrologer')->findOrFail($providerId);
-                $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
-                $pricing = $pricingCalculator->calculate($provider->astrologer, 'call');
-                $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+                // Calculate provider share dynamically based on active offer or global admin setting
+                $provider = \App\Models\User::with('astrologer')->find($providerId);
+                $adminCommission = (float) \App\Models\Setting::get('global_commission_percentage', \App\Models\Setting::get('global_admin_commission_rate', 20.00));
+                $astrologerSharePct = 100 - $adminCommission;
+
+                if ($provider && $provider->astrologer) {
+                    $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
+                    $pricing = $pricingCalculator->calculate($provider->astrologer, 'call');
+                    $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? $astrologerSharePct);
+                }
+
                 $creditAmount = round(($session->rate_per_minute * $astrologerSharePct) / 100, 2);
 
                 // Perform credit (throws exception on failure)
@@ -84,14 +97,27 @@ class CallBillingTickJob implements ShouldQueue
                 $session->save();
             });
 
-            // Re-dispatch for next minute
-            CallBillingTickJob::dispatch($this->sessionId)->delay(now()->addMinute());
+            // Re-dispatch for next minute if session is still ongoing
+            $currentSession = CallSession::find($this->sessionId);
+            if ($currentSession && $currentSession->status === 'ongoing') {
+                CallBillingTickJob::dispatch($this->sessionId)->delay(now()->addMinute());
+            }
 
         } catch (Exception $e) {
+            \Illuminate\Support\Facades\Log::warning("CallBillingTickJob warning for session #{$this->sessionId}: " . $e->getMessage());
+
             $session = CallSession::find($this->sessionId);
-            if ($session && in_array($session->status, ['initiated', 'ringing', 'accepted', 'ongoing'])) {
-                $callService->endCall($session->id);
-                event(new CallEnded($session, $session->consumer_id));
+            if ($session && $session->status === 'ongoing') {
+                if ($isInsufficientBalance) {
+                    // Genuine insufficient balance: gracefully end call
+                    \Illuminate\Support\Facades\Log::info("Ending call #{$session->id} due to exhausted wallet balance.");
+                    $callService->endCall($session->id);
+                    event(new CallEnded($session, $session->consumer_id));
+                } else {
+                    // Transient error (e.g. temporary lock contention): retry tick without dropping the call
+                    \Illuminate\Support\Facades\Log::info("Re-dispatching CallBillingTickJob for call #{$session->id} after transient error.");
+                    CallBillingTickJob::dispatch($this->sessionId)->delay(now()->addSeconds(10));
+                }
             }
         }
     }
