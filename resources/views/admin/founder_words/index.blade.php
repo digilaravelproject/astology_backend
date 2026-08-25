@@ -73,7 +73,7 @@
                         <tr class="hover:bg-light/30 transition-colors">
                             <td class="px-6 py-4">
                                 @if($word->image)
-                                    <img src="{{ $word->image_url }}" alt="{{ $word->title }}" class="w-12 h-12 rounded-lg object-cover">
+                                    <img src="{{ Storage::url($word->image_url) }}" alt="{{ $word->title }}" class="w-12 h-12 rounded-lg object-cover">
                                 @else
                                     <div class="w-12 h-12 rounded-lg bg-gray-lighter flex items-center justify-center">
                                         <i class="fas fa-image text-gray text-xs"></i>

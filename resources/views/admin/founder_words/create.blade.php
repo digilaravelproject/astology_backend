@@ -51,7 +51,7 @@
                     @if($word->id && $word->image)
                         <div class="bg-light/50 rounded-2xl p-3 border border-gray-lighter">
                             <div class="text-[10px] font-black text-gray uppercase tracking-widest mb-3">Current Image</div>
-                            <img src="{{ $word->image_url }}" alt="{{ $word->title }}" class="w-full h-40 object-cover rounded-xl">
+                            <img src="{{ Storage::url($word->image_url) }}" alt="{{ $word->title }}" class="w-full h-40 object-cover rounded-xl">
                         </div>
                     @endif
 

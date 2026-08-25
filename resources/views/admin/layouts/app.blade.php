@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ \App\Models\Setting::get('app_name', 'Astology Premium') }} - Admin</title>
+    <title>{{ \App\Models\Setting::get('app_name', 'SuryapathKundli') }} - Admin</title>
     <link rel="shortcut icon" href="{{ \App\Models\Setting::get('favicon_path', '/favicon.ico') }}" type="image/x-icon">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -93,9 +93,9 @@
             <span class="admin-brand text-xl font-bold bg-linear-to-r from-primary-light to-primary bg-clip-text text-transparent flex items-center gap-2">
                 @php $logoPath = \App\Models\Setting::get('logo_path'); @endphp
                 <img src="{{ $logoPath ?: asset('images/logo.jpeg') }}"
-                     alt="{{ \App\Models\Setting::get('app_name', 'Astology Premium') }} Logo"
+                     alt="{{ \App\Models\Setting::get('app_name', 'SuryapathKundli') }} Logo"
                      class="admin-brand-mark h-9 w-9 rounded-lg object-contain border border-secondary/50">
-                <span>{{ \App\Models\Setting::get('app_name', 'Astology Premium') }}</span>
+                <span>{{ \App\Models\Setting::get('app_name', 'SuryapathKundli') }}</span>
             </span>
         </div>
 
@@ -542,6 +542,18 @@
                                      : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
                             <i class="fas fa-comments w-5 text-center text-base"></i>
                             <span>Feedback</span>
+                        </a>
+                    </li>
+
+                    <!-- Founder Words -->
+                    <li>
+                        <a href="{{ route('admin.founder_words.index') }}" 
+                           class="flex items-center gap-4 px-6 py-3 text-[14px] font-medium transition-all duration-300
+                                  {{ request()->routeIs('admin.founder_words.*')
+                                     ? 'bg-sidebar-hover text-primary border-r-[3px] border-primary'
+                                     : 'text-text-secondary hover:bg-sidebar-hover hover:text-primary' }}">
+                            <i class="fas fa-quote-left w-5 text-center text-base"></i>
+                            <span>Founder Words</span>
                         </a>
                     </li>
 
