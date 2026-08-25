@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class FoundersWordController extends Controller
 {
     /**
-     * List active founder messages (latest first) filtered by language.
+     * List active founder messages (latest first) translated to the requested language.
      */
     public function index(Request $request): JsonResponse
     {
@@ -28,27 +28,38 @@ class FoundersWordController extends Controller
 
             if (!$language) {
                 $language = CacheHelper::remember("language:default", 86400, function () {
-                    return Language::where('is_active', true)->first() ?? Language::first();
+                    return Language::where('code', 'en')->first() 
+                        ?? Language::where('is_active', true)->first() 
+                        ?? Language::first();
                 }, -1800, 1800);
             }
 
-            $cacheKey = $language ? "founders_words:lang:{$language->id}" : "founders_words:all_active";
-            $words = CacheHelper::remember($cacheKey, 86400, function () use ($language) {
-                $query = FoundersWord::with('language')->where('is_active', true);
-                if ($language) {
-                    $query->where('language_id', $language->id);
-                }
+            $langCode = strtolower($language?->code ?? 'en');
+            $cacheKey = "founders_words:lang:{$langCode}";
 
-                return $query->orderBy('created_at', 'desc')
+            $words = CacheHelper::remember($cacheKey, 86400, function () use ($language, $langCode) {
+                return FoundersWord::where('is_active', true)
+                    ->orderBy('created_at', 'desc')
                     ->get()
-                    ->map(function ($word) {
+                    ->map(function ($word) use ($language, $langCode) {
                         return [
                             'id' => $word->id,
-                            'language_id' => $word->language_id,
-                            'language_code' => $word->language?->code,
-                            'language_name' => $word->language?->name,
-                            'title' => $word->title,
-                            'message' => $word->message,
+                            'language_id' => $language?->id ?? $word->language_id,
+                            'language_code' => $langCode,
+                            'language_name' => $language?->name ?? 'English',
+                            'title' => $word->getTranslatedTitle($langCode),
+                            'message' => $word->getTranslatedMessage($langCode),
+                            'title_en' => $word->title_en ?: $word->title,
+                            'message_en' => $word->message_en ?: $word->message,
+                            'title_hi' => $word->title_hi,
+                            'message_hi' => $word->message_hi,
+                            'title_mr' => $word->title_mr,
+                            'message_mr' => $word->message_mr,
+                            'translations' => $word->translations ?: [
+                                'en' => ['title' => $word->title_en ?: $word->title, 'message' => $word->message_en ?: $word->message],
+                                'hi' => ['title' => $word->title_hi, 'message' => $word->message_hi],
+                                'mr' => ['title' => $word->title_mr, 'message' => $word->message_mr],
+                            ],
                             'image' => $word->image_url,
                             'image_path' => $word->image,
                             'is_active' => $word->is_active,
@@ -71,14 +82,32 @@ class FoundersWordController extends Controller
     }
 
     /**
-     * Get a single founder message.
+     * Get a single founder message with translations.
      */
-    public function show($id): JsonResponse
+    public function show(Request $request, $id): JsonResponse
     {
         try {
-            $wordData = CacheHelper::remember("founders_word:detail:{$id}", 86400, function () use ($id) {
-                $word = FoundersWord::with('language')
-                    ->where('id', $id)
+            $langKey = $request->query('language') ?? $request->header('Accept-Language');
+            $language = null;
+            if ($langKey) {
+                $language = CacheHelper::remember("language:code:{$langKey}", 86400, function () use ($langKey) {
+                    return Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+                }, -1800, 1800);
+            }
+
+            if (!$language) {
+                $language = CacheHelper::remember("language:default", 86400, function () {
+                    return Language::where('code', 'en')->first() 
+                        ?? Language::where('is_active', true)->first() 
+                        ?? Language::first();
+                }, -1800, 1800);
+            }
+
+            $langCode = strtolower($language?->code ?? 'en');
+            $cacheKey = "founders_word:detail:{$id}:{$langCode}";
+
+            $wordData = CacheHelper::remember($cacheKey, 86400, function () use ($id, $language, $langCode) {
+                $word = FoundersWord::where('id', $id)
                     ->where('is_active', true)
                     ->first();
 
@@ -88,11 +117,22 @@ class FoundersWordController extends Controller
 
                 return [
                     'id' => $word->id,
-                    'language_id' => $word->language_id,
-                    'language_code' => $word->language?->code,
-                    'language_name' => $word->language?->name,
-                    'title' => $word->title,
-                    'message' => $word->message,
+                    'language_id' => $language?->id ?? $word->language_id,
+                    'language_code' => $langCode,
+                    'language_name' => $language?->name ?? 'English',
+                    'title' => $word->getTranslatedTitle($langCode),
+                    'message' => $word->getTranslatedMessage($langCode),
+                    'title_en' => $word->title_en ?: $word->title,
+                    'message_en' => $word->message_en ?: $word->message,
+                    'title_hi' => $word->title_hi,
+                    'message_hi' => $word->message_hi,
+                    'title_mr' => $word->title_mr,
+                    'message_mr' => $word->message_mr,
+                    'translations' => $word->translations ?: [
+                        'en' => ['title' => $word->title_en ?: $word->title, 'message' => $word->message_en ?: $word->message],
+                        'hi' => ['title' => $word->title_hi, 'message' => $word->message_hi],
+                        'mr' => ['title' => $word->title_mr, 'message' => $word->message_mr],
+                    ],
                     'image' => $word->image_url,
                     'image_path' => $word->image,
                     'is_active' => $word->is_active,

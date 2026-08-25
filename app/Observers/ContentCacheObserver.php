@@ -64,6 +64,10 @@ class ContentCacheObserver
     {
         Cache::forget('founders_words:active');
         Cache::forget('founders_words:all_active');
+        foreach (['en', 'hi', 'mr'] as $code) {
+            Cache::forget("founders_words:lang:{$code}");
+            Cache::forget("founders_word:detail:{$word->id}:{$code}");
+        }
         if ($word->language_id) {
             Cache::forget("founders_words:lang:{$word->language_id}");
         }
@@ -74,6 +78,10 @@ class ContentCacheObserver
     {
         Cache::forget('founders_words:active');
         Cache::forget('founders_words:all_active');
+        foreach (['en', 'hi', 'mr'] as $code) {
+            Cache::forget("founders_words:lang:{$code}");
+            Cache::forget("founders_word:detail:{$word->id}:{$code}");
+        }
         if ($word->language_id) {
             Cache::forget("founders_words:lang:{$word->language_id}");
         }

@@ -93,13 +93,17 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4">
-                                @if($word->language)
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full text-[10px] font-black uppercase tracking-wider">
-                                        {{ $word->language->name }} ({{ strtoupper($word->language->code) }})
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase {{ !empty($word->title_en ?: $word->title) ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-gray-100 text-gray-400' }}" title="English">
+                                        EN
                                     </span>
-                                @else
-                                    <span class="text-xs text-gray italic">Not Set</span>
-                                @endif
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase {{ !empty($word->title_hi) ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-gray-100 text-gray-400 opacity-50' }}" title="{{ !empty($word->title_hi) ? 'Hindi available' : 'Hindi not configured' }}">
+                                        HI
+                                    </span>
+                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase {{ !empty($word->title_mr) ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-gray-100 text-gray-400 opacity-50' }}" title="{{ !empty($word->title_mr) ? 'Marathi available' : 'Marathi not configured' }}">
+                                        MR
+                                    </span>
+                                </div>
                             </td>
                             <td class="px-6 py-4">
                                 <div class="text-sm font-black text-dark">{{ $word->title }}</div>
