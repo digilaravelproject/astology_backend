@@ -114,11 +114,11 @@ class AppServiceProvider extends ServiceProvider
             SendChatInitiatedPushListener::class
         );
 
-        // 2. Chat Message Push Listener
-        Event::listen(
-            MessageSent::class,
-            SendMessagePushNotificationListener::class
-        );
+        // 2. Chat Message Push Listener (Disabled to prevent push spam during active chats; real-time delivery is handled via WebSockets)
+        // Event::listen(
+        //     MessageSent::class,
+        //     SendMessagePushNotificationListener::class
+        // );
 
         // 3. Acceptance Listeners (Notify Consumer User)
         Event::listen(

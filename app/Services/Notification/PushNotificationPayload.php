@@ -57,6 +57,7 @@ class PushNotificationPayload
             'caller_name' => $callerName,
             'caller_avatar' => $callerAvatar ?? '',
             'call_type' => $callType,
+            'screen_route' => '/call-room',
             'click_action' => 'FLUTTER_NOTIFICATION_CLICK',
             'created_at' => now()->toIso8601String(),
         ], $extra);
@@ -71,7 +72,7 @@ class PushNotificationPayload
             sound: 'call_ringtone',
             priority: 'high',
             customData: $data,
-            isDataOnly: true // Data message enables custom high-priority incoming call screen in Flutter
+            isDataOnly: false // Allows OS notification banner & ringtone when app is closed / backgrounded
         );
     }
 
