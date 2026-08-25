@@ -4,39 +4,70 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\FoundersWord;
+use App\Models\Language;
+use App\Helpers\CacheHelper;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class FoundersWordController extends Controller
 {
     /**
-     * List active founder messages (latest first).
+     * List active founder messages (latest first) filtered by language.
      */
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
-        $words = \App\Helpers\CacheHelper::remember('founders_words:active', 86400, function () {
-            return FoundersWord::where('is_active', true)
-                ->orderBy('created_at', 'desc')
-                ->get()
-                ->map(function ($word) {
-                    return [
-                        'id' => $word->id,
-                        'title' => $word->title,
-                        'message' => $word->message,
-                        'image' => $word->image_url,
-                        'image_path' => $word->image,
-                        'is_active' => $word->is_active,
-                        'created_at' => $word->created_at,
-                        'updated_at' => $word->updated_at,
-                    ];
-                });
-        }, -1800, 1800);
+        try {
+            $langKey = $request->query('language') ?? $request->header('Accept-Language');
+            $language = null;
+            if ($langKey) {
+                $language = CacheHelper::remember("language:code:{$langKey}", 86400, function () use ($langKey) {
+                    return Language::where('code', $langKey)->orWhere('id', $langKey)->first();
+                }, -1800, 1800);
+            }
 
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'founders_words' => $words,
-            ],
-        ], 200);
+            if (!$language) {
+                $language = CacheHelper::remember("language:default", 86400, function () {
+                    return Language::where('is_active', true)->first() ?? Language::first();
+                }, -1800, 1800);
+            }
+
+            $cacheKey = $language ? "founders_words:lang:{$language->id}" : "founders_words:all_active";
+            $words = CacheHelper::remember($cacheKey, 86400, function () use ($language) {
+                $query = FoundersWord::with('language')->where('is_active', true);
+                if ($language) {
+                    $query->where('language_id', $language->id);
+                }
+
+                return $query->orderBy('created_at', 'desc')
+                    ->get()
+                    ->map(function ($word) {
+                        return [
+                            'id' => $word->id,
+                            'language_id' => $word->language_id,
+                            'language_code' => $word->language?->code,
+                            'language_name' => $word->language?->name,
+                            'title' => $word->title,
+                            'message' => $word->message,
+                            'image' => $word->image_url,
+                            'image_path' => $word->image,
+                            'is_active' => $word->is_active,
+                            'created_at' => $word->created_at,
+                            'updated_at' => $word->updated_at,
+                        ];
+                    });
+            }, -1800, 1800);
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'founders_words' => $words,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('FoundersWord index error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to fetch founder messages.'], 500);
+        }
     }
 
     /**
@@ -44,39 +75,48 @@ class FoundersWordController extends Controller
      */
     public function show($id): JsonResponse
     {
-        $wordData = \App\Helpers\CacheHelper::remember("founders_word:detail:{$id}", 86400, function () use ($id) {
-            $word = FoundersWord::where('id', $id)
-                ->where('is_active', true)
-                ->first();
+        try {
+            $wordData = CacheHelper::remember("founders_word:detail:{$id}", 86400, function () use ($id) {
+                $word = FoundersWord::with('language')
+                    ->where('id', $id)
+                    ->where('is_active', true)
+                    ->first();
 
-            if (!$word) {
-                return null;
+                if (!$word) {
+                    return null;
+                }
+
+                return [
+                    'id' => $word->id,
+                    'language_id' => $word->language_id,
+                    'language_code' => $word->language?->code,
+                    'language_name' => $word->language?->name,
+                    'title' => $word->title,
+                    'message' => $word->message,
+                    'image' => $word->image_url,
+                    'image_path' => $word->image,
+                    'is_active' => $word->is_active,
+                    'created_at' => $word->created_at,
+                    'updated_at' => $word->updated_at,
+                ];
+            }, -1800, 1800);
+
+            if (!$wordData) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Founder message not found.',
+                ], 404);
             }
 
-            return [
-                'id' => $word->id,
-                'title' => $word->title,
-                'message' => $word->message,
-                'image' => $word->image_url,
-                'image_path' => $word->image,
-                'is_active' => $word->is_active,
-                'created_at' => $word->created_at,
-                'updated_at' => $word->updated_at,
-            ];
-        });
-
-        if (!$wordData) {
             return response()->json([
-                'status' => 'error',
-                'message' => 'Founder message not found.',
-            ], 404);
+                'status' => 'success',
+                'data' => [
+                    'founders_word' => $wordData,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            Log::error('FoundersWord show error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to fetch founder message.'], 500);
         }
-
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'founders_word' => $wordData,
-            ],
-        ], 200);
     }
 }

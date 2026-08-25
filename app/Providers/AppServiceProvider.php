@@ -188,6 +188,10 @@ class AppServiceProvider extends ServiceProvider
 
         $clearFounder = function ($model) {
             \Illuminate\Support\Facades\Cache::forget('founders_words:active');
+            \Illuminate\Support\Facades\Cache::forget('founders_words:all_active');
+            if ($model->language_id) {
+                \Illuminate\Support\Facades\Cache::forget("founders_words:lang:{$model->language_id}");
+            }
             \Illuminate\Support\Facades\Cache::forget("founders_word:detail:{$model->id}");
         };
         \App\Models\FoundersWord::saved($clearFounder);

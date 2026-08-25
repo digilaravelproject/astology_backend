@@ -30,6 +30,19 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div class="space-y-6">
                     <div>
+                        <label class="block text-sm font-black text-gray mb-2">Language <span class="text-danger">*</span></label>
+                        <select name="language_id" class="w-full px-4 py-3 border border-gray-lighter rounded-2xl focus:outline-none focus:border-primary/50 {{ $errors->has('language_id') ? 'border-danger' : '' }}" required>
+                            <option value="">Select Language</option>
+                            @foreach($languages as $language)
+                                <option value="{{ $language->id }}" {{ old('language_id', $word->language_id) == $language->id ? 'selected' : '' }}>
+                                    {{ $language->name }} ({{ strtoupper($language->code) }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('language_id')<p class="text-danger text-xs mt-2">{{ $message }}</p>@enderror
+                    </div>
+
+                    <div>
                         <label class="block text-sm font-black text-gray mb-2">Title <span class="text-danger">*</span></label>
                         <input type="text" name="title" value="{{ old('title', $word->title) }}" placeholder="Enter founder word title" class="w-full px-4 py-3 border border-gray-lighter rounded-2xl focus:outline-none focus:border-primary/50 {{ $errors->has('title') ? 'border-danger' : '' }}">
                         @error('title')<p class="text-danger text-xs mt-2">{{ $message }}</p>@enderror

@@ -63,12 +63,20 @@ class ContentCacheObserver
     public function savedFoundersWord(FoundersWord $word): void
     {
         Cache::forget('founders_words:active');
+        Cache::forget('founders_words:all_active');
+        if ($word->language_id) {
+            Cache::forget("founders_words:lang:{$word->language_id}");
+        }
         Cache::forget("founders_word:detail:{$word->id}");
     }
 
     public function deletedFoundersWord(FoundersWord $word): void
     {
         Cache::forget('founders_words:active');
+        Cache::forget('founders_words:all_active');
+        if ($word->language_id) {
+            Cache::forget("founders_words:lang:{$word->language_id}");
+        }
         Cache::forget("founders_word:detail:{$word->id}");
     }
 

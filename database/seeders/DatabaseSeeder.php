@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         // Seed notices for the notice board.
+        $this->call(LanguageSeeder::class);
         $this->call(AdminSeeder::class);
         $this->call(NoticeSeeder::class);
         $this->call(SubscriptionTestSeeder::class);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\FoundersWord;
+use App\Models\Language;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -11,7 +12,7 @@ class FounderWordsController extends Controller
 {
     public function index(Request $request)
     {
-        $query = FoundersWord::query();
+        $query = FoundersWord::with('language');
 
         if ($request->filled('search')) {
             $search = trim($request->input('search'));
@@ -19,6 +20,10 @@ class FounderWordsController extends Controller
                 $q->where('title', 'like', "%{$search}%")
                   ->orWhere('message', 'like', "%{$search}%");
             });
+        }
+
+        if ($request->filled('language_id')) {
+            $query->where('language_id', $request->input('language_id'));
         }
 
         if ($request->filled('status')) {
@@ -37,18 +42,22 @@ class FounderWordsController extends Controller
             'inactive' => FoundersWord::where('is_active', false)->count(),
         ];
 
-        return view('admin.founder_words.index', compact('words', 'stats'));
+        $languages = Language::where('is_active', true)->get();
+
+        return view('admin.founder_words.index', compact('words', 'stats', 'languages'));
     }
 
     public function create()
     {
         $word = new FoundersWord();
-        return view('admin.founder_words.create', compact('word'));
+        $languages = Language::where('is_active', true)->get();
+        return view('admin.founder_words.create', compact('word', 'languages'));
     }
 
     public function store(Request $request)
     {
         $data = $request->validate([
+            'language_id' => 'required|exists:languages,id',
             'title' => 'required|string|max:255',
             'message' => 'required|string|max:2000',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
@@ -70,7 +79,8 @@ class FounderWordsController extends Controller
     public function edit($id)
     {
         $word = FoundersWord::findOrFail($id);
-        return view('admin.founder_words.create', compact('word'));
+        $languages = Language::where('is_active', true)->get();
+        return view('admin.founder_words.create', compact('word', 'languages'));
     }
 
     public function update(Request $request, $id)
@@ -78,6 +88,7 @@ class FounderWordsController extends Controller
         $word = FoundersWord::findOrFail($id);
 
         $data = $request->validate([
+            'language_id' => 'required|exists:languages,id',
             'title' => 'required|string|max:255',
             'message' => 'required|string|max:2000',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',

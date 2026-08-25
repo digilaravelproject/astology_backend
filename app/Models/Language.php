@@ -34,4 +34,12 @@ class Language extends Model
     {
         return $this->hasMany(Remedy::class);
     }
+
+    /**
+     * Get the founder words associated with the language.
+     */
+    public function founderWords()
+    {
+        return $this->hasMany(FoundersWord::class);
+    }
 }

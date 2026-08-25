@@ -41,6 +41,17 @@
                 <input name="search" value="{{ request('search') }}" type="text" placeholder="Search by title or message..." class="w-full px-4 py-3 bg-light/50 border border-gray-lighter rounded-xl focus:outline-none focus:border-primary/50 text-sm">
             </div>
             <div class="flex-0 w-full lg:w-auto">
+                <label class="block text-[10px] font-black text-gray uppercase mb-1 ml-1">Language</label>
+                <select name="language_id" class="w-full px-4 py-3 bg-light/50 border border-gray-lighter rounded-xl focus:outline-none focus:border-primary/50 text-sm">
+                    <option value="">All Languages</option>
+                    @foreach($languages as $language)
+                        <option value="{{ $language->id }}" {{ request('language_id') == $language->id ? 'selected' : '' }}>
+                            {{ $language->name }} ({{ strtoupper($language->code) }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="flex-0 w-full lg:w-auto">
                 <label class="block text-[10px] font-black text-gray uppercase mb-1 ml-1">Status</label>
                 <select name="status" class="w-full px-4 py-3 bg-light/50 border border-gray-lighter rounded-xl focus:outline-none focus:border-primary/50 text-sm">
                     <option value="">All Status</option>
@@ -61,6 +72,7 @@
                 <thead class="bg-light/50 border-b border-gray-lighter">
                     <tr>
                         <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Image</th>
+                        <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Language</th>
                         <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Title</th>
                         <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider">Message Preview</th>
                         <th class="px-6 py-4 text-[11px] font-black text-gray uppercase tracking-wider text-center">Status</th>
@@ -78,6 +90,15 @@
                                     <div class="w-12 h-12 rounded-lg bg-gray-lighter flex items-center justify-center">
                                         <i class="fas fa-image text-gray text-xs"></i>
                                     </div>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                @if($word->language)
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary border border-primary/20 rounded-full text-[10px] font-black uppercase tracking-wider">
+                                        {{ $word->language->name }} ({{ strtoupper($word->language->code) }})
+                                    </span>
+                                @else
+                                    <span class="text-xs text-gray italic">Not Set</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4">
@@ -103,7 +124,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-10 text-center text-gray">No founder words found.</td>
+                            <td colspan="7" class="px-6 py-10 text-center text-gray">No founder words found.</td>
                         </tr>
                     @endforelse
                 </tbody>

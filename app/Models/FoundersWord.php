@@ -15,6 +15,7 @@ class FoundersWord extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'language_id',
         'title',
         'message',
         'image',
@@ -35,5 +36,13 @@ class FoundersWord extends Model
     public function getImageUrlAttribute(): ?string
     {
         return \App\Helpers\MediaHelper::getUrl($this->image);
+    }
+
+    /**
+     * Get the language associated with this founder word.
+     */
+    public function language()
+    {
+        return $this->belongsTo(Language::class);
     }
 }
