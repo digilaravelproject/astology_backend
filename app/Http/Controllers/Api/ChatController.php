@@ -146,7 +146,8 @@ class ChatController extends Controller
         $request->validate([
             'message' => 'required_without:attachment_url|string',
             'attachment_url' => 'nullable|string',
-            'type' => 'in:text,image,system,document,file,audio,video'
+            'type' => 'in:text,image,system,document,file,audio,video',
+            'reply_to_id' => 'nullable|integer|exists:messages,id',
         ]);
 
         try {
@@ -177,7 +178,12 @@ class ChatController extends Controller
                 'message' => $sanitizedMessage,
                 'attachment_url' => $request->attachment_url,
                 'type' => $request->type ?? 'text',
+                'reply_to_id' => $request->input('reply_to_id'),
             ]);
+
+            if ($message->reply_to_id) {
+                $message->load('replyTo');
+            }
 
             broadcast(new MessageSent($message, $receiverId));
 

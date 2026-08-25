@@ -11,6 +11,7 @@ class Message extends Model
 
     protected $fillable = [
         'chat_session_id',
+        'reply_to_id',
         'sender_id',
         'receiver_id',
         'message',
@@ -23,6 +24,7 @@ class Message extends Model
     protected $casts = [
         'is_read' => 'boolean',
         'is_delivered' => 'boolean',
+        'reply_to_id' => 'integer',
     ];
 
     protected $appends = ['attachment_url'];
@@ -45,5 +47,13 @@ class Message extends Model
     public function receiver()
     {
         return $this->belongsTo(User::class, 'receiver_id');
+    }
+
+    /**
+     * Self-referential relationship to the replied/quoted message.
+     */
+    public function replyTo()
+    {
+        return $this->belongsTo(Message::class, 'reply_to_id');
     }
 }

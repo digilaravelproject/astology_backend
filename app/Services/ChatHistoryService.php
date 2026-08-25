@@ -32,7 +32,7 @@ class ChatHistoryService
             throw new Exception("You are not authorized to access this chat history.", 403);
         }
 
-        $query = Message::query();
+        $query = Message::with(['replyTo']);
 
         if ($scope === 'session') {
             $query->where('chat_session_id', $sessionId);
