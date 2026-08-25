@@ -93,16 +93,16 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4">
-                                <div class="flex items-center gap-1.5 flex-wrap">
-                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase {{ !empty($word->title_en ?: $word->title) ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-gray-100 text-gray-400' }}" title="English">
-                                        EN
-                                    </span>
-                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase {{ !empty($word->title_hi) ? 'bg-amber-500/10 text-amber-700 border border-amber-500/20' : 'bg-gray-100 text-gray-400 opacity-50' }}" title="{{ !empty($word->title_hi) ? 'Hindi available' : 'Hindi not configured' }}">
-                                        HI
-                                    </span>
-                                    <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase {{ !empty($word->title_mr) ? 'bg-emerald-500/10 text-emerald-700 border border-emerald-500/20' : 'bg-gray-100 text-gray-400 opacity-50' }}" title="{{ !empty($word->title_mr) ? 'Marathi available' : 'Marathi not configured' }}">
-                                        MR
-                                    </span>
+                                <div class="flex items-center gap-1.5 flex-wrap max-w-xs">
+                                    @foreach($languages as $lang)
+                                        @php
+                                            $isFilled = !empty($word->translations[$lang->code]['title'] ?? ($word->{'title_'.$lang->code} ?? ($lang->code === 'en' ? $word->title : null)));
+                                        @endphp
+                                        <span class="px-2 py-0.5 rounded-md text-[10px] font-black uppercase {{ $isFilled ? 'bg-primary/10 text-primary border border-primary/20' : 'bg-gray-100 text-gray-400 opacity-40' }}" 
+                                              title="{{ $lang->name }}: {{ $isFilled ? 'Available' : 'Not configured' }}">
+                                            {{ strtoupper($lang->code) }}
+                                        </span>
+                                    @endforeach
                                 </div>
                             </td>
                             <td class="px-6 py-4">

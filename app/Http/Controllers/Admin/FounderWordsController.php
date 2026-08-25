@@ -24,7 +24,8 @@ class FounderWordsController extends Controller
                   ->orWhere('title_hi', 'like', "%{$search}%")
                   ->orWhere('message_hi', 'like', "%{$search}%")
                   ->orWhere('title_mr', 'like', "%{$search}%")
-                  ->orWhere('message_mr', 'like', "%{$search}%");
+                  ->orWhere('message_mr', 'like', "%{$search}%")
+                  ->orWhere('translations', 'like', "%{$search}%");
             });
         }
 
@@ -58,65 +59,58 @@ class FounderWordsController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'title_en' => 'nullable|string|max:255',
-            'message_en' => 'nullable|string|max:2000',
-            'title_hi' => 'nullable|string|max:255',
-            'message_hi' => 'nullable|string|max:2000',
-            'title_mr' => 'nullable|string|max:255',
-            'message_mr' => 'nullable|string|max:2000',
-            // Fallback fields
-            'title' => 'nullable|string|max:255',
-            'message' => 'nullable|string|max:2000',
-            'language_id' => 'nullable|exists:languages,id',
+        $request->validate([
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'sometimes|boolean',
+            'translations' => 'nullable|array',
+            'title_en' => 'nullable|string|max:255',
+            'message_en' => 'nullable|string|max:2000',
         ]);
 
-        // Require at least one language title and message
-        if (empty($data['title_en']) && empty($data['title_hi']) && empty($data['title_mr']) && empty($data['title'])) {
-            return back()->withErrors(['title_en' => 'Please provide a title in at least one language (English).'])->withInput();
+        $translationsInput = $request->input('translations', []);
+
+        // Also merge any direct inputs (title_en, title_hi, title_mr, etc.) into translations
+        foreach (['en', 'hi', 'mr', 'gu', 'bn', 'ta', 'te', 'kn', 'ml', 'pa', 'or', 'ur'] as $code) {
+            if ($request->filled('title_' . $code) || $request->filled('message_' . $code)) {
+                $translationsInput[$code] = [
+                    'title' => $request->input('title_' . $code, $translationsInput[$code]['title'] ?? ''),
+                    'message' => $request->input('message_' . $code, $translationsInput[$code]['message'] ?? ''),
+                ];
+            }
         }
 
-        if (empty($data['message_en']) && empty($data['message_hi']) && empty($data['message_mr']) && empty($data['message'])) {
-            return back()->withErrors(['message_en' => 'Please provide a message in at least one language (English).'])->withInput();
+        // English is the default anchor
+        $titleEn = $translationsInput['en']['title'] ?? ($request->input('title_en') ?? ($request->input('title') ?? ''));
+        $messageEn = $translationsInput['en']['message'] ?? ($request->input('message_en') ?? ($request->input('message') ?? ''));
+
+        // If English is empty, try to find any first filled language
+        if (empty($titleEn) || empty($messageEn)) {
+            foreach ($translationsInput as $t) {
+                if (empty($titleEn) && !empty($t['title'])) $titleEn = $t['title'];
+                if (empty($messageEn) && !empty($t['message'])) $messageEn = $t['message'];
+            }
         }
 
-        // Set primary title and message
-        $data['title'] = $data['title_en'] ?: ($data['title_hi'] ?: ($data['title_mr'] ?: ($data['title'] ?? '')));
-        $data['message'] = $data['message_en'] ?: ($data['message_hi'] ?: ($data['message_mr'] ?: ($data['message'] ?? '')));
-
-        // If title_en or message_en empty but title/message provided, backfill en
-        if (empty($data['title_en'])) {
-            $data['title_en'] = $data['title'];
-        }
-        if (empty($data['message_en'])) {
-            $data['message_en'] = $data['message'];
+        if (empty($titleEn) || empty($messageEn)) {
+            return back()->withErrors(['title_en' => 'Please provide at least an English title and message.'])->withInput();
         }
 
-        // Prepare translations json
-        $data['translations'] = [
-            'en' => [
-                'title' => $data['title_en'] ?? '',
-                'message' => $data['message_en'] ?? '',
-            ],
-            'hi' => [
-                'title' => $data['title_hi'] ?? '',
-                'message' => $data['message_hi'] ?? '',
-            ],
-            'mr' => [
-                'title' => $data['title_mr'] ?? '',
-                'message' => $data['message_mr'] ?? '',
-            ],
+        $data = [
+            'title' => $titleEn,
+            'message' => $messageEn,
+            'title_en' => $titleEn,
+            'message_en' => $messageEn,
+            'title_hi' => $translationsInput['hi']['title'] ?? null,
+            'message_hi' => $translationsInput['hi']['message'] ?? null,
+            'title_mr' => $translationsInput['mr']['title'] ?? null,
+            'message_mr' => $translationsInput['mr']['message'] ?? null,
+            'translations' => $translationsInput,
+            'is_active' => $request->has('is_active'),
         ];
 
-        // Default language
-        if (empty($data['language_id'])) {
-            $defaultLang = Language::where('code', 'en')->first() ?? Language::first();
-            $data['language_id'] = $defaultLang?->id;
-        }
-
-        $data['is_active'] = $request->has('is_active');
+        // Default language id
+        $defaultLang = Language::where('code', 'en')->first() ?? Language::first();
+        $data['language_id'] = $defaultLang?->id;
 
         // Handle image upload
         if ($request->hasFile('image')) {
@@ -125,7 +119,7 @@ class FounderWordsController extends Controller
 
         FoundersWord::create($data);
 
-        return redirect()->route('admin.founder_words.index')->with('success', 'Founder word created successfully with multi-language support.');
+        return redirect()->route('admin.founder_words.index')->with('success', 'Founder word created successfully with all language translations.');
     }
 
     public function edit($id)
@@ -139,62 +133,56 @@ class FounderWordsController extends Controller
     {
         $word = FoundersWord::findOrFail($id);
 
-        $data = $request->validate([
-            'title_en' => 'nullable|string|max:255',
-            'message_en' => 'nullable|string|max:2000',
-            'title_hi' => 'nullable|string|max:255',
-            'message_hi' => 'nullable|string|max:2000',
-            'title_mr' => 'nullable|string|max:255',
-            'message_mr' => 'nullable|string|max:2000',
-            // Fallback fields
-            'title' => 'nullable|string|max:255',
-            'message' => 'nullable|string|max:2000',
-            'language_id' => 'nullable|exists:languages,id',
+        $request->validate([
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
             'is_active' => 'sometimes|boolean',
+            'translations' => 'nullable|array',
+            'title_en' => 'nullable|string|max:255',
+            'message_en' => 'nullable|string|max:2000',
         ]);
 
-        // Require at least one language title and message
-        if (empty($data['title_en']) && empty($data['title_hi']) && empty($data['title_mr']) && empty($data['title'])) {
-            return back()->withErrors(['title_en' => 'Please provide a title in at least one language (English).'])->withInput();
+        $translationsInput = $request->input('translations', []);
+
+        // Merge any direct inputs
+        foreach (['en', 'hi', 'mr', 'gu', 'bn', 'ta', 'te', 'kn', 'ml', 'pa', 'or', 'ur'] as $code) {
+            if ($request->filled('title_' . $code) || $request->filled('message_' . $code)) {
+                $translationsInput[$code] = [
+                    'title' => $request->input('title_' . $code, $translationsInput[$code]['title'] ?? ''),
+                    'message' => $request->input('message_' . $code, $translationsInput[$code]['message'] ?? ''),
+                ];
+            }
         }
 
-        if (empty($data['message_en']) && empty($data['message_hi']) && empty($data['message_mr']) && empty($data['message'])) {
-            return back()->withErrors(['message_en' => 'Please provide a message in at least one language (English).'])->withInput();
+        // English anchor
+        $titleEn = $translationsInput['en']['title'] ?? ($request->input('title_en') ?? ($request->input('title') ?? ''));
+        $messageEn = $translationsInput['en']['message'] ?? ($request->input('message_en') ?? ($request->input('message') ?? ''));
+
+        if (empty($titleEn) || empty($messageEn)) {
+            foreach ($translationsInput as $t) {
+                if (empty($titleEn) && !empty($t['title'])) $titleEn = $t['title'];
+                if (empty($messageEn) && !empty($t['message'])) $messageEn = $t['message'];
+            }
         }
 
-        // Set primary title and message
-        $data['title'] = $data['title_en'] ?: ($data['title_hi'] ?: ($data['title_mr'] ?: ($data['title'] ?? '')));
-        $data['message'] = $data['message_en'] ?: ($data['message_hi'] ?: ($data['message_mr'] ?: ($data['message'] ?? '')));
-
-        if (empty($data['title_en'])) {
-            $data['title_en'] = $data['title'];
-        }
-        if (empty($data['message_en'])) {
-            $data['message_en'] = $data['message'];
+        if (empty($titleEn) || empty($messageEn)) {
+            return back()->withErrors(['title_en' => 'Please provide at least an English title and message.'])->withInput();
         }
 
-        // Prepare translations json
-        $data['translations'] = [
-            'en' => [
-                'title' => $data['title_en'] ?? '',
-                'message' => $data['message_en'] ?? '',
-            ],
-            'hi' => [
-                'title' => $data['title_hi'] ?? '',
-                'message' => $data['message_hi'] ?? '',
-            ],
-            'mr' => [
-                'title' => $data['title_mr'] ?? '',
-                'message' => $data['message_mr'] ?? '',
-            ],
+        $data = [
+            'title' => $titleEn,
+            'message' => $messageEn,
+            'title_en' => $titleEn,
+            'message_en' => $messageEn,
+            'title_hi' => $translationsInput['hi']['title'] ?? null,
+            'message_hi' => $translationsInput['hi']['message'] ?? null,
+            'title_mr' => $translationsInput['mr']['title'] ?? null,
+            'message_mr' => $translationsInput['mr']['message'] ?? null,
+            'translations' => $translationsInput,
+            'is_active' => $request->has('is_active'),
         ];
-
-        $data['is_active'] = $request->has('is_active');
 
         // Handle image upload
         if ($request->hasFile('image')) {
-            // Delete old image if exists
             if ($word->image && Storage::disk('public')->exists($word->image)) {
                 Storage::disk('public')->delete($word->image);
             }
@@ -203,14 +191,13 @@ class FounderWordsController extends Controller
 
         $word->update($data);
 
-        return redirect()->route('admin.founder_words.index')->with('success', 'Founder word updated successfully with multi-language support.');
+        return redirect()->route('admin.founder_words.index')->with('success', 'Founder word updated successfully with all language translations.');
     }
 
     public function destroy($id)
     {
         $word = FoundersWord::findOrFail($id);
         
-        // Delete image if exists
         if ($word->image && Storage::disk('public')->exists($word->image)) {
             Storage::disk('public')->delete($word->image);
         }

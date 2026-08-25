@@ -55,48 +55,52 @@ class FoundersWord extends Model
     }
 
     /**
-     * Get title for specific language with automatic fallback.
+     * Get title for any language code with automatic fallback to English.
      */
     public function getTranslatedTitle(?string $code = 'en'): string
     {
         $code = strtolower($code ?? 'en');
-        if ($code === 'hi' && !empty($this->title_hi)) {
-            return $this->title_hi;
-        }
-        if ($code === 'mr' && !empty($this->title_mr)) {
-            return $this->title_mr;
-        }
-        if ($code === 'en' && !empty($this->title_en)) {
-            return $this->title_en;
-        }
 
-        // Check translations json if exists
+        // Check translations json
         if (!empty($this->translations[$code]['title'])) {
             return $this->translations[$code]['title'];
+        }
+
+        // Check direct property if exists
+        $col = 'title_' . $code;
+        if (!empty($this->$col)) {
+            return $this->$col;
+        }
+
+        // Fallback to English translation
+        if (!empty($this->translations['en']['title'])) {
+            return $this->translations['en']['title'];
         }
 
         return $this->title_en ?: ($this->title ?: '');
     }
 
     /**
-     * Get message for specific language with automatic fallback.
+     * Get message for any language code with automatic fallback to English.
      */
     public function getTranslatedMessage(?string $code = 'en'): string
     {
         $code = strtolower($code ?? 'en');
-        if ($code === 'hi' && !empty($this->message_hi)) {
-            return $this->message_hi;
-        }
-        if ($code === 'mr' && !empty($this->message_mr)) {
-            return $this->message_mr;
-        }
-        if ($code === 'en' && !empty($this->message_en)) {
-            return $this->message_en;
-        }
 
-        // Check translations json if exists
+        // Check translations json
         if (!empty($this->translations[$code]['message'])) {
             return $this->translations[$code]['message'];
+        }
+
+        // Check direct property if exists
+        $col = 'message_' . $code;
+        if (!empty($this->$col)) {
+            return $this->$col;
+        }
+
+        // Fallback to English translation
+        if (!empty($this->translations['en']['message'])) {
+            return $this->translations['en']['message'];
         }
 
         return $this->message_en ?: ($this->message ?: '');
