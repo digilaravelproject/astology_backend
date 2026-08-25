@@ -1867,6 +1867,22 @@ class AstrologerAuthController extends Controller
 
         $astrologer->save();
 
+        // Broadcast real-time availability to all clients
+        try {
+            $isOnline = (bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled);
+            $isBusy = (bool) ($user->is_busy ?? false);
+            broadcast(new \App\Events\AstrologerAvailabilityUpdated(
+                $user->id,
+                $isOnline,
+                $isBusy,
+                $user->busy_session_id ?? null,
+                null,
+                $astrologer->id
+            ));
+        } catch (\Throwable $e) {
+            Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on toggle: " . $e->getMessage());
+        }
+
         NotificationHelper::send(
             $user->id,
             "{$displayName} status updated",
@@ -1877,6 +1893,7 @@ class AstrologerAuthController extends Controller
         // Prepare response data
         $responseData = [
             'astrologer_id' => $astrologer->id,
+            'availability_status' => ($user->is_busy ?? false) ? 'Engaged' : ((bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled) ? 'Online' : 'Offline'),
             $fieldName => (bool) $astrologer->$fieldName,
             'updated_at' => $astrologer->updated_at,
         ];

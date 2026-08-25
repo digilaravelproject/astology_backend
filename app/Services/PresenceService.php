@@ -16,7 +16,9 @@ class PresenceService
 
     public function setOnline($userId)
     {
-        return $this->userRepo->updatePresence($userId, true, false, null);
+        $result = $this->userRepo->updatePresence($userId, true, false, null);
+        $this->broadcastAstrologerAvailability($userId, true, false, null);
+        return $result;
     }
 
     /**
@@ -46,9 +48,11 @@ class PresenceService
                 if ($userId == $consumerId) {
                     $this->userRepo->updatePresence($consumerId, false, false, null);
                     $this->userRepo->updatePresence($providerId, true, false, null);
+                    $this->broadcastAstrologerAvailability($providerId, true, false, null);
                 } else {
                     $this->userRepo->updatePresence($providerId, false, false, null);
                     $this->userRepo->updatePresence($consumerId, true, false, null);
+                    $this->broadcastAstrologerAvailability($providerId, false, false, null);
                 }
 
                 broadcast(new \App\Events\ChatDismissed($initiatedChat->refresh(), $userId));
@@ -78,9 +82,11 @@ class PresenceService
                 if ($userId == $consumerId) {
                     $this->userRepo->updatePresence($consumerId, false, false, null);
                     $this->userRepo->updatePresence($providerId, true, false, null);
+                    $this->broadcastAstrologerAvailability($providerId, true, false, null);
                 } else {
                     $this->userRepo->updatePresence($providerId, false, false, null);
                     $this->userRepo->updatePresence($consumerId, true, false, null);
+                    $this->broadcastAstrologerAvailability($providerId, false, false, null);
                 }
 
                 // CallDismissed notifies both parties so their ring UI is dismissed
@@ -90,17 +96,45 @@ class PresenceService
             }
         }
 
-        return $this->userRepo->updatePresence($userId, false, false, null);
+        $result = $this->userRepo->updatePresence($userId, false, false, null);
+        $this->broadcastAstrologerAvailability($userId, false, false, null);
+        return $result;
     }
 
-    public function setBusy($userId, $sessionId)
+    public function setBusy($userId, $sessionId, ?string $sessionType = null)
     {
-        return $this->userRepo->updatePresence($userId, true, true, $sessionId);
+        $result = $this->userRepo->updatePresence($userId, true, true, $sessionId);
+        $this->broadcastAstrologerAvailability($userId, true, true, $sessionId, $sessionType);
+        return $result;
     }
 
     public function setFree($userId)
     {
-        return $this->userRepo->updatePresence($userId, true, false, null);
+        $result = $this->userRepo->updatePresence($userId, true, false, null);
+        $this->broadcastAstrologerAvailability($userId, true, false, null);
+        return $result;
+    }
+
+    /**
+     * Broadcast real-time availability update ("Engaged", "Online", "Offline") for astrologers.
+     */
+    public function broadcastAstrologerAvailability(int $userId, bool $isOnline, bool $isBusy, ?int $sessionId = null, ?string $sessionType = null): void
+    {
+        try {
+            $astro = \App\Models\Astrologer::where('user_id', $userId)->first();
+            if ($astro) {
+                broadcast(new \App\Events\AstrologerAvailabilityUpdated(
+                    $userId,
+                    $isOnline,
+                    $isBusy,
+                    $sessionId,
+                    $sessionType,
+                    $astro->id
+                ));
+            }
+        } catch (\Throwable $e) {
+            Log::warning("Broadcasting AstrologerAvailabilityUpdated failed for user #{$userId}: " . $e->getMessage());
+        }
     }
 
     /**

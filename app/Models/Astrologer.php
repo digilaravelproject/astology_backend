@@ -423,4 +423,23 @@ class Astrologer extends Model
 
         return ($callSeconds + $chatSeconds) / 60;
     }
+
+    /**
+     * Get real-time availability status string: "Engaged" | "Online" | "Offline".
+     */
+    public function getAvailabilityStatusAttribute(): string
+    {
+        if (!empty($this->attributes['is_busy']) || !empty($this->is_busy)) {
+            return 'Engaged';
+        }
+
+        $isOnline = (bool) (
+            ($this->attributes['is_chat_enabled'] ?? false) ||
+            ($this->attributes['is_call_enabled'] ?? false) ||
+            ($this->attributes['is_video_call_enabled'] ?? false) ||
+            ($this->attributes['is_online'] ?? false)
+        );
+
+        return $isOnline ? 'Online' : 'Offline';
+    }
 }

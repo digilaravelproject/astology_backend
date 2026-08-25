@@ -76,6 +76,8 @@ class CallStabilityAndTurnTransportTest extends TestCase
     /** @test */
     public function call_billing_tick_job_successfully_bills_minute_when_balance_sufficient()
     {
+        \Illuminate\Support\Facades\Queue::fake([CallBillingTickJob::class]);
+
         Wallet::create(['user_id' => $this->user->id, 'balance' => 100.00]);
         Wallet::create(['user_id' => $this->astrologerUser->id, 'balance' => 0.00]);
 

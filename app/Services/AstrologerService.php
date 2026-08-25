@@ -214,6 +214,7 @@ class AstrologerService
             if ($astrologer->user) {
                 $astrologer->user->is_busy = $isBusy;
             }
+            $astrologer->availability_status = $isBusy ? 'Engaged' : ($astrologer->is_online ? 'Online' : 'Offline');
 
             $astrologer->is_followed = $currentUser ? in_array($astrologer->id, $followedAstrologerIds) : false;
             $astrologer->is_blocked = $currentUser ? in_array($astrologer->user_id, $blockedUserIds) : false;
@@ -331,6 +332,7 @@ class AstrologerService
         if ($astrologer->user) {
             $astrologer->user->is_busy = $isBusy;
         }
+        $astrologer->availability_status = $isBusy ? 'Engaged' : ($astrologer->is_online ? 'Online' : 'Offline');
 
         if ($currentUser) {
             $community = AstrologerCommunity::where('astrologer_id', $id)
