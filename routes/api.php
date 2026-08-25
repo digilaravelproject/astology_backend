@@ -473,6 +473,16 @@ Route::prefix('v1')->group(function () {
     */
     Route::prefix('kundli')->middleware(['auth:sanctum'])->group(function () {
         Route::post('/create',  [KundliController::class, 'store'])->middleware('throttle:general');
+        Route::post('/',        [KundliController::class, 'store'])->middleware('throttle:general');
+        Route::get('/',         [KundliController::class, 'index'])->middleware('throttle:general');
+        Route::get('/{id}',     [KundliController::class, 'show'])->middleware('throttle:general');
+        Route::put('/{id}',     [KundliController::class, 'update'])->middleware('throttle:general');
+        Route::delete('/{id}',  [KundliController::class, 'destroy'])->middleware('throttle:general');
+    });
+
+    Route::prefix('kundlis')->middleware(['auth:sanctum'])->group(function () {
+        Route::post('/create',  [KundliController::class, 'store'])->middleware('throttle:general');
+        Route::post('/',        [KundliController::class, 'store'])->middleware('throttle:general');
         Route::get('/',         [KundliController::class, 'index'])->middleware('throttle:general');
         Route::get('/{id}',     [KundliController::class, 'show'])->middleware('throttle:general');
         Route::put('/{id}',     [KundliController::class, 'update'])->middleware('throttle:general');

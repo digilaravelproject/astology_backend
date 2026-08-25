@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasLocalTimezoneSerialization;
 use Illuminate\Database\Eloquent\Model;
 
 class Kundli extends Model
 {
+    use HasLocalTimezoneSerialization;
+
     protected $fillable = [
         'user_id',
         'name',

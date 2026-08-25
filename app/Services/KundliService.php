@@ -23,6 +23,16 @@ class KundliService
     public function createKundli(array $data, int $userId): Kundli
     {
         $data['user_id'] = $userId;
+
+        // Ensure datetime is synchronized in Asia/Kolkata timezone
+        if (!empty($data['birth_date']) && !empty($data['birth_time'])) {
+            try {
+                $data['datetime'] = \Carbon\Carbon::parse($data['birth_date'] . ' ' . $data['birth_time'], 'Asia/Kolkata')->format('Y-m-d H:i:s');
+            } catch (\Throwable $e) {
+                // Keep provided datetime if parse fails
+            }
+        }
+
         return Kundli::create($data);
     }
 
@@ -61,6 +71,17 @@ class KundliService
      */
     public function updateKundli(Kundli $kundli, array $data): Kundli
     {
+        $birthDate = $data['birth_date'] ?? $kundli->birth_date?->format('Y-m-d');
+        $birthTime = $data['birth_time'] ?? $kundli->birth_time;
+
+        if (!empty($birthDate) && !empty($birthTime)) {
+            try {
+                $data['datetime'] = \Carbon\Carbon::parse("{$birthDate} {$birthTime}", 'Asia/Kolkata')->format('Y-m-d H:i:s');
+            } catch (\Throwable $e) {
+                // Keep provided datetime if parse fails
+            }
+        }
+
         $kundli->update($data);
         return $kundli;
     }

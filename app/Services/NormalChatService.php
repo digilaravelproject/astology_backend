@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ChatSession;
+use App\Models\Kundli;
 use App\Models\User;
 use App\Models\Message;
 use App\Models\AstrologerDefaultMessage;
@@ -395,11 +396,33 @@ class NormalChatService
 
     protected function formatUserDetailsMessage(User $consumer, ChatSession $session): string
     {
-        $name = $consumer->name ?? 'User';
-        $gender = $consumer->gender ? ucfirst($consumer->gender) : 'N/A';
-        $dob = $consumer->date_of_birth ? $consumer->date_of_birth->format('d M Y') : 'N/A';
-        $tob = $consumer->time_of_birth ? (string) $consumer->time_of_birth : 'N/A';
-        $pob = $consumer->place_of_birth ?? 'N/A';
+        // Fallback to user's saved Kundli if user profile birth details are incomplete
+        $savedKundli = null;
+        if (empty($consumer->date_of_birth) && empty($consumer->time_of_birth)) {
+            $savedKundli = Kundli::where('user_id', $consumer->id)->latest()->first();
+        }
+
+        $name = $consumer->name ?? $savedKundli?->name ?? 'User';
+        $gender = $consumer->gender ? ucfirst($consumer->gender) : ($savedKundli?->gender ? ucfirst($savedKundli->gender) : 'N/A');
+
+        $dob = 'N/A';
+        if ($consumer->date_of_birth) {
+            $dob = $consumer->date_of_birth->timezone('Asia/Kolkata')->format('d M Y');
+        } elseif ($savedKundli?->birth_date) {
+            $dob = \Carbon\Carbon::parse($savedKundli->birth_date, 'Asia/Kolkata')->format('d M Y');
+        }
+
+        $tob = 'N/A';
+        $rawTob = $consumer->time_of_birth ?? $savedKundli?->birth_time;
+        if ($rawTob) {
+            try {
+                $tob = \Carbon\Carbon::parse($rawTob, 'Asia/Kolkata')->format('h:i A');
+            } catch (\Throwable $e) {
+                $tob = (string) $rawTob;
+            }
+        }
+
+        $pob = $consumer->place_of_birth ?? $savedKundli?->birth_place ?? 'N/A';
         $occupation = $consumer->occupation ?? 'N/A';
         $status = $consumer->relationship_status ?? 'N/A';
         $question = $session->question ? trim($session->question) : 'General Consultation';

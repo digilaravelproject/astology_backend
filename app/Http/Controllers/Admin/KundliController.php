@@ -50,12 +50,21 @@ class KundliController extends Controller
             'name' => 'required|string|max:255',
             'gender' => 'required|in:male,female,other',
             'birth_date' => 'required|date',
-            'birth_time' => 'required|date_format:H:i',
+            'birth_time' => 'required|string',
             'birth_place' => 'nullable|string|max:500',
             'latitude' => 'nullable|numeric|min:-90|max:90',
             'longitude' => 'nullable|numeric|min:-180|max:180',
-            'datetime' => 'nullable|date_time',
+            'datetime' => 'nullable|date',
         ]);
+
+        if (!empty($validated['birth_date']) && !empty($validated['birth_time'])) {
+            try {
+                $validated['birth_time'] = \Carbon\Carbon::parse($validated['birth_time'], 'Asia/Kolkata')->format('H:i:s');
+                $validated['datetime'] = \Carbon\Carbon::parse($validated['birth_date'] . ' ' . $validated['birth_time'], 'Asia/Kolkata')->format('Y-m-d H:i:s');
+            } catch (\Throwable $e) {
+                // Ignore parse errors
+            }
+        }
 
         Kundli::create($validated);
 
@@ -94,12 +103,21 @@ class KundliController extends Controller
             'name' => 'required|string|max:255',
             'gender' => 'required|in:male,female,other',
             'birth_date' => 'required|date',
-            'birth_time' => 'required|date_format:H:i',
+            'birth_time' => 'required|string',
             'birth_place' => 'nullable|string|max:500',
             'latitude' => 'nullable|numeric|min:-90|max:90',
             'longitude' => 'nullable|numeric|min:-180|max:180',
-            'datetime' => 'nullable|date_time',
+            'datetime' => 'nullable|date',
         ]);
+
+        if (!empty($validated['birth_date']) && !empty($validated['birth_time'])) {
+            try {
+                $validated['birth_time'] = \Carbon\Carbon::parse($validated['birth_time'], 'Asia/Kolkata')->format('H:i:s');
+                $validated['datetime'] = \Carbon\Carbon::parse($validated['birth_date'] . ' ' . $validated['birth_time'], 'Asia/Kolkata')->format('Y-m-d H:i:s');
+            } catch (\Throwable $e) {
+                // Ignore parse errors
+            }
+        }
 
         $kundli->update($validated);
 
