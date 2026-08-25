@@ -188,11 +188,18 @@ Route::prefix('v1')->group(function () {
             Route::post('/remove-token', [DeviceTokenController::class, 'remove']);
             Route::get('/notifications/count',              [NotificationController::class, 'count']);
             Route::get('/notifications',                    [NotificationController::class, 'list']);
+            
             Route::get('/notifications/{id}',               [NotificationController::class, 'show']);
             Route::put('/notifications/{id}/mark-read',      [NotificationController::class, 'markRead']);
             Route::post('/notifications/{id}/mark-read',     [NotificationController::class, 'markRead']);
             Route::post('/notifications/mark-all-read',      [NotificationController::class, 'markAllRead']);
             Route::delete('/notifications/{id}',            [NotificationController::class, 'destroy']);
+
+            // Kundli Management (Astrologer Side)
+            Route::delete('/kundli/{id}',  [KundliController::class, 'destroy']);
+            Route::delete('/kundlis/{id}', [KundliController::class, 'destroy']);
+            Route::get('/kundli',          [KundliController::class, 'index']);
+            Route::get('/kundli/{id}',     [KundliController::class, 'show']);
 
             // Session & Account Lifecycle
             Route::post('/logout',          [AstrologerAuthController::class, 'logout']);

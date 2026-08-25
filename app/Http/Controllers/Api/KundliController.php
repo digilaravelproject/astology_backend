@@ -4,39 +4,33 @@ namespace App\Http\Controllers\Api;
 
 use App\Helpers\ApiResponse;
 use App\Http\Controllers\Controller;
-use App\Models\Kundli;
+use App\Http\Requests\StoreKundliRequest;
+use App\Http\Requests\UpdateKundliRequest;
+use App\Services\KundliService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class KundliController extends Controller
 {
+    protected KundliService $kundliService;
+
+    public function __construct(KundliService $kundliService)
+    {
+        $this->kundliService = $kundliService;
+    }
+
     /**
      * Create a new Kundli
      */
-    public function store(Request $request)
+    public function store(StoreKundliRequest $request)
     {
         try {
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'gender' => 'required|in:male,female,other',
-                'birth_date' => 'required|date',
-                'birth_time' => 'required|date_format:H:i:s',
-                'birth_place' => 'nullable|string|max:500',
-                'latitude' => 'required|numeric|between:-90,90',
-                'longitude' => 'required|numeric|between:-180,180',
-                'datetime' => 'required|date_format:Y-m-d H:i:s',
-            ]);
-
-            // Associate with authenticated user
-            $validated['user_id'] = Auth::id();
-
-            $kundli = Kundli::create($validated);
+            $kundli = $this->kundliService->createKundli($request->validated(), Auth::id());
 
             return ApiResponse::success($kundli, 'Kundli created successfully', 201);
-        } catch (ValidationException $e) {
-            return ApiResponse::error('Validation failed', 422, $e->errors());
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('Kundli store failed: ' . $e->getMessage());
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
@@ -47,12 +41,12 @@ class KundliController extends Controller
     public function index(Request $request)
     {
         try {
-            $per_page = $request->get('per_page', 15);
-            $kundlis = Kundli::where('user_id', Auth::id())
-                ->paginate($per_page);
+            $perPage = (int) $request->get('per_page', 15);
+            $kundlis = $this->kundliService->getUserKundlis(Auth::id(), $perPage);
 
             return ApiResponse::success($kundlis, 'Kundlis retrieved successfully');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('Kundli index failed: ' . $e->getMessage());
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
@@ -63,14 +57,15 @@ class KundliController extends Controller
     public function show($id)
     {
         try {
-            $kundli = Kundli::where('user_id', Auth::id())->find($id);
+            $kundli = $this->kundliService->findUserKundli((int) $id, Auth::id());
 
             if (! $kundli) {
                 return ApiResponse::error('Kundli not found', 404);
             }
 
             return ApiResponse::success($kundli, 'Kundli retrieved successfully');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            Log::error('Kundli show failed: ' . $e->getMessage());
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
@@ -78,52 +73,46 @@ class KundliController extends Controller
     /**
      * Update a Kundli (only if owned by user)
      */
-    public function update(Request $request, $id)
+    public function update(UpdateKundliRequest $request, $id)
     {
         try {
-            $kundli = Kundli::where('user_id', Auth::id())->find($id);
+            $kundli = $this->kundliService->findUserKundli((int) $id, Auth::id());
 
             if (! $kundli) {
                 return ApiResponse::error('Kundli not found', 404);
             }
 
-            $validated = $request->validate([
-                'name' => 'sometimes|string|max:255',
-                'gender' => 'sometimes|in:male,female,other',
-                'birth_date' => 'sometimes|date',
-                'birth_time' => 'sometimes|date_format:H:i:s',
-                'birth_place' => 'sometimes|nullable|string|max:500',
-                'latitude' => 'sometimes|numeric|between:-90,90',
-                'longitude' => 'sometimes|numeric|between:-180,180',
-                'datetime' => 'sometimes|date_format:Y-m-d H:i:s',
-            ]);
+            $updated = $this->kundliService->updateKundli($kundli, $request->validated());
 
-            $kundli->update($validated);
-
-            return ApiResponse::success($kundli, 'Kundli updated successfully');
-        } catch (ValidationException $e) {
-            return ApiResponse::error('Validation failed', 422, $e->errors());
-        } catch (\Exception $e) {
+            return ApiResponse::success($updated, 'Kundli updated successfully');
+        } catch (\Throwable $e) {
+            Log::error('Kundli update failed: ' . $e->getMessage());
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
 
     /**
-     * Delete a Kundli (only if owned by user)
+     * Delete a Kundli (Both User and Astrologer with strict consultation-bound check)
      */
     public function destroy($id)
     {
         try {
-            $kundli = Kundli::where('user_id', Auth::id())->find($id);
+            $user = Auth::user();
+            $kundliId = (int) $id;
 
-            if (! $kundli) {
-                return ApiResponse::error('Kundli not found', 404);
+            if ($user && ($user->user_type === 'astrologer' || $user->relationLoaded('astrologer') ? (bool) $user->astrologer : false)) {
+                $result = $this->kundliService->deleteByAstrologer($kundliId, $user->id);
+            } else {
+                $result = $this->kundliService->deleteByUser($kundliId, Auth::id());
             }
 
-            $kundli->delete();
+            if (! $result['success']) {
+                return ApiResponse::error($result['message'], $result['status_code']);
+            }
 
-            return ApiResponse::success(null, 'Kundli deleted successfully');
-        } catch (\Exception $e) {
+            return ApiResponse::success(null, $result['message']);
+        } catch (\Throwable $e) {
+            Log::error('Kundli delete failed: ' . $e->getMessage());
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
