@@ -846,15 +846,30 @@ class UserAuthController extends Controller
         }
 
         try {
-            // Revoke all tokens for the user
-            $user->tokens()->delete();
+            $fcmToken = $request->input('fcm_token');
+            $deviceId = $request->input('device_id');
 
-            NotificationHelper::send(
-                $user->id,
-                'Logged out',
-                'You have been logged out successfully.',
-                []
-            );
+            // Deactivate device token(s) on logout
+            if ($deviceId || $fcmToken) {
+                $query = \App\Models\UserDevice::where('user_id', $user->id);
+                if ($deviceId) {
+                    $query->where('device_id', $deviceId);
+                } elseif ($fcmToken) {
+                    $query->where('fcm_token', $fcmToken);
+                }
+                $query->update(['is_active' => false]);
+            } else {
+                // If no specific device info provided, deactivate all active devices for this user
+                \App\Models\UserDevice::where('user_id', $user->id)->update(['is_active' => false]);
+            }
+
+            if (!$fcmToken || $user->fcm_token === $fcmToken) {
+                $user->fcm_token = null;
+                $user->save();
+            }
+
+            // Revoke tokens for the user
+            $user->tokens()->delete();
 
             return response()->json([
                 'status' => 'success',

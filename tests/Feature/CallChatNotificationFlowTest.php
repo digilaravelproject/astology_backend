@@ -281,4 +281,59 @@ class CallChatNotificationFlowTest extends TestCase
         // Assert NO push notification job is dispatched
         Queue::assertNotPushed(SendPushNotificationJob::class);
     }
+
+    /** @test */
+    public function user_logout_deactivates_device_token_and_clears_fcm_token()
+    {
+        $this->consumer->fcm_token = 'fcm_token_consumer_123';
+        $this->consumer->save();
+
+        $this->assertTrue(UserDevice::where('user_id', $this->consumer->id)->where('is_active', true)->exists());
+
+        $response = $this->actingAs($this->consumer)->postJson('/api/v1/user/logout', [
+            'fcm_token' => 'fcm_token_consumer_123',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertFalse(UserDevice::where('user_id', $this->consumer->id)->where('is_active', true)->exists());
+        $this->assertNull($this->consumer->fresh()->fcm_token);
+    }
+
+    /** @test */
+    public function astrologer_logout_deactivates_device_token_and_clears_fcm_token()
+    {
+        $this->provider->fcm_token = 'fcm_token_provider_456';
+        $this->provider->save();
+
+        $this->assertTrue(UserDevice::where('user_id', $this->provider->id)->where('is_active', true)->exists());
+
+        $response = $this->actingAs($this->provider)->postJson('/api/v1/astrologer/logout', [
+            'fcm_token' => 'fcm_token_provider_456',
+        ]);
+
+        $response->assertStatus(200);
+        $this->assertFalse(UserDevice::where('user_id', $this->provider->id)->where('is_active', true)->exists());
+        $this->assertNull($this->provider->fresh()->fcm_token);
+    }
+
+    /** @test */
+    public function registering_new_device_token_deactivates_previous_device_tokens_for_same_user()
+    {
+        // Provider already has fcm_token_provider_456 active from setUp
+        $this->assertTrue(UserDevice::where('user_id', $this->provider->id)->where('fcm_token', 'fcm_token_provider_456')->value('is_active'));
+
+        // Provider logs in on a new device with new token
+        $response = $this->actingAs($this->provider)->postJson('/api/v1/astrologer/device-token', [
+            'fcm_token' => 'fcm_token_new_device_789',
+            'device_type' => 'android',
+        ]);
+
+        $response->assertStatus(200);
+
+        // Old device token must now be deactivated
+        $this->assertFalse(UserDevice::where('user_id', $this->provider->id)->where('fcm_token', 'fcm_token_provider_456')->value('is_active'));
+
+        // New device token must be active
+        $this->assertTrue(UserDevice::where('user_id', $this->provider->id)->where('fcm_token', 'fcm_token_new_device_789')->value('is_active'));
+    }
 }

@@ -1378,13 +1378,41 @@ class AstrologerAuthController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
-        $token = $request->user()->currentAccessToken();
-        if ($token) {
-            /** @var \Laravel\Sanctum\PersonalAccessToken $token */
-            $token->delete();
-        }
+        try {
+            $fcmToken = $request->input('fcm_token');
+            $deviceId = $request->input('device_id');
 
-        return response()->json(['status' => 'success', 'message' => 'Logged out successfully.'], 200);
+            // Deactivate device token(s) on logout
+            if ($deviceId || $fcmToken) {
+                $query = \App\Models\UserDevice::where('user_id', $user->id);
+                if ($deviceId) {
+                    $query->where('device_id', $deviceId);
+                } elseif ($fcmToken) {
+                    $query->where('fcm_token', $fcmToken);
+                }
+                $query->update(['is_active' => false]);
+            } else {
+                // If no specific device info provided, deactivate all active devices for this astrologer
+                \App\Models\UserDevice::where('user_id', $user->id)->update(['is_active' => false]);
+            }
+
+            if (!$fcmToken || $user->fcm_token === $fcmToken) {
+                $user->fcm_token = null;
+                $user->save();
+            }
+
+            $token = $request->user()->currentAccessToken();
+            if ($token instanceof \Laravel\Sanctum\PersonalAccessToken) {
+                $token->delete();
+            } else {
+                $user->tokens()->delete();
+            }
+
+            return response()->json(['status' => 'success', 'message' => 'Logged out successfully.'], 200);
+        } catch (\Exception $e) {
+            Log::error('Astrologer logout error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'An error occurred while logging out.'], 500);
+        }
     }
 
     /**

@@ -39,6 +39,11 @@ class DeviceTokenController extends Controller
                 ->where('user_id', '!=', $user->id)
                 ->update(['is_active' => false]);
 
+            // Deactivate any previous devices for THIS user so only the current active device receives notifications
+            UserDevice::where('user_id', $user->id)
+                ->where('fcm_token', '!=', $fcmToken)
+                ->update(['is_active' => false]);
+
             // Find or create device record for current user
             $device = null;
             if ($deviceId) {
@@ -113,8 +118,8 @@ class DeviceTokenController extends Controller
 
             $affected = $query->update(['is_active' => false]);
 
-            // Clear users table fcm_token if matching
-            if ($user->fcm_token === $fcmToken) {
+            // Clear users table fcm_token if matching or if no specific token given
+            if (!$fcmToken || $user->fcm_token === $fcmToken) {
                 $user->fcm_token = null;
                 $user->save();
             }
