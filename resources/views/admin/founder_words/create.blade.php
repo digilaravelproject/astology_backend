@@ -153,11 +153,16 @@
 
                         <!-- Card Mockup -->
                         <div class="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-lighter shadow-sm space-y-3 sm:space-y-4">
-                            @if($word->id && $word->image)
-                                <div class="w-full h-32 sm:h-36 rounded-xl overflow-hidden bg-gray-lighter">
-                                    <img src="{{ Storage::url($word->image_url) }}" alt="Preview" class="w-full h-full object-cover">
+                            <div class="w-full max-h-72 rounded-2xl overflow-hidden bg-light/60 border border-gray-lighter flex items-center justify-center p-1.5" id="preview_image_container">
+                                <img id="live_img_preview" 
+                                     src="{{ $word->image ? Storage::url($word->image_url) : '' }}" 
+                                     alt="Founder Preview" 
+                                     class="w-full max-h-64 object-contain rounded-xl transition-all {{ ($word->id && $word->image) ? '' : 'hidden' }}">
+                                <div id="no_img_placeholder" class="py-8 text-gray text-xs flex flex-col items-center gap-2 {{ ($word->id && $word->image) ? 'hidden' : '' }}">
+                                    <i class="fas fa-image text-2xl text-gray-300"></i>
+                                    <span class="text-[11px] font-semibold text-gray-400">Founder Photo Preview</span>
                                 </div>
-                            @endif
+                            </div>
 
                             <div>
                                 <div class="text-[10px] sm:text-xs font-black uppercase text-primary tracking-wider mb-1">Founder's Word</div>
@@ -255,6 +260,28 @@
     document.querySelectorAll('[id^="input_title_"], [id^="input_msg_"]').forEach(el => {
         el.addEventListener('input', updateLivePreview);
     });
+
+    const imageInput = document.getElementById('image_input');
+    if (imageInput) {
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    const img = document.getElementById('live_img_preview');
+                    const placeholder = document.getElementById('no_img_placeholder');
+                    if (img) {
+                        img.src = evt.target.result;
+                        img.classList.remove('hidden');
+                    }
+                    if (placeholder) {
+                        placeholder.classList.add('hidden');
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
 
     updateLivePreview();
 </script>
