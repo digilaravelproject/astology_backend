@@ -107,6 +107,17 @@ class ChatAssistanceMessageSent implements ShouldBroadcastNow
                     'is_delivered' => (bool) $this->messageData->is_delivered,
                     'call_session_id' => $this->messageData->call_session_id ? (int) $this->messageData->call_session_id : null,
                     'created_at' => $this->messageData->created_at ? $this->messageData->created_at->toIso8601String() : null,
+                    'reply_to_id' => $this->messageData->reply_to_id ? (int) $this->messageData->reply_to_id : null,
+                    'reply_to' => $this->messageData->replyTo ? [
+                        'id' => (int) $this->messageData->replyTo->id,
+                        'chat_assistance_session_id' => (int) $this->messageData->replyTo->chat_assistance_session_id,
+                        'sender_id' => (int) $this->messageData->replyTo->sender_id,
+                        'receiver_id' => (int) $this->messageData->replyTo->receiver_id,
+                        'message' => $this->messageData->replyTo->message,
+                        'attachment_url' => $this->messageData->replyTo->attachment_url ? \App\Helpers\MediaHelper::getFullUrl($this->messageData->replyTo->attachment_url) : null,
+                        'type' => $this->messageData->replyTo->type,
+                        'created_at' => $this->messageData->replyTo->created_at ? $this->messageData->replyTo->created_at->toIso8601String() : null,
+                    ] : null,
                     'sender' => $this->messageData->sender ? [
                         'id' => $this->messageData->sender->id,
                         'name' => $this->messageData->sender->name,

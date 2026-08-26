@@ -13,6 +13,7 @@ class ChatAssistanceMessage extends Model
 
     protected $fillable = [
         'chat_assistance_session_id',
+        'reply_to_id',
         'sender_id',
         'receiver_id',
         'message',
@@ -26,6 +27,7 @@ class ChatAssistanceMessage extends Model
     protected $casts = [
         'is_read' => 'boolean',
         'is_delivered' => 'boolean',
+        'reply_to_id' => 'integer',
     ];
 
     protected $appends = ['attachment_url'];
@@ -53,5 +55,13 @@ class ChatAssistanceMessage extends Model
     public function callSession()
     {
         return $this->belongsTo(CallSession::class, 'call_session_id');
+    }
+
+    /**
+     * Self-referential relationship to the replied/quoted message.
+     */
+    public function replyTo()
+    {
+        return $this->belongsTo(ChatAssistanceMessage::class, 'reply_to_id');
     }
 }

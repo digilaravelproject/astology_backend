@@ -62,6 +62,7 @@ class ChatAssistanceController extends Controller
             'file' => 'nullable|file|max:10240',
             'type' => 'nullable|in:text,image,document,file,audio,video',
             'call_session_id' => 'nullable|exists:call_sessions,id',
+            'reply_to_id' => 'nullable|integer|exists:chat_assistance_messages,id',
         ]);
 
         $hasMessage = $request->filled('message');
@@ -106,6 +107,7 @@ class ChatAssistanceController extends Controller
                 'attachment_url' => $attachmentUrl,
                 'type' => $type,
                 'call_session_id' => $request->call_session_id,
+                'reply_to_id' => $request->input('reply_to_id'),
             ];
 
             $message = $this->chatAssistanceService->sendMessage($sessionId, $userId, $messageData);

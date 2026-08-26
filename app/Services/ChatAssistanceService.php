@@ -165,6 +165,7 @@ class ChatAssistanceService
 
             $message = ChatAssistanceMessage::create([
                 'chat_assistance_session_id' => $session->id,
+                'reply_to_id' => $data['reply_to_id'] ?? null,
                 'sender_id' => $senderId,
                 'receiver_id' => $receiverId,
                 'message' => $sanitizedMsg,
@@ -190,6 +191,11 @@ class ChatAssistanceService
             return $message;
         });
 
+        if ($message->reply_to_id) {
+            $message->load('replyTo');
+        }
+        $message->load('sender');
+
         // Broadcast real-time message OUTSIDE transaction
         event(new ChatAssistanceMessageSent($message, $receiverId));
 
@@ -210,7 +216,8 @@ class ChatAssistanceService
         }
 
         // Fetch latest messages first so Page 1 contains the most recent messages (e.g. today's chat)
-        $paginator = ChatAssistanceMessage::where('chat_assistance_session_id', $sessionId)
+        $paginator = ChatAssistanceMessage::with(['replyTo', 'sender'])
+            ->where('chat_assistance_session_id', $sessionId)
             ->orderBy('created_at', 'desc')
             ->orderBy('id', 'desc')
             ->paginate($perPage);
