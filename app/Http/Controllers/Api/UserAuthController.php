@@ -12,6 +12,7 @@ use App\Models\MatrimonyProfile;
 use App\Services\NotificationHelper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -53,7 +54,24 @@ class UserAuthController extends Controller
                 ], 403);
             }
 
-            // 2. Check if consumer user exists (pessimistic lock for atomic safety)
+            // 2. 30-Second Resend Cooldown Check
+            $cooldownKey = "otp_cooldown:{$phone}";
+            if (Cache::has($cooldownKey)) {
+                $lastSent = (int) Cache::get($cooldownKey);
+                $diff = time() - $lastSent;
+                if ($diff < 30) {
+                    $retryAfter = 30 - $diff;
+                    DB::rollBack();
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Please wait {$retryAfter} seconds before requesting a new OTP.",
+                        'error_code' => 'OTP_COOLDOWN_ACTIVE',
+                        'retry_after_seconds' => $retryAfter,
+                    ], 429);
+                }
+            }
+
+            // 3. Check if consumer user exists (pessimistic lock for atomic safety)
             $user = User::where('phone', $phone)
                 ->where('user_type', 'user')
                 ->lockForUpdate()
@@ -82,6 +100,10 @@ class UserAuthController extends Controller
             $user->save();
 
             DB::commit();
+
+            // Set cooldown for 30 seconds & reset failed attempts on new OTP request
+            Cache::put($cooldownKey, time(), 30);
+            Cache::forget("otp_attempts:{$phone}");
 
             // Asynchronously dispatch SMS OTP without holding DB connection or transaction locks
             \App\Jobs\SendSmsOtpJob::dispatch($phone, $otp);
@@ -152,6 +174,20 @@ class UserAuthController extends Controller
                 ], 403);
             }
 
+            // 2. Max 5 Wrong Attempts Check
+            $attemptKey = "otp_attempts:{$phone}";
+            $attempts = (int) Cache::get($attemptKey, 0);
+
+            if ($attempts >= 5) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Too many invalid OTP attempts. Please wait 10 minutes or request a new OTP.',
+                    'error_code' => 'MAX_OTP_ATTEMPTS_EXCEEDED',
+                    'retry_after_seconds' => 600,
+                ], 429);
+            }
+
             $user = User::where('phone', $phone)
                 ->where('user_type', 'user')
                 ->lockForUpdate()
@@ -171,13 +207,31 @@ class UserAuthController extends Controller
                 }
 
                 if ($user->otp !== $otp) {
+                    $attempts = (int) Cache::increment($attemptKey);
+                    if ($attempts === 1) {
+                        Cache::put($attemptKey, 1, now()->addMinutes(10));
+                    }
+                    $remaining = max(0, 5 - $attempts);
+
                     DB::rollBack();
-                    return response()->json(['status' => 'error', 'message' => 'Invalid OTP.'], 422);
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Invalid OTP. You have {$remaining} attempt(s) remaining.",
+                        'error_code' => 'INVALID_OTP',
+                        'remaining_attempts' => $remaining,
+                    ], 422);
                 }
             }
 
             // OTP verified
             $user->otp = null;
+            $user->otp_expires_at = null;
+            $user->otp_verified_at = Carbon::now();
+            $user->save();
+
+            // Clear cooldown and attempts cache on successful verification
+            Cache::forget($attemptKey);
+            Cache::forget("otp_cooldown:{$phone}");
             $user->otp_expires_at = null;
             $user->otp_verified_at = Carbon::now();
             $user->save();

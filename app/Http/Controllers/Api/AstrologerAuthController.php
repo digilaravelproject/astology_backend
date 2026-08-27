@@ -23,6 +23,7 @@ use App\Models\AstrologerCommunity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use DateTime;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -255,6 +256,23 @@ class AstrologerAuthController extends Controller
                 ], 403);
             }
 
+            // 2. 30-Second Resend Cooldown Check
+            $cooldownKey = "otp_cooldown:{$phone}";
+            if (Cache::has($cooldownKey)) {
+                $lastSent = (int) Cache::get($cooldownKey);
+                $diff = time() - $lastSent;
+                if ($diff < 30) {
+                    $retryAfter = 30 - $diff;
+                    DB::rollBack();
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Please wait {$retryAfter} seconds before requesting a new OTP.",
+                        'error_code' => 'OTP_COOLDOWN_ACTIVE',
+                        'retry_after_seconds' => $retryAfter,
+                    ], 429);
+                }
+            }
+
             $user = User::where('phone', $phone)
                 ->where('user_type', 'astrologer')
                 ->first();
@@ -284,6 +302,10 @@ class AstrologerAuthController extends Controller
             $astrologer->save();
 
             DB::commit();
+
+            // Set cooldown for 30 seconds & reset failed attempts on new OTP request
+            Cache::put($cooldownKey, time(), 30);
+            Cache::forget("otp_attempts:{$phone}");
 
             // Asynchronously dispatch SMS OTP without holding DB connection or transaction locks
             \App\Jobs\SendSmsOtpJob::dispatch($phone, $otp);
@@ -351,6 +373,20 @@ class AstrologerAuthController extends Controller
                 ], 403);
             }
 
+            // 2. Max 5 Wrong Attempts Check
+            $attemptKey = "otp_attempts:{$phone}";
+            $attempts = (int) Cache::get($attemptKey, 0);
+
+            if ($attempts >= 5) {
+                DB::rollBack();
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Too many invalid OTP attempts. Please wait 10 minutes or request a new OTP.',
+                    'error_code' => 'MAX_OTP_ATTEMPTS_EXCEEDED',
+                    'retry_after_seconds' => 600,
+                ], 429);
+            }
+
             $user = User::where('phone', $phone)
                 ->where('user_type', 'astrologer')
                 ->first();
@@ -377,8 +413,19 @@ class AstrologerAuthController extends Controller
                 }
 
                 if ($astrologer->otp !== $otp) {
+                    $attempts = (int) Cache::increment($attemptKey);
+                    if ($attempts === 1) {
+                        Cache::put($attemptKey, 1, now()->addMinutes(10));
+                    }
+                    $remaining = max(0, 5 - $attempts);
+
                     DB::rollBack();
-                    return response()->json(['status' => 'error', 'message' => 'Invalid OTP.'], 422);
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => "Invalid OTP. You have {$remaining} attempt(s) remaining.",
+                        'error_code' => 'INVALID_OTP',
+                        'remaining_attempts' => $remaining,
+                    ], 422);
                 }
             }
 
@@ -387,6 +434,10 @@ class AstrologerAuthController extends Controller
             $astrologer->otp_expires_at = null;
             $astrologer->otp_verified_at = Carbon::now();
             $astrologer->save();
+
+            // Clear cooldown and attempts cache on successful verification
+            Cache::forget($attemptKey);
+            Cache::forget("otp_cooldown:{$phone}");
 
             // Revoke all existing tokens for single device constraint
             $user->tokens()->delete();

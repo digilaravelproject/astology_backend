@@ -25,13 +25,13 @@ class RouteServiceProvider extends ServiceProvider
             $phone = preg_replace('/[^0-9]/', '', (string) ($request->input('phone') ?? $request->input('mobile') ?? $request->input('phone_number') ?? ''));
 
             $limits = [
-                Limit::perMinute(Setting::get('rate_limit_otp_device', 15))
+                Limit::perMinute((int) Setting::get('rate_limit_otp_device', 20))
                     ->by("otp_device:{$deviceKey}")
                     ->response($this->rateLimitResponse('Too many OTP attempts from this device. Please wait a moment.')),
             ];
 
             if (! empty($phone)) {
-                $limits[] = Limit::perMinute(Setting::get('rate_limit_otp_phone', 5))
+                $limits[] = Limit::perMinute((int) Setting::get('rate_limit_otp_phone', 10))
                     ->by("otp_phone:{$phone}")
                     ->response($this->rateLimitResponse('Too many OTP requests for this phone number. Please wait a moment.'));
             }
