@@ -871,6 +871,12 @@ class UserAuthController extends Controller
             // Revoke tokens for the user
             $user->tokens()->delete();
 
+            try {
+                app(\App\Services\PresenceService::class)->setOffline($user->id);
+            } catch (\Throwable $e) {
+                // Ignore presence offline error on logout
+            }
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Logged out successfully.',

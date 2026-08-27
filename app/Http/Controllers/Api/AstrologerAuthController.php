@@ -782,6 +782,25 @@ class AstrologerAuthController extends Controller
         $astrologer->fill($validated);
         $astrologer->save();
 
+        // Broadcast real-time availability update
+        try {
+            $astrologer->refresh();
+            $isOnline = (bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled);
+            $isBusy = (bool) ($user->is_busy ?? false);
+
+            User::where('id', $user->id)->update(['is_online' => $isOnline]);
+
+            app(\App\Services\PresenceService::class)->broadcastAstrologerAvailability(
+                $user->id,
+                $isOnline,
+                $isBusy,
+                $user->busy_session_id ?? null,
+                null
+            );
+        } catch (\Throwable $e) {
+            Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on updateHomeStatus: " . $e->getMessage());
+        }
+
         NotificationHelper::send(
             $user->id,
             'Home status updated',
@@ -895,6 +914,25 @@ class AstrologerAuthController extends Controller
 
         // Update the astrologer with only the provided fields
         $astrologer->update($updateData);
+
+        // Broadcast real-time availability update
+        try {
+            $astrologer->refresh();
+            $isOnline = (bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled);
+            $isBusy = (bool) ($user->is_busy ?? false);
+
+            User::where('id', $user->id)->update(['is_online' => $isOnline]);
+
+            app(\App\Services\PresenceService::class)->broadcastAstrologerAvailability(
+                $user->id,
+                $isOnline,
+                $isBusy,
+                $user->busy_session_id ?? null,
+                null
+            );
+        } catch (\Throwable $e) {
+            Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on updateHomeSettings: " . $e->getMessage());
+        }
 
         // Send notification
         NotificationHelper::send(
@@ -1408,6 +1446,12 @@ class AstrologerAuthController extends Controller
                 $user->tokens()->delete();
             }
 
+            try {
+                app(\App\Services\PresenceService::class)->setOffline($user->id);
+            } catch (\Throwable $e) {
+                Log::warning("Failed to set astrologer offline on logout: " . $e->getMessage());
+            }
+
             return response()->json(['status' => 'success', 'message' => 'Logged out successfully.'], 200);
         } catch (\Exception $e) {
             Log::error('Astrologer logout error: ' . $e->getMessage());
@@ -1887,26 +1931,27 @@ class AstrologerAuthController extends Controller
             // Sync chat/call enabled flags with general online status for backward compatibility
             $astrologer->is_chat_enabled = $newOnlineStatus;
             $astrologer->is_call_enabled = $newOnlineStatus;
+            $astrologer->is_video_call_enabled = $newOnlineStatus;
             $fieldName = 'is_online';
             $displayName = 'Online';
         }
-        
-        // echo'<pre>';print_r($astrologer);die;
 
         $astrologer->save();
 
+        $isOnline = (bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled);
+        $isBusy = (bool) ($user->is_busy ?? false);
+
+        User::where('id', $user->id)->update(['is_online' => $isOnline]);
+
         // Broadcast real-time availability to all clients
         try {
-            $isOnline = (bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled);
-            $isBusy = (bool) ($user->is_busy ?? false);
-            broadcast(new \App\Events\AstrologerAvailabilityUpdated(
+            app(\App\Services\PresenceService::class)->broadcastAstrologerAvailability(
                 $user->id,
                 $isOnline,
                 $isBusy,
                 $user->busy_session_id ?? null,
-                null,
-                $astrologer->id
-            ));
+                null
+            );
         } catch (\Throwable $e) {
             Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on toggle: " . $e->getMessage());
         }
@@ -1921,7 +1966,7 @@ class AstrologerAuthController extends Controller
         // Prepare response data
         $responseData = [
             'astrologer_id' => $astrologer->id,
-            'availability_status' => ($user->is_busy ?? false) ? 'Engaged' : ((bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled) ? 'Online' : 'Offline'),
+            'availability_status' => ($user->is_busy ?? false) ? 'Engaged' : ((bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled) ? 'Online' : 'Offline'),
             $fieldName => (bool) $astrologer->$fieldName,
             'updated_at' => $astrologer->updated_at,
         ];

@@ -16,8 +16,40 @@ class PresenceService
 
     public function setOnline($userId)
     {
-        $result = $this->userRepo->updatePresence($userId, true, false, null);
-        $this->broadcastAstrologerAvailability($userId, true, false, null);
+        $user = \App\Models\User::find($userId);
+        if (!$user) {
+            return false;
+        }
+
+        // Check if user is currently engaged in an active chat or call session
+        $activeChat = \App\Models\ChatSession::where(function ($query) use ($userId) {
+                $query->where('consumer_id', $userId)
+                      ->orWhere('provider_id', $userId);
+            })
+            ->whereIn('status', ['accepted', 'ongoing'])
+            ->first();
+
+        $activeCall = \App\Models\CallSession::where(function ($query) use ($userId) {
+                $query->where('consumer_id', $userId)
+                      ->orWhere('provider_id', $userId);
+            })
+            ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
+            ->first();
+
+        $isBusy = ($activeChat || $activeCall || (bool) $user->is_busy);
+        $sessionId = $activeChat ? $activeChat->id : ($activeCall ? $activeCall->id : $user->busy_session_id);
+        $sessionType = $activeChat ? 'chat' : ($activeCall ? 'call' : null);
+
+        $wasOnline = (bool) $user->is_online;
+        $wasBusy = (bool) $user->is_busy;
+
+        $result = $this->userRepo->updatePresence($userId, true, $isBusy, $sessionId);
+
+        // Only broadcast if status changed (e.g. was offline or busy shifted)
+        if (!$wasOnline || ($wasBusy !== $isBusy)) {
+            $this->broadcastAstrologerAvailability($userId, true, $isBusy, $sessionId, $sessionType);
+        }
+
         return $result;
     }
 
@@ -110,8 +142,11 @@ class PresenceService
 
     public function setFree($userId)
     {
-        $result = $this->userRepo->updatePresence($userId, true, false, null);
-        $this->broadcastAstrologerAvailability($userId, true, false, null);
+        $astro = \App\Models\Astrologer::where('user_id', $userId)->first();
+        $isOnline = $astro ? (bool) ($astro->is_online || $astro->is_chat_enabled || $astro->is_call_enabled || $astro->is_video_call_enabled) : true;
+
+        $result = $this->userRepo->updatePresence($userId, $isOnline, false, null);
+        $this->broadcastAstrologerAvailability($userId, $isOnline, false, null);
         return $result;
     }
 
@@ -123,13 +158,20 @@ class PresenceService
         try {
             $astro = \App\Models\Astrologer::where('user_id', $userId)->first();
             if ($astro) {
+                $isChatEnabled = (bool) ($astro->is_chat_enabled ?? $astro->chat_enabled ?? false);
+                $isCallEnabled = (bool) ($astro->is_call_enabled ?? $astro->call_enabled ?? false);
+                $isVideoCallEnabled = (bool) ($astro->is_video_call_enabled ?? $astro->video_call_enabled ?? false);
+
                 broadcast(new \App\Events\AstrologerAvailabilityUpdated(
                     $userId,
                     $isOnline,
                     $isBusy,
                     $sessionId,
                     $sessionType,
-                    $astro->id
+                    $astro->id,
+                    $isChatEnabled,
+                    $isCallEnabled,
+                    $isVideoCallEnabled
                 ));
             }
         } catch (\Throwable $e) {

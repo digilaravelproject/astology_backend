@@ -121,4 +121,54 @@ class AstrologerAvailabilityEngagedTest extends TestCase
         $this->assertFalse((bool) $details->is_busy);
         $this->assertEquals('Online', $details->availability_status);
     }
+
+    /** @test */
+    public function pulse_retains_busy_status_when_active_session_is_ongoing()
+    {
+        Event::fake([AstrologerAvailabilityUpdated::class]);
+
+        // Create ongoing session
+        ChatSession::create([
+            'consumer_id'     => $this->user->id,
+            'provider_id'     => $this->astrologerUser->id,
+            'status'          => 'ongoing',
+            'rate_per_minute' => 15.00,
+        ]);
+
+        $this->astrologerUser->update(['is_busy' => true]);
+
+        $presenceService = app(PresenceService::class);
+        $presenceService->setOnline($this->astrologerUser->id);
+
+        // User should STILL be busy
+        $this->astrologerUser->refresh();
+        $this->assertTrue((bool) $this->astrologerUser->is_busy);
+
+        $service = app(AstrologerService::class);
+        $details = $service->getAstrologerDetails($this->astrologer->id, $this->user);
+        $this->assertTrue((bool) $details->is_busy);
+        $this->assertEquals('Engaged', $details->availability_status);
+    }
+
+    /** @test */
+    public function update_home_settings_dispatches_availability_event_with_channels()
+    {
+        Event::fake([AstrologerAvailabilityUpdated::class]);
+
+        $response = $this->actingAs($this->astrologerUser, 'sanctum')
+            ->putJson('/api/v1/astrologer/home-settings', [
+                'is_chat_enabled' => false,
+                'is_call_enabled' => true,
+            ]);
+
+        $response->assertStatus(200);
+
+        Event::assertDispatched(AstrologerAvailabilityUpdated::class, function ($event) {
+            $data = $event->broadcastWith();
+            return $event->userId === $this->astrologerUser->id
+                && $data['is_chat_enabled'] === false
+                && $data['is_call_enabled'] === true
+                && $data['availability_status'] === 'Online';
+        });
+    }
 }
