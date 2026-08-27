@@ -196,6 +196,11 @@ class FcmChannelDriver
 
             if ($response->successful()) {
                 $resData = $response->json();
+                Log::info("FCM Sent Successfully to token [" . substr($deviceToken, 0, 15) . "...]", [
+                    'type'       => $payload->type,
+                    'title'      => $payload->title,
+                    'message_id' => $resData['name'] ?? null,
+                ]);
                 return [
                     'success'    => true,
                     'message_id' => $resData['name'] ?? null,

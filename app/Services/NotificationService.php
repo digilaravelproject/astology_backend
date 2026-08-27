@@ -45,22 +45,36 @@ class NotificationService
         }
 
         // Fetch active FCM tokens for this user
-        $tokens = UserDevice::forUser($userId)
+        $devices = UserDevice::forUser($userId)
             ->active()
-            ->pluck('fcm_token')
-            ->filter()
-            ->toArray();
+            ->get(['id', 'device_model', 'device_type', 'fcm_token']);
+
+        $tokens = $devices->pluck('fcm_token')->filter()->toArray();
 
         // If user has legacy fcm_token on users table and no active device registered yet, fallback to it
         if (empty($tokens)) {
             $user = User::find($userId);
             if ($user && !empty($user->fcm_token)) {
                 $tokens = [$user->fcm_token];
+                Log::info("NotificationService: Using legacy users.fcm_token for User ID [{$userId}]", [
+                    'token' => substr($user->fcm_token, 0, 20) . '...',
+                    'title' => $payload->title,
+                    'type'  => $payload->type,
+                ]);
             }
+        } else {
+            Log::info("NotificationService: Dispatching push for User ID [{$userId}]", [
+                'active_devices_count' => $devices->count(),
+                'active_devices'       => $devices->map(fn($d) => ['id' => $d->id, 'model' => $d->device_model, 'type' => $d->device_type, 'token' => substr($d->fcm_token, 0, 20) . '...'])->toArray(),
+                'title'                => $payload->title,
+                'type'                 => $payload->type,
+            ]);
         }
 
         if (!empty($tokens)) {
             SendPushNotificationJob::dispatch($tokens, $payload);
+        } else {
+            Log::warning("NotificationService: No active FCM tokens found for User ID [{$userId}]. Push skipped.");
         }
 
         return $appNotification;
