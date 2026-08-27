@@ -27,22 +27,22 @@ class DeviceTokenController extends Controller
             $deviceModel = $validated['device_model'] ?? null;
             $appVersion = $validated['app_version'] ?? null;
 
-            // If a device_id is provided, deactivate any previous user associations on this physical device
+            // If a device_id is provided, delete any previous user associations on this physical device
             if ($deviceId) {
                 UserDevice::where('device_id', $deviceId)
                     ->where('user_id', '!=', $user->id)
-                    ->update(['is_active' => false]);
+                    ->delete();
             }
 
-            // Also deactivate any entries with identical token for another user
+            // Also delete any entries with identical token for another user
             UserDevice::where('fcm_token', $fcmToken)
                 ->where('user_id', '!=', $user->id)
-                ->update(['is_active' => false]);
+                ->delete();
 
-            // Deactivate any previous devices for THIS user so only the current active device receives notifications
+            // Delete all previous devices for THIS user so only the current active device exists
             UserDevice::where('user_id', $user->id)
                 ->where('fcm_token', '!=', $fcmToken)
-                ->update(['is_active' => false]);
+                ->delete();
 
             // Find or create device record for current user
             $device = null;
@@ -116,7 +116,7 @@ class DeviceTokenController extends Controller
                 $query->where('fcm_token', $fcmToken);
             }
 
-            $affected = $query->update(['is_active' => false]);
+            $affected = $query->delete();
 
             // Clear users table fcm_token if matching or if no specific token given
             if (!$fcmToken || $user->fcm_token === $fcmToken) {

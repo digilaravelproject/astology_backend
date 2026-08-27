@@ -7,9 +7,16 @@ use App\Http\Requests\UpdateUserProfilePhotoRequest;
 use App\Http\Requests\UpdateUserProfileRequest;
 use App\Models\Astrologer;
 use App\Models\AstrologerCommunity;
-use App\Models\User;
+use App\Models\AstrologerReview;
+use App\Models\AppNotification;
 use App\Models\MatrimonyProfile;
+use App\Models\User;
+use App\Models\UserDevice;
+use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use App\Services\NotificationHelper;
+use App\Services\BlockService;
+use App\Services\PresenceService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -18,12 +25,22 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
-use App\Services\ExotelSmsService;
+use Exception;
+use Throwable;
 
 class UserAuthController extends Controller
 {
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 1: AUTHENTICATION & ACCESS CONTROL
+    |--------------------------------------------------------------------------
+    | Handles consumer OTP login, registration, verification with rate-limits,
+    | single active session management, permanent device token deletion on
+    | logout, and account removal.
+    */
+
     /**
-     * Send OTP to user (creates account if doesn't exist).
+     * Send OTP to consumer user (creates account if doesn't exist) with 30s cooldown.
      */
     public function sendOtp(Request $request): JsonResponse
     {
@@ -48,8 +65,8 @@ class UserAuthController extends Controller
             if ($existingAstrologer) {
                 DB::rollBack();
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'This phone number is registered as an Astrologer. Please log in using the Astrologer App.',
+                    'status'     => 'error',
+                    'message'    => 'This phone number is registered as an Astrologer. Please log in using the Astrologer App.',
                     'error_code' => 'ROLE_MISMATCH_ASTROLOGER'
                 ], 403);
             }
@@ -63,9 +80,9 @@ class UserAuthController extends Controller
                     $retryAfter = 30 - $diff;
                     DB::rollBack();
                     return response()->json([
-                        'status' => 'error',
-                        'message' => "Please wait {$retryAfter} seconds before requesting a new OTP.",
-                        'error_code' => 'OTP_COOLDOWN_ACTIVE',
+                        'status'              => 'error',
+                        'message'             => "Please wait {$retryAfter} seconds before requesting a new OTP.",
+                        'error_code'          => 'OTP_COOLDOWN_ACTIVE',
                         'retry_after_seconds' => $retryAfter,
                     ], 429);
                 }
@@ -77,13 +94,12 @@ class UserAuthController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            // If user doesn't exist, create one
             if (!$user) {
                 $user = User::create([
-                    'name' => $phone, // Default name as phone
-                    'phone' => $phone,
+                    'name'      => $phone,
+                    'phone'     => $phone,
                     'user_type' => 'user',
-                    'password' => bcrypt($phone), // Default password using phone
+                    'password'  => bcrypt($phone),
                 ]);
             }
 
@@ -93,7 +109,7 @@ class UserAuthController extends Controller
                 $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
             }
 
-            // Store OTP (in users table)
+            // Store OTP in users table
             $user->otp = $otp;
             $user->otp_expires_at = Carbon::now()->addMinutes(10);
             $user->otp_verified_at = null;
@@ -105,10 +121,9 @@ class UserAuthController extends Controller
             Cache::put($cooldownKey, time(), 30);
             Cache::forget("otp_attempts:{$phone}");
 
-            // Asynchronously dispatch SMS OTP without holding DB connection or transaction locks
+            // Asynchronously dispatch SMS OTP
             \App\Jobs\SendSmsOtpJob::dispatch($phone, $otp);
 
-            // Notify user about generated OTP
             NotificationHelper::send(
                 $user->id,
                 'OTP generated',
@@ -119,35 +134,35 @@ class UserAuthController extends Controller
             $exposedOtp = (!app()->isProduction() && config('app.debug')) ? $otp : null;
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'OTP generated and saved.',
-                'data' => [
-                    'phone' => $phone,
-                    'user_id' => $user->id,
-                    'otp' => $exposedOtp,
+                'data'    => [
+                    'phone'      => $phone,
+                    'user_id'    => $user->id,
+                    'otp'        => $exposedOtp,
                     'expires_at' => $user->otp_expires_at,
                 ],
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('User sendOtp error: ' . $e->getMessage());
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'An error occurred while sending OTP.',
             ], 500);
         }
     }
 
     /**
-     * Verify OTP and issue token.
+     * Verify OTP, lock on 5 failed attempts, and issue scoped Sanctum token.
      */
     public function verifyOtp(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'phone' => ['required', 'regex:/^[0-9]{10}$/'],
-            'otp' => ['required', 'digits:4'],
+            'otp'   => ['required', 'digits:4'],
         ]);
 
         if ($validator->fails()) {
@@ -168,8 +183,8 @@ class UserAuthController extends Controller
             if ($existingAstrologer) {
                 DB::rollBack();
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'This phone number is registered as an Astrologer. Please log in using the Astrologer App.',
+                    'status'     => 'error',
+                    'message'    => 'This phone number is registered as an Astrologer. Please log in using the Astrologer App.',
                     'error_code' => 'ROLE_MISMATCH_ASTROLOGER'
                 ], 403);
             }
@@ -181,9 +196,9 @@ class UserAuthController extends Controller
             if ($attempts >= 5) {
                 DB::rollBack();
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Too many invalid OTP attempts. Please wait 10 minutes or request a new OTP.',
-                    'error_code' => 'MAX_OTP_ATTEMPTS_EXCEEDED',
+                    'status'              => 'error',
+                    'message'             => 'Too many invalid OTP attempts. Please wait 10 minutes or request a new OTP.',
+                    'error_code'          => 'MAX_OTP_ATTEMPTS_EXCEEDED',
                     'retry_after_seconds' => 600,
                 ], 429);
             }
@@ -215,9 +230,9 @@ class UserAuthController extends Controller
 
                     DB::rollBack();
                     return response()->json([
-                        'status' => 'error',
-                        'message' => "Invalid OTP. You have {$remaining} attempt(s) remaining.",
-                        'error_code' => 'INVALID_OTP',
+                        'status'             => 'error',
+                        'message'            => "Invalid OTP. You have {$remaining} attempt(s) remaining.",
+                        'error_code'         => 'INVALID_OTP',
                         'remaining_attempts' => $remaining,
                     ], 422);
                 }
@@ -232,12 +247,12 @@ class UserAuthController extends Controller
             // Clear cooldown and attempts cache on successful verification
             Cache::forget($attemptKey);
             Cache::forget("otp_cooldown:{$phone}");
-            $user->otp_expires_at = null;
-            $user->otp_verified_at = Carbon::now();
-            $user->save();
 
-            // Revoke all existing tokens for single device constraint
+            // Revoke all existing tokens and old devices for single active session constraint
             $user->tokens()->delete();
+            UserDevice::where('user_id', $user->id)->delete();
+            $user->fcm_token = null;
+            $user->save();
 
             // Issue Sanctum token scoped specifically for 'role:user'
             $token = $user->createToken('user_token', ['role:user'])->plainTextToken;
@@ -252,16 +267,16 @@ class UserAuthController extends Controller
             );
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'OTP verified.',
-                'token' => $token,
+                'status'     => 'success',
+                'message'    => 'OTP verified.',
+                'token'      => $token,
                 'token_type' => 'Bearer',
-                'data' => [
+                'data'       => [
                     'user' => $user,
                 ],
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('User verifyOtp error: ' . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => 'Failed to verify OTP.'], 500);
@@ -269,13 +284,158 @@ class UserAuthController extends Controller
     }
 
     /**
-     * Resend OTP (regenerate).
+     * Resend OTP.
      */
     public function resendOtp(Request $request): JsonResponse
     {
-        // Same as sendOtp logic
         return $this->sendOtp($request);
     }
+
+    /**
+     * Logout consumer user by revoking all tokens and permanently deleting device records.
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Unauthenticated user.',
+            ], 401);
+        }
+
+        try {
+            $fcmToken = $request->input('fcm_token');
+            $deviceId = $request->input('device_id');
+
+            // Delete device token(s) on logout
+            if ($deviceId || $fcmToken) {
+                $query = UserDevice::where('user_id', $user->id);
+                if ($deviceId) {
+                    $query->where('device_id', $deviceId);
+                } elseif ($fcmToken) {
+                    $query->where('fcm_token', $fcmToken);
+                }
+                $query->delete();
+            } else {
+                UserDevice::where('user_id', $user->id)->delete();
+            }
+
+            if (!$fcmToken || $user->fcm_token === $fcmToken) {
+                $user->fcm_token = null;
+                $user->save();
+            }
+
+            // Revoke tokens for the user
+            $user->tokens()->delete();
+
+            try {
+                app(PresenceService::class)->setOffline($user->id);
+            } catch (Throwable $e) {
+                // Ignore presence offline error on logout
+            }
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Logged out successfully.',
+                'data'    => [
+                    'user_id'       => $user->id,
+                    'logged_out_at' => now(),
+                ],
+            ], 200);
+
+        } catch (Exception $e) {
+            Log::error('User logout error: ' . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'An error occurred while logging out.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete user account and cascade delete all associated data.
+     */
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Authenticated user not found or not a regular user.',
+            ], 404);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $userId = $user->id;
+            $userName = $user->name;
+
+            // Delete wallet transactions
+            WalletTransaction::where('wallet_id', function ($query) use ($userId) {
+                $query->select('id')->from('wallets')->where('user_id', $userId);
+            })->delete();
+
+            // Delete wallet
+            Wallet::where('user_id', $userId)->delete();
+
+            // Delete reviews by user
+            AstrologerReview::where('user_id', $userId)->delete();
+
+            // Delete astrologer community records
+            AstrologerCommunity::where('user_id', $userId)->delete();
+
+            // Delete matrimony profiles
+            MatrimonyProfile::where('user_id', $userId)->delete();
+
+            // Delete notifications for user
+            AppNotification::where('user_id', $userId)->delete();
+
+            // Delete user devices
+            UserDevice::where('user_id', $userId)->delete();
+
+            // Revoke all tokens
+            $user->tokens()->delete();
+
+            // Delete user record
+            $user->delete();
+
+            DB::commit();
+
+            Log::info("User account deleted: ID={$userId}, Name={$userName}");
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Account deleted successfully. All your data has been removed.',
+                'data'    => [
+                    'user_id'    => $userId,
+                    'deleted_at' => now(),
+                ],
+            ], 200);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            Log::error('Delete user account error: ' . $e->getMessage());
+
+            return response()->json([
+                'status'        => 'error',
+                'message'       => 'An error occurred while deleting the account.',
+                'error_details' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 2: USER PROFILE & MEDIA MANAGEMENT
+    |--------------------------------------------------------------------------
+    | Handles fetching consumer user profiles, updating personal details
+    | (astrological birth data, place, occupation), and avatar uploads.
+    */
 
     /**
      * Get user profile by user ID.
@@ -286,33 +446,23 @@ class UserAuthController extends Controller
             $user = User::find($userId);
 
             if (!$user) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'User not found.',
-                ], 404);
+                return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
             }
 
             if ($user->user_type !== 'user') {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'This is not a regular user.',
-                ], 404);
+                return response()->json(['status' => 'error', 'message' => 'This is not a regular user.'], 404);
             }
 
             return response()->json([
                 'status' => 'success',
-                'data' => [
+                'data'   => [
                     'user' => $user,
                 ],
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Get profile error: ' . $e->getMessage());
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while fetching profile.',
-            ], 500);
+            return response()->json(['status' => 'error', 'message' => 'An error occurred while fetching profile.'], 500);
         }
     }
 
@@ -325,23 +475,16 @@ class UserAuthController extends Controller
             $user = User::find($userId);
 
             if (!$user) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'User not found.',
-                ], 404);
+                return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
             }
 
             if ($user->user_type !== 'user') {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'This is not a regular user account.',
-                ], 403);
+                return response()->json(['status' => 'error', 'message' => 'This is not a regular user account.'], 403);
             }
 
-            // Check if user has verified OTP
             if (!$user->otp_verified_at) {
                 return response()->json([
-                    'status' => 'error',
+                    'status'  => 'error',
                     'message' => 'Please verify your phone number with OTP before updating profile.',
                 ], 403);
             }
@@ -363,7 +506,6 @@ class UserAuthController extends Controller
                 }
             }
 
-            // Handle optional profile_photo file upload
             if ($request->hasFile('profile_photo')) {
                 $file = $request->file('profile_photo');
                 $filename = time() . '_' . $user->id . '_profile_photo.' . $file->getClientOriginalExtension();
@@ -390,19 +532,19 @@ class UserAuthController extends Controller
             );
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Profile updated successfully.',
-                'data' => [
+                'data'    => [
                     'user' => $user->fresh(),
                 ],
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Update user profile error: ' . $e->getMessage());
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'An error occurred while updating profile: ' . $e->getMessage(),
             ], 500);
         }
@@ -416,17 +558,14 @@ class UserAuthController extends Controller
         $user = $request->user();
 
         if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Authenticated user not found or not a regular user.'], 404);
         }
 
         $file = $request->file('profile_photo');
 
         if (!$file) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'No profile_photo file was uploaded. Make sure you send a multipart/form-data request.',
             ], 422);
         }
@@ -434,7 +573,6 @@ class UserAuthController extends Controller
         $filename = time() . '_' . $user->id . '_profile_photo.' . $file->getClientOriginalExtension();
         $path = 'users/' . $user->id . '/profile_photo';
 
-        // Delete existing file if present
         if ($user->profile_photo && Storage::disk('public')->exists($user->profile_photo)) {
             Storage::disk('public')->delete($user->profile_photo);
         }
@@ -451,9 +589,9 @@ class UserAuthController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Profile photo updated successfully.',
-            'data' => [
+            'data'    => [
                 'user' => $user->fresh(),
             ],
         ], 200);
@@ -461,18 +599,13 @@ class UserAuthController extends Controller
 
     /**
      * Update in-app user profile (authenticated).
-     *
-     * This endpoint is used when a logged-in user edits their profile in the app.
      */
     public function updateInAppProfile(UpdateUserProfileRequest $request): JsonResponse
     {
         $user = $request->user();
 
         if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Authenticated user not found or not a regular user.'], 404);
         }
 
         DB::beginTransaction();
@@ -493,7 +626,6 @@ class UserAuthController extends Controller
                 }
             }
 
-            // Handle optional profile_photo file upload
             if ($request->hasFile('profile_photo')) {
                 $file = $request->file('profile_photo');
                 $filename = time() . '_' . $user->id . '_profile_photo.' . $file->getClientOriginalExtension();
@@ -520,19 +652,94 @@ class UserAuthController extends Controller
             );
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Profile updated successfully.',
-                'data' => [
+                'data'    => [
                     'user' => $user->fresh(),
                 ],
             ], 200);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Update in-app profile error: ' . $e->getMessage());
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'An error occurred while updating the profile: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 3: ASTROLOGER FOLLOWING & INTERACTIONS
+    |--------------------------------------------------------------------------
+    | Allows consumer users to follow, unfollow, and retrieve the list of
+    | followed astrologers with live status and ratings.
+    */
+
+    /**
+     * Get list of astrologers that the authenticated user is following.
+     */
+    public function getFollowing(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json(['status' => 'error', 'message' => 'Authenticated user not found or not a regular user.'], 404);
+        }
+
+        try {
+            $following = AstrologerCommunity::with(['astrologer.user'])
+                ->where('user_id', $user->id)
+                ->where('is_liked', true)
+                ->orderByDesc('liked_at')
+                ->get();
+
+            $data = $following->map(function ($record) {
+                $astrologer = $record->astrologer;
+                
+                $avgRating = AstrologerReview::where('astrologer_id', $astrologer->id)->avg('rating');
+                $avgRatingValue = $avgRating ? (float) number_format($avgRating, 2) : 0;
+                
+                $isChatEnabled = (bool) $astrologer->is_chat_enabled;
+                $isCallEnabled = (bool) $astrologer->is_call_enabled;
+                $isOnline = $isChatEnabled || $isCallEnabled;
+                
+                return [
+                    'astrologer_id'       => $astrologer->id,
+                    'name'                => $astrologer->user->name,
+                    'email'               => $astrologer->user->email,
+                    'phone'               => $astrologer->user->phone,
+                    'profile_photo'       => $astrologer->profile_photo,
+                    'years_of_experience' => $astrologer->years_of_experience,
+                    'areas_of_expertise'  => $astrologer->areas_of_expertise,
+                    'languages'           => $astrologer->languages,
+                    'bio'                 => $astrologer->bio,
+                    'status'              => $astrologer->status,
+                    'avg_rating'          => $avgRatingValue,
+                    'is_online'           => $isOnline ? 1 : 0,
+                    'is_chat_enabled'     => $isChatEnabled ? 1 : 0,
+                    'is_call_enabled'     => $isCallEnabled ? 1 : 0,
+                    'followed_at'         => $record->liked_at,
+                    'created_at'          => $record->created_at,
+                ];
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Following list retrieved successfully.',
+                'data'    => [
+                    'count'     => $data->count(),
+                    'following' => $data,
+                ],
+            ], 200);
+
+        } catch (Exception $e) {
+            Log::error('Get following list error: ' . $e->getMessage());
+
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'An error occurred while retrieving the following list.',
             ], 500);
         }
     }
@@ -545,25 +752,18 @@ class UserAuthController extends Controller
         $user = $request->user();
 
         if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Authenticated user not found or not a regular user.'], 404);
         }
 
         $astrologer = Astrologer::find($astrologerId);
         if (!$astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer not found.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Astrologer not found.'], 404);
         }
 
         $community = AstrologerCommunity::where('astrologer_id', $astrologer->id)
             ->where('user_id', $user->id)
             ->first();
 
-        // If already following, unfollow by deleting the relationship record.
         if ($community && $community->is_liked) {
             $community->delete();
 
@@ -575,21 +775,20 @@ class UserAuthController extends Controller
             );
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Astrologer unfollowed.',
-                'data' => [
+                'data'    => [
                     'astrologer_id' => $astrologer->id,
-                    'is_following' => false,
-                    'followed_at' => null,
+                    'is_following'  => false,
+                    'followed_at'   => null,
                 ],
             ], 200);
         }
 
-        // Otherwise create (or update) the follow relationship.
-        if (! $community) {
+        if (!$community) {
             $community = new AstrologerCommunity([
                 'astrologer_id' => $astrologer->id,
-                'user_id' => $user->id,
+                'user_id'       => $user->id,
             ]);
         }
 
@@ -597,7 +796,6 @@ class UserAuthController extends Controller
         $community->liked_at = Carbon::now();
         $community->save();
 
-        // Notify user
         NotificationHelper::send(
             $user->id,
             'Astrologer followed',
@@ -605,7 +803,6 @@ class UserAuthController extends Controller
             ['astrologer_id' => $astrologer->id]
         );
 
-        // Notify astrologer
         NotificationHelper::send(
             $astrologer->user->id,
             'New follower',
@@ -614,135 +811,23 @@ class UserAuthController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Astrologer followed.',
-            'data' => [
+            'data'    => [
                 'astrologer_id' => $astrologer->id,
-                'is_following' => true,
-                'followed_at' => $community->liked_at,
+                'is_following'  => true,
+                'followed_at'   => $community->liked_at,
             ],
         ], 200);
     }
 
-    /**
-     * Block an astrologer (stops follow and records blocked status).
-     */
-    public function blockAstrologer(Request $request, $astrologerId): JsonResponse
-    {
-        $user = $request->user();
-
-        if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
-        }
-
-        // Support both astrologers.id and astrologers.user_id
-        $astrologer = Astrologer::with('user')->find($astrologerId)
-            ?? Astrologer::with('user')->where('user_id', $astrologerId)->first();
-
-        if (!$astrologer || !$astrologer->user) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer not found.',
-            ], 404);
-        }
-
-        $reason = $request->input('reason', $request->input('report_reason'));
-
-        /** @var \App\Services\BlockService $blockService */
-        $blockService = app(\App\Services\BlockService::class);
-        $userBlock = $blockService->block($user, $astrologer->user, $reason);
-
-        NotificationHelper::send(
-            $user->id,
-            'User blocked',
-            "You have blocked astrologer {$astrologer->user->name}.",
-            ['astrologer_id' => $astrologer->id]
-        );
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Astrologer blocked successfully.',
-            'data' => [
-                'astrologer_id' => $astrologer->id,
-                'astrologer_user_id' => $astrologer->user->id,
-                'is_blocked' => true,
-                'blocked_at' => $userBlock->created_at,
-            ],
-        ], 200);
-    }
-
-    /**
-     * Unblock a previously blocked astrologer.
-     */
-    public function unblockAstrologer(Request $request, $astrologerId): JsonResponse
-    {
-        $user = $request->user();
-
-        if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
-        }
-
-        $astrologer = Astrologer::with('user')->find($astrologerId)
-            ?? Astrologer::with('user')->where('user_id', $astrologerId)->first();
-
-        if (!$astrologer || !$astrologer->user) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer not found.',
-            ], 404);
-        }
-
-        /** @var \App\Services\BlockService $blockService */
-        $blockService = app(\App\Services\BlockService::class);
-        $unblocked = $blockService->unblock($user, $astrologer->user);
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Astrologer unblocked successfully.',
-            'data' => [
-                'astrologer_id' => $astrologer->id,
-                'astrologer_user_id' => $astrologer->user->id,
-                'is_blocked' => false,
-            ],
-        ], 200);
-    }
-
-    /**
-     * Get list of astrologers blocked by the authenticated user.
-     */
-    public function getBlockedAstrologers(Request $request): JsonResponse
-    {
-        $user = $request->user();
-
-        if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
-        }
-
-        $perPage = (int) $request->input('per_page', 15);
-        /** @var \App\Services\BlockService $blockService */
-        $blockService = app(\App\Services\BlockService::class);
-        $paginated = $blockService->getBlockedAstrologersForUser($user, $perPage);
-
-        return response()->json([
-            'status' => 'success',
-            'data' => [
-                'current_page' => $paginated->currentPage(),
-                'data' => $paginated->items(),
-                'total' => $paginated->total(),
-                'per_page' => $paginated->perPage(),
-                'last_page' => $paginated->lastPage(),
-            ],
-        ], 200);
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 4: MODERATION & SAFETY CONTROLS
+    |--------------------------------------------------------------------------
+    | Allows consumer users to report inappropriate behavior, block/unblock
+    | astrologers, and retrieve list of blocked astrologers.
+    */
 
     /**
      * Report an astrologer with a reason.
@@ -752,10 +837,7 @@ class UserAuthController extends Controller
         $user = $request->user();
 
         if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Authenticated user not found or not a regular user.'], 404);
         }
 
         $validator = Validator::make($request->all(), [
@@ -764,23 +846,20 @@ class UserAuthController extends Controller
 
         if ($validator->fails()) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'Validation failed.',
-                'errors' => $validator->errors(),
+                'errors'  => $validator->errors(),
             ], 422);
         }
 
         $astrologer = Astrologer::find($astrologerId);
         if (!$astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer not found.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Astrologer not found.'], 404);
         }
 
         $community = AstrologerCommunity::firstOrNew([
             'astrologer_id' => $astrologer->id,
-            'user_id' => $user->id,
+            'user_id'       => $user->id,
         ]);
 
         $community->report_reason = $request->input('reason');
@@ -802,227 +881,117 @@ class UserAuthController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Reported successfully.',
-            'data' => [
+            'data'    => [
                 'astrologer_id' => $astrologer->id,
                 'report_reason' => $community->report_reason,
-                'reported_at' => $community->reported_at,
+                'reported_at'   => $community->reported_at,
             ],
         ], 200);
     }
 
     /**
-     * Get list of astrologers that the user is following.
+     * Block an astrologer.
      */
-    public function getFollowing(Request $request): JsonResponse
+    public function blockAstrologer(Request $request, $astrologerId): JsonResponse
     {
         $user = $request->user();
 
         if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Authenticated user not found or not a regular user.'], 404);
         }
 
-        try {
-            // Get all astrologers the user is following
-            $following = AstrologerCommunity::with(['astrologer.user'])
-                ->where('user_id', $user->id)
-                ->where('is_liked', true)
-                ->orderByDesc('liked_at')
-                ->get();
+        $astrologer = Astrologer::with('user')->find($astrologerId)
+            ?? Astrologer::with('user')->where('user_id', $astrologerId)->first();
 
-            $data = $following->map(function ($record) {
-                $astrologer = $record->astrologer;
-                
-                // Calculate actual average rating from reviews
-                $avgRating = \App\Models\AstrologerReview::where('astrologer_id', $astrologer->id)
-                    ->avg('rating');
-                $avgRatingValue = $avgRating ? (float) number_format($avgRating, 2) : 0;
-                
-                // Get availability flags from astrologers table
-                $isChatEnabled = (bool) $astrologer->is_chat_enabled;
-                $isCallEnabled = (bool) $astrologer->is_call_enabled;
-                $isOnline = $isChatEnabled || $isCallEnabled;
-                
-                return [
-                    'astrologer_id' => $astrologer->id,
-                    // 'user_id' => $astrologer->user->id,
-                    'name' => $astrologer->user->name,
-                    'email' => $astrologer->user->email,
-                    'phone' => $astrologer->user->phone,
-                    'profile_photo' => $astrologer->profile_photo,
-                    'years_of_experience' => $astrologer->years_of_experience,
-                    'areas_of_expertise' => $astrologer->areas_of_expertise,
-                    'languages' => $astrologer->languages,
-                    'bio' => $astrologer->bio,
-                    'status' => $astrologer->status,
-                    'avg_rating' => $avgRatingValue,
-                    'is_online' => $isOnline ? 1 : 0,
-                    'is_chat_enabled' => $isChatEnabled ? 1 : 0,
-                    'is_call_enabled' => $isCallEnabled ? 1 : 0,
-                    'followed_at' => $record->liked_at,
-                    'created_at' => $record->created_at,
-                ];
-            });
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Following list retrieved successfully.',
-                'data' => [
-                    'count' => $data->count(),
-                    'following' => $data,
-                ],
-            ], 200);
-
-        } catch (\Exception $e) {
-            Log::error('Get following list error: ' . $e->getMessage());
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while retrieving the following list.',
-            ], 500);
+        if (!$astrologer || !$astrologer->user) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer not found.'], 404);
         }
+
+        $reason = $request->input('reason', $request->input('report_reason'));
+
+        /** @var BlockService $blockService */
+        $blockService = app(BlockService::class);
+        $userBlock = $blockService->block($user, $astrologer->user, $reason);
+
+        NotificationHelper::send(
+            $user->id,
+            'User blocked',
+            "You have blocked astrologer {$astrologer->user->name}.",
+            ['astrologer_id' => $astrologer->id]
+        );
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Astrologer blocked successfully.',
+            'data'    => [
+                'astrologer_id'      => $astrologer->id,
+                'astrologer_user_id' => $astrologer->user->id,
+                'is_blocked'         => true,
+                'blocked_at'         => $userBlock->created_at,
+            ],
+        ], 200);
     }
 
     /**
-     * Logout user by revoking all tokens.
+     * Unblock a previously blocked astrologer.
      */
-    public function logout(Request $request): JsonResponse
-    {
-        $user = $request->user();
-
-        if (!$user) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Unauthenticated user.',
-            ], 401);
-        }
-
-        try {
-            $fcmToken = $request->input('fcm_token');
-            $deviceId = $request->input('device_id');
-
-            // Deactivate device token(s) on logout
-            if ($deviceId || $fcmToken) {
-                $query = \App\Models\UserDevice::where('user_id', $user->id);
-                if ($deviceId) {
-                    $query->where('device_id', $deviceId);
-                } elseif ($fcmToken) {
-                    $query->where('fcm_token', $fcmToken);
-                }
-                $query->update(['is_active' => false]);
-            } else {
-                // If no specific device info provided, deactivate all active devices for this user
-                \App\Models\UserDevice::where('user_id', $user->id)->update(['is_active' => false]);
-            }
-
-            if (!$fcmToken || $user->fcm_token === $fcmToken) {
-                $user->fcm_token = null;
-                $user->save();
-            }
-
-            // Revoke tokens for the user
-            $user->tokens()->delete();
-
-            try {
-                app(\App\Services\PresenceService::class)->setOffline($user->id);
-            } catch (\Throwable $e) {
-                // Ignore presence offline error on logout
-            }
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Logged out successfully.',
-                'data' => [
-                    'user_id' => $user->id,
-                    'logged_out_at' => now(),
-                ],
-            ], 200);
-
-        } catch (\Exception $e) {
-            Log::error('User logout error: ' . $e->getMessage());
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while logging out.',
-            ], 500);
-        }
-    }
-
-    /**
-     * Delete user account and all associated records.
-     */
-    public function deleteAccount(Request $request): JsonResponse
+    public function unblockAstrologer(Request $request, $astrologerId): JsonResponse
     {
         $user = $request->user();
 
         if (!$user || $user->user_type !== 'user') {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Authenticated user not found or not a regular user.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Authenticated user not found or not a regular user.'], 404);
         }
 
-        try {
-            DB::beginTransaction();
+        $astrologer = Astrologer::with('user')->find($astrologerId)
+            ?? Astrologer::with('user')->where('user_id', $astrologerId)->first();
 
-            $userId = $user->id;
-            $userName = $user->name;
-
-            // Delete all related records before deleting user
-            // The following is deleted based on foreign key constraints
-
-            // Delete wallet transactions
-            \App\Models\WalletTransaction::where('wallet_id', function ($query) use ($userId) {
-                $query->select('id')->from('wallets')->where('user_id', $userId);
-            })->delete();
-
-            // Delete wallet
-            \App\Models\Wallet::where('user_id', $userId)->delete();
-
-            // Delete reviews by user
-            \App\Models\AstrologerReview::where('user_id', $userId)->delete();
-
-            // Delete astrologer community records (following/followers relation)
-            AstrologerCommunity::where('user_id', $userId)->delete();
-
-            // Delete matrimony profiles
-            \App\Models\MatrimonyProfile::where('user_id', $userId)->delete();
-
-            // Delete notifications for user
-            \App\Models\AppNotification::where('user_id', $userId)->delete();
-
-            // Revoke all tokens
-            $user->tokens()->delete();
-
-            // Delete the user account
-            $user->delete();
-
-            DB::commit();
-
-            Log::info("User account deleted: ID={$userId}, Name={$userName}");
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Account deleted successfully. All your data has been removed.',
-                'data' => [
-                    'user_id' => $userId,
-                    'deleted_at' => now(),
-                ],
-            ], 200);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Delete user account error: ' . $e->getMessage());
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while deleting the account.',
-                'error_details' => $e->getMessage(),
-            ], 500);
+        if (!$astrologer || !$astrologer->user) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer not found.'], 404);
         }
+
+        /** @var BlockService $blockService */
+        $blockService = app(BlockService::class);
+        $blockService->unblock($user, $astrologer->user);
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Astrologer unblocked successfully.',
+            'data'    => [
+                'astrologer_id'      => $astrologer->id,
+                'astrologer_user_id' => $astrologer->user->id,
+                'is_blocked'         => false,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Get list of astrologers blocked by the authenticated user.
+     */
+    public function getBlockedAstrologers(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || $user->user_type !== 'user') {
+            return response()->json(['status' => 'error', 'message' => 'Authenticated user not found or not a regular user.'], 404);
+        }
+
+        $perPage = (int) $request->input('per_page', 15);
+        /** @var BlockService $blockService */
+        $blockService = app(BlockService::class);
+        $paginated = $blockService->getBlockedAstrologersForUser($user, $perPage);
+
+        return response()->json([
+            'status' => 'success',
+            'data'   => [
+                'current_page' => $paginated->currentPage(),
+                'data'         => $paginated->items(),
+                'total'        => $paginated->total(),
+                'per_page'     => $paginated->perPage(),
+                'last_page'    => $paginated->lastPage(),
+            ],
+        ], 200);
     }
 }

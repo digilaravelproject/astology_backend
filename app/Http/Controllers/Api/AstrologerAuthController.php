@@ -20,9 +20,11 @@ use App\Services\NotificationHelper;
 use App\Models\AstrologerSkill;
 use App\Models\AstrologerOtherDetail;
 use App\Models\AstrologerCommunity;
+use App\Models\UserDevice;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use DateTime;
+use Exception;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -30,45 +32,47 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
-use App\Services\ExotelSmsService;
 
 class AstrologerAuthController extends Controller
 {
-    /**
-     * Register a new astrologer.
-     *
-     * @param AstrologerSignupRequest $request
-     * @return JsonResponse
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 1: AUTHENTICATION & ACCESS CONTROL
+    |--------------------------------------------------------------------------
+    | Handles astrologer signup, OTP generation, OTP verification, resending,
+    | single-device session tokens, permanent device deletion on logout, and
+    | account termination.
+    */
 
+    /**
+     * Register a new astrologer account.
+     */
     public function signup(AstrologerSignupRequest $request): JsonResponse
     {
         try {
-            // Begin database transaction
             DB::beginTransaction();
 
-            // Validate and get the request data
             $validated = $request->validated();
 
             // Step 1: Create user with basic details
             $user = User::create([
-                'name' => $validated['full_name'],
-                'email' => $validated['email'] ?? null,
-                'phone' => $validated['phone'],
-                'city' => $validated['city'],
-                'country' => $validated['country'],
+                'name'      => $validated['full_name'],
+                'email'     => $validated['email'] ?? null,
+                'phone'     => $validated['phone'],
+                'city'      => $validated['city'],
+                'country'   => $validated['country'],
                 'user_type' => 'astrologer',
-                'password' => bcrypt($validated['phone']), // Default password using phone
+                'password'  => bcrypt($validated['phone']),
             ]);
 
             // Initialize file path array for storing uploaded files
             $uploadedFiles = [
                 'profile_photo' => null,
-                'id_proof' => null,
-                'certificate' => null,
+                'id_proof'      => null,
+                'certificate'   => null,
             ];
 
-            // Step 2: Handle file uploads with loop validation
+            // Step 2: Handle file uploads
             $fileFields = ['profile_photo', 'id_proof', 'certificate'];
             foreach ($fileFields as $field) {
                 if ($request->hasFile($field)) {
@@ -76,14 +80,9 @@ class AstrologerAuthController extends Controller
                         $file = $request->file($field);
                         $filename = time() . '_' . $user->id . '_' . $field . '.' . $file->getClientOriginalExtension();
                         $path = 'astrologers/' . $user->id . '/' . $field;
-
-                        // Store file in storage
                         $uploadedFiles[$field] = Storage::disk('public')->putFileAs($path, $file, $filename);
-
-                    } catch (\Exception $e) {
-                        // Log file upload error but continue
+                    } catch (Exception $e) {
                         Log::error("File upload error for {$field}: " . $e->getMessage());
-                        // Don't throw error, just skip this file
                     }
                 }
             }
@@ -91,16 +90,8 @@ class AstrologerAuthController extends Controller
             // Step 3: Validate and process areas of expertise array
             $areasOfExpertise = [];
             $validAreas = [
-                'Vedic Astrology',
-                'Tarot',
-                'Numerology',
-                'Palmistry',
-                'Vastu',
-                'KP Astrology',
-                'Nadi Astrology',
-                'Feng Shui',
-                'Face Reading',
-                'Prashna'
+                'Vedic Astrology', 'Tarot', 'Numerology', 'Palmistry', 'Vastu',
+                'KP Astrology', 'Nadi Astrology', 'Feng Shui', 'Face Reading', 'Prashna'
             ];
 
             if (isset($validated['areas_of_expertise']) && is_array($validated['areas_of_expertise'])) {
@@ -114,18 +105,8 @@ class AstrologerAuthController extends Controller
             // Step 4: Validate and process languages array
             $languages = [];
             $validLanguages = [
-                'Hindi',
-                'English',
-                'Bengali',
-                'Tamil',
-                'Telugu',
-                'Marathi',
-                'Gujarati',
-                'Kannada',
-                'Malayalam',
-                'Punjabi',
-                'Odia',
-                'Urdu'
+                'Hindi', 'English', 'Bengali', 'Tamil', 'Telugu', 'Marathi',
+                'Gujarati', 'Kannada', 'Malayalam', 'Punjabi', 'Odia', 'Urdu'
             ];
 
             if (isset($validated['languages']) && is_array($validated['languages'])) {
@@ -136,51 +117,46 @@ class AstrologerAuthController extends Controller
                 }
             }
 
-            // Validate that we have at least one area of expertise and language
             if (empty($areasOfExpertise)) {
-                throw new \Exception('Invalid areas of expertise provided.');
+                throw new Exception('Invalid areas of expertise provided.');
             }
 
             if (empty($languages)) {
-                throw new \Exception('Invalid languages provided.');
+                throw new Exception('Invalid languages provided.');
             }
 
             // Step 5: Create astrologer profile record with default pricing
             $astrologer = Astrologer::create([
-                'user_id' => $user->id,
-                'years_of_experience' => $validated['years_of_experience'],
-                'areas_of_expertise' => $areasOfExpertise,
-                'languages' => $languages,
-                'profile_photo' => $uploadedFiles['profile_photo'],
-                'bio' => $validated['bio'] ?? null,
-                'id_proof' => $uploadedFiles['id_proof'],
-                'certificate' => $uploadedFiles['certificate'],
-                'id_proof_number' => $validated['id_proof_number'],
-                'date_of_birth' => $validated['date_of_birth'],
-                'status' => 'pending',
-                'is_online' => false,
-                'is_chat_enabled' => true,
-                'is_call_enabled' => true,
-                'is_video_call_enabled' => true,
-                'chat_enabled' => true,
-                'call_enabled' => true,
-                'video_call_enabled' => true,
-                'chat_rate_per_minute' => Setting::get('default_chat_rate_per_minute', 15.00),
-                'call_rate_per_minute' => Setting::get('default_call_rate_per_minute', 15.00),
+                'user_id'                    => $user->id,
+                'years_of_experience'        => $validated['years_of_experience'],
+                'areas_of_expertise'         => $areasOfExpertise,
+                'languages'                  => $languages,
+                'profile_photo'              => $uploadedFiles['profile_photo'],
+                'bio'                        => $validated['bio'] ?? null,
+                'id_proof'                   => $uploadedFiles['id_proof'],
+                'certificate'                => $uploadedFiles['certificate'],
+                'id_proof_number'            => $validated['id_proof_number'],
+                'date_of_birth'              => $validated['date_of_birth'],
+                'status'                     => 'pending',
+                'is_online'                  => false,
+                'is_chat_enabled'            => true,
+                'is_call_enabled'            => true,
+                'is_video_call_enabled'      => true,
+                'chat_enabled'               => true,
+                'call_enabled'               => true,
+                'video_call_enabled'         => true,
+                'chat_rate_per_minute'       => Setting::get('default_chat_rate_per_minute', 15.00),
+                'call_rate_per_minute'       => Setting::get('default_call_rate_per_minute', 15.00),
                 'video_call_rate_per_minute' => Setting::get('default_video_call_rate_per_minute', 15.00),
-                'po_at_5_rate_per_minute' => Setting::get('default_po_at_5_rate_per_minute', 5.00),
+                'po_at_5_rate_per_minute'    => Setting::get('default_po_at_5_rate_per_minute', 5.00),
             ]);
 
-            // Generate Sanctum personal access token (plain token returned to client)
             $plainToken = $user->createToken('auth_token')->plainTextToken;
 
-            // Commit transaction if all operations are successful
             DB::commit();
 
-            // Load relations and prepare full data
             $user->load('astrologer');
 
-            // Add notification to astrologer user about signup.
             NotificationHelper::send(
                 $user->id,
                 'Signup successful',
@@ -188,44 +164,38 @@ class AstrologerAuthController extends Controller
                 ['astrologer_id' => $astrologer->id]
             );
 
-            // Return success response with full user + astrologer data and token (Bearer)
             return response()->json([
-                'status' => 'success',
-                'message' => 'Astrologer signup successful. Your profile is under review.',
-                'token' => $plainToken,
+                'status'     => 'success',
+                'message'    => 'Astrologer signup successful. Your profile is under review.',
+                'token'      => $plainToken,
                 'token_type' => 'Bearer',
-                'data' => [
-                    'user' => $user,
+                'data'       => [
+                    'user'       => $user,
                     'astrologer' => $astrologer,
                 ],
             ], 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
-            // Rollback transaction on validation error
             DB::rollBack();
-
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'Validation failed',
-                'errors' => $e->errors(),
+                'errors'  => $e->errors(),
             ], 422);
 
-        } catch (\Exception $e) {
-            // Rollback transaction on any exception
+        } catch (Exception $e) {
             DB::rollBack();
-
-            // Log the error
             Log::error('Astrologer signup error: ' . $e->getMessage());
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => $e->getMessage() ?? 'An error occurred during signup. Please try again.',
             ], 500);
         }
     }
 
     /**
-     * Send OTP to astrologer (creates OTP record).
+     * Send OTP to astrologer with 30-second cooldown protection.
      */
     public function sendOtp(Request $request): JsonResponse
     {
@@ -250,8 +220,8 @@ class AstrologerAuthController extends Controller
             if ($existingConsumer) {
                 DB::rollBack();
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'This phone number is registered as a User account. Please log in using the Astology User App.',
+                    'status'     => 'error',
+                    'message'    => 'This phone number is registered as a User account. Please log in using the Astology User App.',
                     'error_code' => 'ROLE_MISMATCH_USER'
                 ], 403);
             }
@@ -265,9 +235,9 @@ class AstrologerAuthController extends Controller
                     $retryAfter = 30 - $diff;
                     DB::rollBack();
                     return response()->json([
-                        'status' => 'error',
-                        'message' => "Please wait {$retryAfter} seconds before requesting a new OTP.",
-                        'error_code' => 'OTP_COOLDOWN_ACTIVE',
+                        'status'              => 'error',
+                        'message'             => "Please wait {$retryAfter} seconds before requesting a new OTP.",
+                        'error_code'          => 'OTP_COOLDOWN_ACTIVE',
                         'retry_after_seconds' => $retryAfter,
                     ], 429);
                 }
@@ -280,8 +250,8 @@ class AstrologerAuthController extends Controller
             if (!$user || !$user->astrologer) {
                 DB::rollBack();
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Astrologer account with this phone number not found. Please complete signup first.',
+                    'status'     => 'error',
+                    'message'    => 'Astrologer account with this phone number not found. Please complete signup first.',
                     'error_code' => 'ASTROLOGER_NOT_FOUND'
                 ], 404);
             }
@@ -307,7 +277,7 @@ class AstrologerAuthController extends Controller
             Cache::put($cooldownKey, time(), 30);
             Cache::forget("otp_attempts:{$phone}");
 
-            // Asynchronously dispatch SMS OTP without holding DB connection or transaction locks
+            // Asynchronously dispatch SMS OTP
             \App\Jobs\SendSmsOtpJob::dispatch($phone, $otp);
 
             NotificationHelper::send(
@@ -320,33 +290,33 @@ class AstrologerAuthController extends Controller
             $exposedOtp = (!app()->isProduction() && config('app.debug')) ? $otp : null;
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'OTP generated and saved.',
-                'data' => [
-                    'phone' => $phone,
-                    'otp' => $exposedOtp,
+                'data'    => [
+                    'phone'      => $phone,
+                    'otp'        => $exposedOtp,
                     'expires_at' => $astrologer->otp_expires_at,
                 ],
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Astrologer sendOtp error: ' . $e->getMessage());
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'An error occurred while sending OTP.',
             ], 500);
         }
     }
 
     /**
-     * Verify OTP and issue token.
+     * Verify OTP, lock on 5 failed attempts, and issue scoped Sanctum token.
      */
     public function verifyOtp(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
             'phone' => ['required', 'regex:/^[0-9]{10}$/'],
-            'otp' => ['required', 'digits:4'],
+            'otp'   => ['required', 'digits:4'],
         ]);
 
         if ($validator->fails()) {
@@ -367,8 +337,8 @@ class AstrologerAuthController extends Controller
             if ($existingConsumer) {
                 DB::rollBack();
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'This phone number is registered as a User account. Please log in using the Astology User App.',
+                    'status'     => 'error',
+                    'message'    => 'This phone number is registered as a User account. Please log in using the Astology User App.',
                     'error_code' => 'ROLE_MISMATCH_USER'
                 ], 403);
             }
@@ -380,9 +350,9 @@ class AstrologerAuthController extends Controller
             if ($attempts >= 5) {
                 DB::rollBack();
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Too many invalid OTP attempts. Please wait 10 minutes or request a new OTP.',
-                    'error_code' => 'MAX_OTP_ATTEMPTS_EXCEEDED',
+                    'status'              => 'error',
+                    'message'             => 'Too many invalid OTP attempts. Please wait 10 minutes or request a new OTP.',
+                    'error_code'          => 'MAX_OTP_ATTEMPTS_EXCEEDED',
                     'retry_after_seconds' => 600,
                 ], 429);
             }
@@ -394,8 +364,8 @@ class AstrologerAuthController extends Controller
             if (!$user || !$user->astrologer) {
                 DB::rollBack();
                 return response()->json([
-                    'status' => 'error',
-                    'message' => 'Astrologer with this phone not found.',
+                    'status'     => 'error',
+                    'message'    => 'Astrologer with this phone not found.',
                     'error_code' => 'ASTROLOGER_NOT_FOUND'
                 ], 404);
             }
@@ -421,9 +391,9 @@ class AstrologerAuthController extends Controller
 
                     DB::rollBack();
                     return response()->json([
-                        'status' => 'error',
-                        'message' => "Invalid OTP. You have {$remaining} attempt(s) remaining.",
-                        'error_code' => 'INVALID_OTP',
+                        'status'             => 'error',
+                        'message'            => "Invalid OTP. You have {$remaining} attempt(s) remaining.",
+                        'error_code'         => 'INVALID_OTP',
                         'remaining_attempts' => $remaining,
                     ], 422);
                 }
@@ -439,8 +409,11 @@ class AstrologerAuthController extends Controller
             Cache::forget($attemptKey);
             Cache::forget("otp_cooldown:{$phone}");
 
-            // Revoke all existing tokens for single device constraint
+            // Revoke all existing tokens and delete old devices for single device constraint
             $user->tokens()->delete();
+            UserDevice::where('user_id', $user->id)->delete();
+            $user->fcm_token = null;
+            $user->save();
 
             // Issue Sanctum token scoped specifically for 'role:astrologer'
             $token = $user->createToken('astrologer_token', ['role:astrologer'])->plainTextToken;
@@ -457,17 +430,17 @@ class AstrologerAuthController extends Controller
             $user->load('astrologer');
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'OTP verified.',
-                'token' => $token,
+                'status'     => 'success',
+                'message'    => 'OTP verified.',
+                'token'      => $token,
                 'token_type' => 'Bearer',
-                'data' => [
-                    'user' => $user,
+                'data'       => [
+                    'user'       => $user,
                     'astrologer' => $astrologer,
                 ],
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Astrologer verifyOtp error: ' . $e->getMessage());
             return response()->json(['status' => 'error', 'message' => 'Failed to verify OTP.'], 500);
@@ -475,82 +448,150 @@ class AstrologerAuthController extends Controller
     }
 
     /**
-     * Resend OTP (regenerate).
+     * Resend OTP.
      */
     public function resendOtp(Request $request): JsonResponse
     {
-        // For now, same as sendOtp logic
         return $this->sendOtp($request);
     }
 
     /**
+     * Logout astrologer, revoke Sanctum token, and permanently delete device tokens.
+     */
+    public function logout(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        try {
+            $fcmToken = $request->input('fcm_token');
+            $deviceId = $request->input('device_id');
+
+            // Delete device token(s) on logout
+            if ($deviceId || $fcmToken) {
+                $query = UserDevice::where('user_id', $user->id);
+                if ($deviceId) {
+                    $query->where('device_id', $deviceId);
+                } elseif ($fcmToken) {
+                    $query->where('fcm_token', $fcmToken);
+                }
+                $query->delete();
+            } else {
+                UserDevice::where('user_id', $user->id)->delete();
+            }
+
+            if (!$fcmToken || $user->fcm_token === $fcmToken) {
+                $user->fcm_token = null;
+                $user->save();
+            }
+
+            $token = $request->user()->currentAccessToken();
+            if ($token instanceof \Laravel\Sanctum\PersonalAccessToken) {
+                $token->delete();
+            } else {
+                $user->tokens()->delete();
+            }
+
+            try {
+                app(\App\Services\PresenceService::class)->setOffline($user->id);
+            } catch (\Throwable $e) {
+                Log::warning("Failed to set astrologer offline on logout: " . $e->getMessage());
+            }
+
+            return response()->json(['status' => 'success', 'message' => 'Logged out successfully.'], 200);
+        } catch (Exception $e) {
+            Log::error('Astrologer logout error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'An error occurred while logging out.'], 500);
+        }
+    }
+
+    /**
+     * Delete astrologer account and cascade delete all associated records.
+     */
+    public function deleteAccount(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            $user->tokens()->delete();
+            UserDevice::where('user_id', $user->id)->delete();
+            $user->delete();
+
+            DB::commit();
+
+            return response()->json(['status' => 'success', 'message' => 'Astrologer account deleted successfully.'], 200);
+        } catch (Exception $e) {
+            DB::rollBack();
+            Log::error('Astrologer delete account error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to delete astrologer account.'], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 2: PROFILE & SKILL MANAGEMENT
+    |--------------------------------------------------------------------------
+    | Handles fetching profile details, updating personal/professional data,
+    | profile photo uploads, structured skills, and social/address metadata.
+    */
+
+    /**
      * Get astrologer profile by user ID.
-     *
-     * @param int $userId
-     * @return JsonResponse
      */
     public function getProfile($userId): JsonResponse
     {
         try {
-            // Eager load astrologer profile and related skill + other details
             $user = User::with(['astrologer.skill', 'astrologer.otherDetails'])->find($userId);
 
             if (!$user) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'User not found.',
-                ], 404);
+                return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
             }
 
             if ($user->user_type !== 'astrologer' || !$user->astrologer) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'This user is not an astrologer.',
-                ], 404);
+                return response()->json(['status' => 'error', 'message' => 'This user is not an astrologer.'], 404);
             }
 
             return response()->json([
                 'status' => 'success',
-                'data' => [
-                    'user' => $user,
-                    'astrologer' => $user->astrologer,
-                    'skill' => $user->astrologer->skill ?? null,
-                    'other_details' => $user->astrologer->otherDetails ?? null,
-                    // convenience top-level values
-                    'website_link' => optional($user->astrologer->otherDetails)->website_link,
+                'data'   => [
+                    'user'               => $user,
+                    'astrologer'         => $user->astrologer,
+                    'skill'              => $user->astrologer->skill ?? null,
+                    'other_details'      => $user->astrologer->otherDetails ?? null,
+                    'website_link'       => optional($user->astrologer->otherDetails)->website_link,
                     'instagram_username' => optional($user->astrologer->otherDetails)->instagram_username,
                 ],
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Get profile error: ' . $e->getMessage());
-
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while fetching profile.',
-            ], 500);
+            return response()->json(['status' => 'error', 'message' => 'An error occurred while fetching profile.'], 500);
         }
     }
 
+    /**
+     * Update authenticated astrologer profile photo.
+     */
     public function updateProfilePhoto(UpdateAstrologerProfilePhotoRequest $request): JsonResponse
     {
         $user = $request->user();
 
-        // Ensure astrologer profile exists
         if (!$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
         $astrologer = $user->astrologer;
 
-        // Store new profile photo
         $file = $request->file('profile_photo');
         if (!$file) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'No profile_photo file was uploaded. Make sure you send a multipart/form-data request.',
             ], 422);
         }
@@ -558,7 +599,6 @@ class AstrologerAuthController extends Controller
         $filename = time() . '_' . $user->id . '_profile_photo.' . $file->getClientOriginalExtension();
         $path = 'astrologers/' . $user->id . '/profile_photo';
 
-        // Delete existing file if present
         if ($astrologer->profile_photo && Storage::disk('public')->exists($astrologer->profile_photo)) {
             Storage::disk('public')->delete($astrologer->profile_photo);
         }
@@ -577,10 +617,10 @@ class AstrologerAuthController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Profile photo updated successfully.',
-            'data' => [
-                'user' => $user,
+            'data'    => [
+                'user'       => $user,
                 'astrologer' => $astrologer,
             ],
         ], 200);
@@ -588,19 +628,13 @@ class AstrologerAuthController extends Controller
 
     /**
      * Update authenticated astrologer profile (basic info + documents).
-     *
-     * @param UpdateAstrologerProfileRequest $request
-     * @return JsonResponse
      */
     public function updateProfile(UpdateAstrologerProfileRequest $request): JsonResponse
     {
         $user = $request->user();
 
         if (!$user || !$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
         $astrologer = $user->astrologer;
@@ -675,7 +709,6 @@ class AstrologerAuthController extends Controller
                     $filename = time() . '_' . $user->id . '_' . $field . '.' . $file->getClientOriginalExtension();
                     $path = 'astrologers/' . $user->id . '/' . $field;
 
-                    // Delete old file if exists
                     if ($astrologer->{$field} && Storage::disk('public')->exists($astrologer->{$field})) {
                         Storage::disk('public')->delete($astrologer->{$field});
                     }
@@ -751,50 +784,147 @@ class AstrologerAuthController extends Controller
             );
 
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'Profile updated successfully.',
-                'data' => [
-                    'user' => $user,
-                    'astrologer' => $user->astrologer,
-                    'skill' => $user->astrologer->skill ?? null,
-                    'other_details' => $user->astrologer->otherDetails ?? null,
-                    'website_link' => optional($user->astrologer->otherDetails)->website_link,
+                'data'    => [
+                    'user'               => $user,
+                    'astrologer'         => $user->astrologer,
+                    'skill'              => $user->astrologer->skill ?? null,
+                    'other_details'      => $user->astrologer->otherDetails ?? null,
+                    'website_link'       => optional($user->astrologer->otherDetails)->website_link,
                     'instagram_username' => optional($user->astrologer->otherDetails)->instagram_username,
                 ],
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             DB::rollBack();
             Log::error('Update profile error: ' . $e->getMessage());
 
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'An error occurred while updating the profile: ' . $e->getMessage(),
             ], 500);
         }
     }
 
     /**
-     * Get the astrologer home status (availability + pricing) for the authenticated astrologer.
-     *
-     * @return JsonResponse
+     * Store or update astrologer skill details.
+     */
+    public function updateSkill(UpdateAstrologerSkillRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $validated = $request->validated();
+
+        $skill = AstrologerSkill::updateOrCreate(
+            ['astrologer_id' => $astrologer->id],
+            [
+                'category'                 => $validated['category'] ?? null,
+                'primary_skills'           => $validated['primary_skills'] ?? null,
+                'all_skills'               => $validated['all_skills'] ?? null,
+                'languages'                => $validated['languages'] ?? null,
+                'experience_years'         => $validated['experience_years'] ?? null,
+                'daily_contribution_hours' => $validated['daily_contribution_hours'] ?? null,
+                'heard_about'              => $validated['heard_about'] ?? null,
+            ]
+        );
+
+        Astrologer::updateOrCreate(
+            ['id' => $astrologer->id],
+            [
+                'areas_of_expertise'  => $validated['primary_skills'] ?? null,
+                'languages'           => $validated['languages'] ?? null,
+                'years_of_experience' => $validated['experience_years'] ?? null,
+            ]
+        );
+
+        NotificationHelper::send(
+            $user->id,
+            'Skill updated',
+            'Your astrologer skills have been saved successfully.',
+            []
+        );
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Skill details saved successfully.',
+            'data'    => [
+                'skill' => $skill,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Store or update astrologer other details (social, bio, address).
+     */
+    public function updateOtherDetails(UpdateAstrologerOtherDetailsRequest $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $validated = $request->validated();
+
+        $otherDetails = AstrologerOtherDetail::updateOrCreate(
+            ['astrologer_id' => $astrologer->id],
+            [
+                'gender'             => $validated['gender'] ?? null,
+                'current_address'    => $validated['current_address'] ?? null,
+                'bio'                => $validated['bio'] ?? null,
+                'date_of_birth'      => $validated['date_of_birth'] ?? null,
+                'website_link'       => $validated['website_link'] ?? null,
+                'instagram_username' => $validated['instagram_username'] ?? null,
+            ]
+        );
+
+        NotificationHelper::send(
+            $user->id,
+            'Profile details updated',
+            'Your astrologer profile other details have been updated successfully.',
+            []
+        );
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Other details saved successfully.',
+            'data'    => [
+                'other_details' => $otherDetails,
+            ],
+        ], 200);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 3: AVAILABILITY, PRESENCE & LIVE RATES
+    |--------------------------------------------------------------------------
+    | Manages real-time service toggles (chat, call, video), pricing rates,
+    | weekly schedule slots, sleep hours, and presence broadcasting.
+    */
+
+    /**
+     * Get astrologer home status (availability toggles + current rates).
      */
     public function getHomeStatus(): JsonResponse
     {
         $user = Auth::user();
 
         if (!$user || !$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
         $astrologer = $user->astrologer;
 
         return response()->json([
             'status' => 'success',
-            'data' => [
+            'data'   => [
                 'astrologer' => $astrologer->only([
                     'chat_enabled',
                     'call_enabled',
@@ -813,25 +943,18 @@ class AstrologerAuthController extends Controller
 
     /**
      * Update astrologer home status and pricing toggles.
-     *
-     * @param UpdateAstrologerHomeRequest $request
-     * @return JsonResponse
      */
     public function updateHomeStatus(UpdateAstrologerHomeRequest $request): JsonResponse
     {
         $user = $request->user();
 
         if (!$user || !$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
         $astrologer = $user->astrologer;
         $validated = $request->validated();
 
-        // Update only fields provided by the request
         $astrologer->fill($validated);
         $astrologer->save();
 
@@ -862,102 +985,86 @@ class AstrologerAuthController extends Controller
         );
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Home status updated successfully.',
-            'data' => [
+            'data'    => [
                 'astrologer' => $astrologer,
             ],
         ], 200);
     }
 
     /**
-     * Get home settings (rate settings) for the authenticated astrologer
-     * GET /api/v1/astrologer/home-settings
+     * Get home settings (rate settings) for the authenticated astrologer.
      */
     public function getHomeSettings(): JsonResponse
     {
         $user = Auth::user();
 
         if (!$user || !$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
         $astrologer = $user->astrologer;
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Rate settings retrieved successfully.',
-            'data' => [
-                'is_chat_enabled' => (bool) $astrologer->is_chat_enabled,
-                'is_call_enabled' => (bool) $astrologer->is_call_enabled,
+            'data'    => [
+                'is_chat_enabled'       => (bool) $astrologer->is_chat_enabled,
+                'is_call_enabled'       => (bool) $astrologer->is_call_enabled,
                 'is_video_call_enabled' => (bool) $astrologer->is_video_call_enabled,
-                'chat_rate' => (float) $astrologer->chat_rate_per_minute,
-                'call_rate' => (float) $astrologer->call_rate_per_minute,
-                'video_call_rate' => (float) $astrologer->video_call_rate_per_minute,
-                'po5_enabled' => (bool) $astrologer->po_at_5_enabled,
-                'po5_user_rate' => $astrologer->po_at_5_rate_per_minute ? (float) $astrologer->po_at_5_rate_per_minute : null,
-                'po5_astrologer_rate' => null, // Add if needed
-                'updated_at' => $astrologer->updated_at,
+                'chat_rate'             => (float) $astrologer->chat_rate_per_minute,
+                'call_rate'             => (float) $astrologer->call_rate_per_minute,
+                'video_call_rate'       => (float) $astrologer->video_call_rate_per_minute,
+                'po5_enabled'           => (bool) $astrologer->po_at_5_enabled,
+                'po5_user_rate'         => $astrologer->po_at_5_rate_per_minute ? (float) $astrologer->po_at_5_rate_per_minute : null,
+                'po5_astrologer_rate'   => null,
+                'updated_at'            => $astrologer->updated_at,
             ],
         ], 200);
     }
 
     /**
-     * Update home settings (rate settings) for the authenticated astrologer
-     * Only updates the provided fields, does not touch other fields
-     * PUT /api/v1/astrologer/home-settings
+     * Update home settings (rate settings) for the authenticated astrologer.
      */
     public function updateHomeSettings(Request $request): JsonResponse
     {
         $user = $request->user();
 
         if (!$user || !$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
-        // Validate input - all fields are optional
         $validator = Validator::make($request->all(), [
-            'is_chat_enabled' => 'sometimes|boolean',
-            'is_call_enabled' => 'sometimes|boolean',
+            'is_chat_enabled'       => 'sometimes|boolean',
+            'is_call_enabled'       => 'sometimes|boolean',
             'is_video_call_enabled' => 'sometimes|boolean',
-            'chat_rate' => 'sometimes|numeric|min:0|max:9999.99',
-            'call_rate' => 'sometimes|numeric|min:0|max:9999.99',
-            'video_call_rate' => 'sometimes|numeric|min:0|max:9999.99',
-            'po5_enabled' => 'sometimes|boolean',
-            'po5_user_rate' => 'sometimes|numeric|min:0|max:9999.99',
-            'po5_astrologer_rate' => 'sometimes|numeric|min:0|max:9999.99',
+            'chat_rate'             => 'sometimes|numeric|min:0|max:9999.99',
+            'call_rate'             => 'sometimes|numeric|min:0|max:9999.99',
+            'video_call_rate'       => 'sometimes|numeric|min:0|max:9999.99',
+            'po5_enabled'           => 'sometimes|boolean',
+            'po5_user_rate'         => 'sometimes|numeric|min:0|max:9999.99',
+            'po5_astrologer_rate'   => 'sometimes|numeric|min:0|max:9999.99',
         ]);
 
         if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validation failed',
-                'errors' => $validator->errors(),
-            ], 422);
+            return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
         }
 
         $astrologer = $user->astrologer;
         $validated = $validator->validated();
 
-        // Map incoming field names to database column names
         $fieldMapping = [
-            'is_chat_enabled' => 'is_chat_enabled',
-            'is_call_enabled' => 'is_call_enabled',
+            'is_chat_enabled'       => 'is_chat_enabled',
+            'is_call_enabled'       => 'is_call_enabled',
             'is_video_call_enabled' => 'is_video_call_enabled',
-            'chat_rate' => 'chat_rate_per_minute',
-            'call_rate' => 'call_rate_per_minute',
-            'video_call_rate' => 'video_call_rate_per_minute',
-            'po5_enabled' => 'po_at_5_enabled',
-            'po5_user_rate' => 'po_at_5_rate_per_minute',
+            'chat_rate'             => 'chat_rate_per_minute',
+            'call_rate'             => 'call_rate_per_minute',
+            'video_call_rate'       => 'video_call_rate_per_minute',
+            'po5_enabled'           => 'po_at_5_enabled',
+            'po5_user_rate'         => 'po_at_5_rate_per_minute',
         ];
 
-        // Update only provided fields
         $updateData = [];
         foreach ($fieldMapping as $inputField => $dbField) {
             if (array_key_exists($inputField, $validated)) {
@@ -965,7 +1072,6 @@ class AstrologerAuthController extends Controller
             }
         }
 
-        // Update the astrologer with only the provided fields
         $astrologer->update($updateData);
 
         // Broadcast real-time availability update
@@ -987,7 +1093,6 @@ class AstrologerAuthController extends Controller
             Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on updateHomeSettings: " . $e->getMessage());
         }
 
-        // Send notification
         NotificationHelper::send(
             $user->id,
             'Rate settings updated',
@@ -995,206 +1100,97 @@ class AstrologerAuthController extends Controller
             []
         );
 
-        // Return updated settings
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Rate settings updated successfully.',
-            'data' => [
-                'is_chat_enabled' => (bool) $astrologer->is_chat_enabled,
-                'is_call_enabled' => (bool) $astrologer->is_call_enabled,
+            'data'    => [
+                'is_chat_enabled'       => (bool) $astrologer->is_chat_enabled,
+                'is_call_enabled'       => (bool) $astrologer->is_call_enabled,
                 'is_video_call_enabled' => (bool) $astrologer->is_video_call_enabled,
-                'chat_rate' => (float) $astrologer->chat_rate_per_minute,
-                'call_rate' => (float) $astrologer->call_rate_per_minute,
-                'video_call_rate' => (float) $astrologer->video_call_rate_per_minute,
-                'po5_enabled' => (bool) $astrologer->po_at_5_enabled,
-                'po5_user_rate' => $astrologer->po_at_5_rate_per_minute ? (float) $astrologer->po_at_5_rate_per_minute : null,
-                'updated_at' => $astrologer->updated_at,
+                'chat_rate'             => (float) $astrologer->chat_rate_per_minute,
+                'call_rate'             => (float) $astrologer->call_rate_per_minute,
+                'video_call_rate'       => (float) $astrologer->video_call_rate_per_minute,
+                'po5_enabled'           => (bool) $astrologer->po_at_5_enabled,
+                'po5_user_rate'         => $astrologer->po_at_5_rate_per_minute ? (float) $astrologer->po_at_5_rate_per_minute : null,
+                'updated_at'            => $astrologer->updated_at,
             ],
         ], 200);
     }
 
     /**
-     * Add astrologer phone number and send OTP.
+     * Toggle astrologer online/offline status or individual service toggles.
      */
-    public function addPhoneNumber(Request $request): JsonResponse
+    public function toggleOnlineStatus(Request $request): JsonResponse
     {
         $user = $request->user();
+
         if (!$user || !$user->astrologer) {
             return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
-
-        $validated = $request->validate([
-            'country_code' => ['required', 'string', 'max:8'],
-            'phone' => ['required', 'string', 'max:20'],
-        ]);
 
         $astrologer = $user->astrologer;
+        $type = $request->input('type');
 
-        $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        $expiry = now()->addMinutes(10);
+        if ($type === 'chat') {
+            $astrologer->is_chat_enabled = !$astrologer->is_chat_enabled;
+            $fieldName = 'is_chat_enabled';
+            $displayName = 'Chat';
+        } elseif ($type === 'call') {
+            $astrologer->is_call_enabled = !$astrologer->is_call_enabled;
+            $fieldName = 'is_call_enabled';
+            $displayName = 'Call';
+        } elseif ($type === 'video_call') {
+            $astrologer->is_video_call_enabled = !$astrologer->is_video_call_enabled;
+            $fieldName = 'is_video_call_enabled';
+            $displayName = 'Video Call';
+        } else {
+            $newOnlineStatus = !$astrologer->is_online;
+            $astrologer->is_online = $newOnlineStatus;
+            $astrologer->is_chat_enabled = $newOnlineStatus;
+            $astrologer->is_call_enabled = $newOnlineStatus;
+            $astrologer->is_video_call_enabled = $newOnlineStatus;
+            $fieldName = 'is_online';
+            $displayName = 'Online';
+        }
 
-        // Check if phone number already exists
-        $phoneRecord = AstrologerPhoneNumber::where('astrologer_id', $astrologer->id)
-            ->where('country_code', $validated['country_code'])
-            ->where('phone', $validated['phone'])
-            ->first();
+        $astrologer->save();
 
-        if ($phoneRecord) {
-            // Update existing phone number with new OTP
-            $phoneRecord->update([
-                'otp' => $otp,
-                'otp_expires_at' => $expiry,
-            ]);
+        $isOnline = (bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled);
+        $isBusy = (bool) ($user->is_busy ?? false);
 
-            NotificationHelper::send(
+        User::where('id', $user->id)->update(['is_online' => $isOnline]);
+
+        try {
+            app(\App\Services\PresenceService::class)->broadcastAstrologerAvailability(
                 $user->id,
-                'Phone OTP sent',
-                "OTP sent to {$validated['country_code']} {$validated['phone']}.",
-                ['phone_number_id' => $phoneRecord->id]
+                $isOnline,
+                $isBusy,
+                $user->busy_session_id ?? null,
+                null
             );
-
-            return response()->json(['status' => 'success', 'message' => 'Phone number updated with new OTP.', 'data' => ['phone' => $phoneRecord]], 200);
+        } catch (\Throwable $e) {
+            Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on toggle: " . $e->getMessage());
         }
-
-        // Create new phone number if it doesn't exist
-        $phoneRecord = AstrologerPhoneNumber::create([
-            'astrologer_id' => $astrologer->id,
-            'country_code' => $validated['country_code'],
-            'phone' => $validated['phone'],
-            'is_verified' => false,
-            'is_default' => false,
-            'otp' => $otp,
-            'otp_expires_at' => $expiry,
-        ]);
 
         NotificationHelper::send(
             $user->id,
-            'Phone OTP sent',
-            "OTP sent to {$validated['country_code']} {$validated['phone']}.",
-            ['phone_number_id' => $phoneRecord->id]
+            "{$displayName} status updated",
+            "Your {$displayName} status has been " . ($astrologer->$fieldName ? 'enabled' : 'disabled') . '.',
+            [$fieldName => $astrologer->$fieldName]
         );
 
-        return response()->json(['status' => 'success', 'message' => 'Phone number added successfully.', 'data' => ['phone' => $phoneRecord]], 201);
-    }
+        $responseData = [
+            'astrologer_id'       => $astrologer->id,
+            'availability_status' => ($user->is_busy ?? false) ? 'Engaged' : ($isOnline ? 'Online' : 'Offline'),
+            $fieldName            => (bool) $astrologer->$fieldName,
+            'updated_at'          => $astrologer->updated_at,
+        ];
 
-    /**
-     * Verify phone number OTP.
-     */
-    public function verifyPhoneNumber(Request $request, $id): JsonResponse
-    {
-        $user = $request->user();
-        if (!$user || !$user->astrologer) {
-            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
-        }
-
-        $validated = $request->validate([
-            'otp' => ['required', 'digits:4'],
-        ]);
-
-        $phoneRecord = AstrologerPhoneNumber::where('id', $id)
-            ->where('astrologer_id', $user->astrologer->id)
-            ->first();
-
-        if (!$phoneRecord) {
-            return response()->json(['status' => 'error', 'message' => 'Phone number not found.'], 404);
-        }
-
-        if ($phoneRecord->is_verified) {
-            return response()->json(['status' => 'success', 'message' => 'Phone number already verified.', 'data' => ['phone' => $phoneRecord]], 200);
-        }
-
-        if (!$phoneRecord->otp || !$phoneRecord->otp_expires_at || now()->greaterThan($phoneRecord->otp_expires_at)) {
-            return response()->json(['status' => 'error', 'message' => 'OTP expired. Please request a new one.'], 422);
-        }
-
-        if ($phoneRecord->otp !== $validated['otp']) {
-            return response()->json(['status' => 'error', 'message' => 'Invalid OTP.'], 422);
-        }
-
-        $phoneRecord->update([
-            'is_verified' => true,
-            'otp' => null,
-            'otp_expires_at' => null,
-            'otp_verified_at' => now(),
-        ]);
-
-        NotificationHelper::send(
-            $user->id,
-            'Phone verified',
-            "Phone number {$phoneRecord->country_code} {$phoneRecord->phone} has been verified.",
-            ['phone_number_id' => $phoneRecord->id]
-        );
-
-        return response()->json(['status' => 'success', 'message' => 'Phone number verified.', 'data' => ['phone' => $phoneRecord]], 200);
-    }
-
-    /**
-     * Set a verified phone number as default.
-     */
-    public function setDefaultPhoneNumber(Request $request, $id): JsonResponse
-    {
-        $user = $request->user();
-        if (!$user || !$user->astrologer) {
-            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
-        }
-
-        $phoneRecord = AstrologerPhoneNumber::where('id', $id)
-            ->where('astrologer_id', $user->astrologer->id)
-            ->first();
-
-        if (!$phoneRecord) {
-            return response()->json(['status' => 'error', 'message' => 'Phone number not found.'], 404);
-        }
-
-        if (!$phoneRecord->is_verified) {
-            return response()->json(['status' => 'error', 'message' => 'Phone number not verified.'], 422);
-        }
-
-        AstrologerPhoneNumber::where('astrologer_id', $user->astrologer->id)->update(['is_default' => false]);
-
-        $phoneRecord->update(['is_default' => true]);
-
-        NotificationHelper::send(
-            $user->id,
-            'Default number changed',
-            "{$phoneRecord->country_code} {$phoneRecord->phone} is now your default number.",
-            ['phone_number_id' => $phoneRecord->id]
-        );
-
-        return response()->json(['status' => 'success', 'message' => 'Default phone number set.', 'data' => ['phone' => $phoneRecord]], 200);
-    }
-
-    /**
-     * Get all phone numbers for authenticated astrologer.
-     */
-    public function getPhoneNumbers(Request $request): JsonResponse
-    {
-        $user = $request->user();
-        if (!$user || !$user->astrologer) {
-            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
-        }
-
-        $numbers = AstrologerPhoneNumber::where('astrologer_id', $user->astrologer->id)->orderByDesc('is_default')->orderBy('id')->get();
-
-        return response()->json(['status' => 'success', 'data' => ['numbers' => $numbers]], 200);
-    }
-
-    /**
-     * Get astrologer bank accounts for authenticated astrologer.
-     */
-    public function getBankAccounts(Request $request): JsonResponse
-    {
-        $user = $request->user();
-        if (!$user || !$user->astrologer) {
-            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
-        }
-
-        $accounts = AstrologerBankAccount::where('astrologer_id', $user->astrologer->id)
-            ->orderByDesc('is_default')
-            ->orderByDesc('updated_at')
-            ->get();
-
-        return response()->json(['status' => 'success', 'data' => ['bank_accounts' => $accounts]], 200);
+        return response()->json([
+            'status'  => 'success',
+            'message' => "{$displayName} status updated successfully.",
+            'data'    => $responseData,
+        ], 200);
     }
 
     /**
@@ -1289,7 +1285,6 @@ class AstrologerAuthController extends Controller
             }
         }
 
-        // Normalize payload with canonical day order and fills missing days as disabled
         $availability = [];
         foreach ($allowedDays as $dayKey) {
             $existing = array_values(array_filter($payload, fn($item) => isset($item['day']) && strtolower($item['day']) === $dayKey));
@@ -1299,7 +1294,7 @@ class AstrologerAuthController extends Controller
                 $slots = $enabled ? array_map(function ($slot) {
                     return [
                         'start' => $slot['start'],
-                        'end' => $slot['end'],
+                        'end'   => $slot['end'],
                     ];
                 }, $item['slots'] ?? []) : [];
             } else {
@@ -1308,9 +1303,9 @@ class AstrologerAuthController extends Controller
             }
 
             $availability[] = [
-                'day' => $dayKey,
+                'day'     => $dayKey,
                 'enabled' => $enabled,
-                'slots' => $slots,
+                'slots'   => $slots,
             ];
         }
 
@@ -1334,12 +1329,10 @@ class AstrologerAuthController extends Controller
         $day = strtolower(trim($day));
         $allowedDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 
-        // Validate day
         if (!in_array($day, $allowedDays, true)) {
             return response()->json(['status' => 'error', 'message' => "Invalid day provided: {$day}"], 422);
         }
 
-        // Validate slotIndex is non-negative
         if ($slotIndex < 0) {
             return response()->json(['status' => 'error', 'message' => 'Slot index must be a non-negative integer.'], 422);
         }
@@ -1347,7 +1340,6 @@ class AstrologerAuthController extends Controller
         $astrologer = $user->astrologer;
         $availability = $astrologer->availability ?? [];
 
-        // Find the day in availability array
         $dayIndex = null;
         foreach ($availability as $index => $item) {
             if ($item['day'] === $day) {
@@ -1362,30 +1354,24 @@ class AstrologerAuthController extends Controller
 
         $dayItem = $availability[$dayIndex];
 
-        // Check if slot index exists
         if (!isset($dayItem['slots'][$slotIndex])) {
             return response()->json(['status' => 'error', 'message' => "Slot index {$slotIndex} not found for day: {$day}"], 404);
         }
 
-        // Remove the slot
         unset($availability[$dayIndex]['slots'][$slotIndex]);
-
-        // Reindex the slots array
         $availability[$dayIndex]['slots'] = array_values($availability[$dayIndex]['slots']);
 
-        // If no slots left, disable the day
         if (count($availability[$dayIndex]['slots']) === 0) {
             $availability[$dayIndex]['enabled'] = false;
         }
 
-        // Save updated availability
         $astrologer->availability = $availability;
         $astrologer->save();
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => "Slot {$slotIndex} deleted successfully for day: {$day}",
-            'data' => ['availability' => $availability]
+            'data'    => ['availability' => $availability]
         ], 200);
     }
 
@@ -1403,9 +1389,9 @@ class AstrologerAuthController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => [
-                'sleep_start_time' => $astrologer->sleep_start_time ? $astrologer->sleep_start_time->format('H:i') : null,
-                'sleep_end_time' => $astrologer->sleep_end_time ? $astrologer->sleep_end_time->format('H:i') : null,
+            'data'   => [
+                'sleep_start_time'       => $astrologer->sleep_start_time ? $astrologer->sleep_start_time->format('H:i') : null,
+                'sleep_end_time'         => $astrologer->sleep_end_time ? $astrologer->sleep_end_time->format('H:i') : null,
                 'sleep_duration_minutes' => $astrologer->sleep_duration_minutes,
             ],
         ], 200);
@@ -1423,7 +1409,7 @@ class AstrologerAuthController extends Controller
 
         $validated = $request->validate([
             'sleep_start_time' => 'required|date_format:H:i',
-            'sleep_end_time' => 'required|date_format:H:i',
+            'sleep_end_time'   => 'required|date_format:H:i',
         ]);
 
         $startTime = DateTime::createFromFormat('H:i', $validated['sleep_start_time']);
@@ -1449,95 +1435,205 @@ class AstrologerAuthController extends Controller
         $astrologer->save();
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'Sleep hours updated successfully.',
-            'data' => [
-                'sleep_start_time' => $astrologer->sleep_start_time->format('H:i'),
-                'sleep_end_time' => $astrologer->sleep_end_time->format('H:i'),
+            'data'    => [
+                'sleep_start_time'       => $astrologer->sleep_start_time->format('H:i'),
+                'sleep_end_time'         => $astrologer->sleep_end_time->format('H:i'),
                 'sleep_duration_minutes' => $astrologer->sleep_duration_minutes,
             ],
         ], 200);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 4: CONTACT & BANK ACCOUNTS
+    |--------------------------------------------------------------------------
+    | Handles secondary phone verification with OTP, payout bank accounts,
+    | default account designation, and GST billing address management.
+    */
+
     /**
-     * Logout astrologer (revoke current token).
+     * Get all phone numbers for authenticated astrologer.
      */
-    public function logout(Request $request): JsonResponse
+    public function getPhoneNumbers(Request $request): JsonResponse
     {
         $user = $request->user();
         if (!$user || !$user->astrologer) {
             return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
-        try {
-            $fcmToken = $request->input('fcm_token');
-            $deviceId = $request->input('device_id');
+        $numbers = AstrologerPhoneNumber::where('astrologer_id', $user->astrologer->id)
+            ->orderByDesc('is_default')
+            ->orderBy('id')
+            ->get();
 
-            // Deactivate device token(s) on logout
-            if ($deviceId || $fcmToken) {
-                $query = \App\Models\UserDevice::where('user_id', $user->id);
-                if ($deviceId) {
-                    $query->where('device_id', $deviceId);
-                } elseif ($fcmToken) {
-                    $query->where('fcm_token', $fcmToken);
-                }
-                $query->update(['is_active' => false]);
-            } else {
-                // If no specific device info provided, deactivate all active devices for this astrologer
-                \App\Models\UserDevice::where('user_id', $user->id)->update(['is_active' => false]);
-            }
-
-            if (!$fcmToken || $user->fcm_token === $fcmToken) {
-                $user->fcm_token = null;
-                $user->save();
-            }
-
-            $token = $request->user()->currentAccessToken();
-            if ($token instanceof \Laravel\Sanctum\PersonalAccessToken) {
-                $token->delete();
-            } else {
-                $user->tokens()->delete();
-            }
-
-            try {
-                app(\App\Services\PresenceService::class)->setOffline($user->id);
-            } catch (\Throwable $e) {
-                Log::warning("Failed to set astrologer offline on logout: " . $e->getMessage());
-            }
-
-            return response()->json(['status' => 'success', 'message' => 'Logged out successfully.'], 200);
-        } catch (\Exception $e) {
-            Log::error('Astrologer logout error: ' . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => 'An error occurred while logging out.'], 500);
-        }
+        return response()->json(['status' => 'success', 'data' => ['numbers' => $numbers]], 200);
     }
 
     /**
-     * Delete astrologer account and all related data.
+     * Add astrologer phone number and send OTP.
      */
-    public function deleteAccount(Request $request): JsonResponse
+    public function addPhoneNumber(Request $request): JsonResponse
     {
         $user = $request->user();
         if (!$user || !$user->astrologer) {
             return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
         }
 
-        DB::beginTransaction();
-        try {
-            // Revoke all tokens
-            $user->tokens()->delete();
+        $validated = $request->validate([
+            'country_code' => ['required', 'string', 'max:8'],
+            'phone'        => ['required', 'string', 'max:20'],
+        ]);
 
-            // Delete the user, cascading via FK to astrologer + child records
-            $user->delete();
+        $astrologer = $user->astrologer;
 
-            DB::commit();
+        $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+        $expiry = now()->addMinutes(10);
 
-            return response()->json(['status' => 'success', 'message' => 'Astrologer account deleted successfully.'], 200);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Astrologer delete account error: ' . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => 'Failed to delete astrologer account.'], 500);
+        $phoneRecord = AstrologerPhoneNumber::where('astrologer_id', $astrologer->id)
+            ->where('country_code', $validated['country_code'])
+            ->where('phone', $validated['phone'])
+            ->first();
+
+        if ($phoneRecord) {
+            $phoneRecord->update([
+                'otp'            => $otp,
+                'otp_expires_at' => $expiry,
+            ]);
+
+            NotificationHelper::send(
+                $user->id,
+                'Phone OTP sent',
+                "OTP sent to {$validated['country_code']} {$validated['phone']}.",
+                ['phone_number_id' => $phoneRecord->id]
+            );
+
+            return response()->json(['status' => 'success', 'message' => 'Phone number updated with new OTP.', 'data' => ['phone' => $phoneRecord]], 200);
         }
+
+        $phoneRecord = AstrologerPhoneNumber::create([
+            'astrologer_id'  => $astrologer->id,
+            'country_code'   => $validated['country_code'],
+            'phone'          => $validated['phone'],
+            'is_verified'    => false,
+            'is_default'     => false,
+            'otp'            => $otp,
+            'otp_expires_at' => $expiry,
+        ]);
+
+        NotificationHelper::send(
+            $user->id,
+            'Phone OTP sent',
+            "OTP sent to {$validated['country_code']} {$validated['phone']}.",
+            ['phone_number_id' => $phoneRecord->id]
+        );
+
+        return response()->json(['status' => 'success', 'message' => 'Phone number added successfully.', 'data' => ['phone' => $phoneRecord]], 201);
+    }
+
+    /**
+     * Verify phone number OTP.
+     */
+    public function verifyPhoneNumber(Request $request, $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $validated = $request->validate([
+            'otp' => ['required', 'digits:4'],
+        ]);
+
+        $phoneRecord = AstrologerPhoneNumber::where('id', $id)
+            ->where('astrologer_id', $user->astrologer->id)
+            ->first();
+
+        if (!$phoneRecord) {
+            return response()->json(['status' => 'error', 'message' => 'Phone number not found.'], 404);
+        }
+
+        if ($phoneRecord->is_verified) {
+            return response()->json(['status' => 'success', 'message' => 'Phone number already verified.', 'data' => ['phone' => $phoneRecord]], 200);
+        }
+
+        if (!$phoneRecord->otp || !$phoneRecord->otp_expires_at || now()->greaterThan($phoneRecord->otp_expires_at)) {
+            return response()->json(['status' => 'error', 'message' => 'OTP expired. Please request a new one.'], 422);
+        }
+
+        if ($phoneRecord->otp !== $validated['otp']) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid OTP.'], 422);
+        }
+
+        $phoneRecord->update([
+            'is_verified'     => true,
+            'otp'             => null,
+            'otp_expires_at'  => null,
+            'otp_verified_at' => now(),
+        ]);
+
+        NotificationHelper::send(
+            $user->id,
+            'Phone verified',
+            "Phone number {$phoneRecord->country_code} {$phoneRecord->phone} has been verified.",
+            ['phone_number_id' => $phoneRecord->id]
+        );
+
+        return response()->json(['status' => 'success', 'message' => 'Phone number verified.', 'data' => ['phone' => $phoneRecord]], 200);
+    }
+
+    /**
+     * Set a verified phone number as default.
+     */
+    public function setDefaultPhoneNumber(Request $request, $id): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $phoneRecord = AstrologerPhoneNumber::where('id', $id)
+            ->where('astrologer_id', $user->astrologer->id)
+            ->first();
+
+        if (!$phoneRecord) {
+            return response()->json(['status' => 'error', 'message' => 'Phone number not found.'], 404);
+        }
+
+        if (!$phoneRecord->is_verified) {
+            return response()->json(['status' => 'error', 'message' => 'Phone number not verified.'], 422);
+        }
+
+        AstrologerPhoneNumber::where('astrologer_id', $user->astrologer->id)->update(['is_default' => false]);
+        $phoneRecord->update(['is_default' => true]);
+
+        NotificationHelper::send(
+            $user->id,
+            'Default number changed',
+            "{$phoneRecord->country_code} {$phoneRecord->phone} is now your default number.",
+            ['phone_number_id' => $phoneRecord->id]
+        );
+
+        return response()->json(['status' => 'success', 'message' => 'Default phone number set.', 'data' => ['phone' => $phoneRecord]], 200);
+    }
+
+    /**
+     * Get astrologer bank accounts for authenticated astrologer.
+     */
+    public function getBankAccounts(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $accounts = AstrologerBankAccount::where('astrologer_id', $user->astrologer->id)
+            ->orderByDesc('is_default')
+            ->orderByDesc('updated_at')
+            ->get();
+
+        return response()->json(['status' => 'success', 'data' => ['bank_accounts' => $accounts]], 200);
     }
 
     /**
@@ -1552,10 +1648,10 @@ class AstrologerAuthController extends Controller
 
         $validated = $request->validate([
             'account_holder_name' => ['required', 'string', 'max:150'],
-            'bank_name' => ['required', 'string', 'max:150'],
-            'account_number' => ['required', 'string', 'max:50'],
-            'ifsc_code' => ['required', 'string', 'size:11'],
-            'passbook_document' => ['sometimes', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
+            'bank_name'           => ['required', 'string', 'max:150'],
+            'account_number'      => ['required', 'string', 'max:50'],
+            'ifsc_code'           => ['required', 'string', 'size:11'],
+            'passbook_document'   => ['sometimes', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:10240'],
         ]);
 
         $astrologer = $user->astrologer;
@@ -1576,7 +1672,6 @@ class AstrologerAuthController extends Controller
             $passbookPath = Storage::disk('public')->putFileAs('astrologers/' . $user->id . '/bank_accounts', $file, $filename);
         }
 
-        // If no default selected and this is first account, make default
         $isDefault = !AstrologerBankAccount::where('astrologer_id', $astrologer->id)->exists();
 
         if ($isDefault) {
@@ -1584,14 +1679,14 @@ class AstrologerAuthController extends Controller
         }
 
         $account = AstrologerBankAccount::create([
-            'astrologer_id' => $astrologer->id,
+            'astrologer_id'       => $astrologer->id,
             'account_holder_name' => $validated['account_holder_name'],
-            'bank_name' => $validated['bank_name'],
-            'account_number' => $validated['account_number'],
-            'ifsc_code' => strtoupper($validated['ifsc_code']),
-            'passbook_document' => $passbookPath,
-            'is_default' => $isDefault,
-            'is_active' => true,
+            'bank_name'           => $validated['bank_name'],
+            'account_number'      => $validated['account_number'],
+            'ifsc_code'           => strtoupper($validated['ifsc_code']),
+            'passbook_document'   => $passbookPath,
+            'is_default'          => $isDefault,
+            'is_active'           => true,
         ]);
 
         return response()->json(['status' => 'success', 'message' => 'Bank account added successfully.', 'data' => ['bank_account' => $account]], 201);
@@ -1620,418 +1715,6 @@ class AstrologerAuthController extends Controller
     }
 
     /**
-     * Store or update astrologer skill details.
-     *
-     * @param UpdateAstrologerSkillRequest $request
-     * @return JsonResponse
-     */
-    public function updateSkill(UpdateAstrologerSkillRequest $request): JsonResponse
-    {
-        $user = $request->user();
-
-        if (!$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
-        }
-
-        $astrologer = $user->astrologer;
-        $validated = $request->validated();
-
-        $skill = AstrologerSkill::updateOrCreate(
-            ['astrologer_id' => $astrologer->id],
-            [
-                'category' => $validated['category'] ?? null,
-                'primary_skills' => $validated['primary_skills'] ?? null,
-                'all_skills' => $validated['all_skills'] ?? null,
-                'languages' => $validated['languages'] ?? null,
-                'experience_years' => $validated['experience_years'] ?? null,
-                'daily_contribution_hours' => $validated['daily_contribution_hours'] ?? null,
-                'heard_about' => $validated['heard_about'] ?? null,
-            ]
-        );
-
-        Astrologer::updateOrCreate(
-            ['id' => $astrologer->id],
-            [
-                'areas_of_expertise' => $validated['primary_skills'] ?? null,
-                'languages' => $validated['languages'] ?? null,
-                'years_of_experience' => $validated['experience_years'] ?? null,
-            ]
-        );
-
-        NotificationHelper::send(
-            $user->id,
-            'Skill updated',
-            'Your astrologer skills have been saved successfully.',
-            []
-        );
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Skill details saved successfully.',
-            'data' => [
-                'skill' => $skill,
-            ],
-        ], 200);
-    }
-
-    /**
-     * Store or update astrologer other details.
-     *
-     * @param UpdateAstrologerOtherDetailsRequest $request
-     * @return JsonResponse
-     */
-    public function updateOtherDetails(UpdateAstrologerOtherDetailsRequest $request): JsonResponse
-    {
-        $user = $request->user();
-
-        if (!$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
-        }
-
-        $astrologer = $user->astrologer;
-        $validated = $request->validated();
-
-        $otherDetails = AstrologerOtherDetail::updateOrCreate(
-            ['astrologer_id' => $astrologer->id],
-            [
-                'gender' => $validated['gender'] ?? null,
-                'current_address' => $validated['current_address'] ?? null,
-                'bio' => $validated['bio'] ?? null,
-                'date_of_birth' => $validated['date_of_birth'] ?? null,
-                'website_link' => $validated['website_link'] ?? null,
-                'instagram_username' => $validated['instagram_username'] ?? null,
-            ]
-        );
-
-        NotificationHelper::send(
-            $user->id,
-            'Profile details updated',
-            'Your astrologer profile other details have been updated successfully.',
-            []
-        );
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Other details saved successfully.',
-            'data' => [
-                'other_details' => $otherDetails,
-            ],
-        ], 200);
-    }
-
-    /**
-     * Get logged in astrologer's followers (community) with count.
-     */
-    public function getFollowers(Request $request): JsonResponse
-    {
-        try {
-            $user = $request->user();
-
-            if (!$user || !$user->astrologer) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Astrologer profile not found.',
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'query' => 'nullable|string|min:1|max:255',
-                'per_page' => 'nullable|integer|min:1|max:100',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors(),
-                ], 422);
-            }
-
-            $astrologer = $user->astrologer;
-            $searchQuery = $request->input('query');
-            $perPage = $request->input('per_page', 15);
-
-            $query = AstrologerCommunity::with('user')
-                ->where('astrologer_id', $astrologer->id);
-
-            // Apply search filter if provided
-            if ($searchQuery) {
-                $query->whereHas('user', function ($q) use ($searchQuery) {
-                    $q->where('name', 'LIKE', "%{$searchQuery}%")
-                      ->orWhere('email', 'LIKE', "%{$searchQuery}%")
-                      ->orWhere('phone', 'LIKE', "%{$searchQuery}%");
-                });
-            }
-
-            // Apply pagination
-            $results = $query->orderByDesc('created_at')->paginate($perPage);
-
-            $data = $results->map(function ($record) {
-                return [
-                    'user_id' => $record->user?->id,
-                    'name' => $record->user?->name,
-                    'email' => $record->user?->email,
-                    'phone' => $record->user?->phone,
-                    'is_liked' => $record->is_liked,
-                    'liked_at' => $record->liked_at,
-                    'followed_at' => $record->created_at,
-                ];
-            });
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Followers retrieved successfully',
-                'data' => [
-                    'total' => $results->total(),
-                    'per_page' => $results->perPage(),
-                    'current_page' => $results->currentPage(),
-                    'last_page' => $results->lastPage(),
-                    'followers' => $data,
-                ],
-            ], 200);
-        } catch (Exception $e) {
-            Log::error('Get followers error: ' . $e->getMessage());
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to retrieve followers: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Toggle like/unlike on a follower.
-     */
-    public function toggleFollowerLike(Request $request, $userId): JsonResponse
-    {
-        $user = $request->user();
-
-        if (!$user || !$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
-        }
-
-        $astrologer = $user->astrologer;
-        $follower = User::find($userId);
-
-        if (!$follower) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Follower user not found.',
-            ], 404);
-        }
-
-        $community = AstrologerCommunity::firstOrNew([
-            'astrologer_id' => $astrologer->id,
-            'user_id' => $follower->id,
-        ]);
-
-        $community->is_liked = !$community->is_liked;
-        $community->liked_at = $community->is_liked ? Carbon::now() : null;
-        $community->save();
-
-        NotificationHelper::send(
-            $follower->id,
-            $community->is_liked ? 'You were liked' : 'You were unliked',
-            $community->is_liked ? "Astrologer {$user->name} liked you." : "Astrologer {$user->name} unliked you.",
-            ['astrologer_id' => $astrologer->id]
-        );
-
-        return response()->json([
-            'status' => 'success',
-            'message' => $community->is_liked ? 'Follower liked.' : 'Follower unliked.',
-            'data' => [
-                'user_id' => $follower->id,
-                'is_liked' => $community->is_liked,
-                'liked_at' => $community->liked_at,
-            ],
-        ], 200);
-    }
-
-    /**
-     * Get favorite (liked) followers for logged in astrologer.
-     */
-    public function getFavorites(Request $request): JsonResponse
-    {
-        try {
-            $user = $request->user();
-
-            if (!$user || !$user->astrologer) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Astrologer profile not found.',
-                ], 404);
-            }
-
-            $validator = Validator::make($request->all(), [
-                'query' => 'nullable|string|min:1|max:255',
-                'per_page' => 'nullable|integer|min:1|max:100',
-            ]);
-
-            if ($validator->fails()) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Validation failed',
-                    'errors' => $validator->errors(),
-                ], 422);
-            }
-
-            $astrologer = $user->astrologer;
-            $searchQuery = $request->input('query');
-            $perPage = $request->input('per_page', 15);
-
-            $query = AstrologerCommunity::with('user')
-                ->where('astrologer_id', $astrologer->id)
-                ->where('is_liked', true);
-
-            // Apply search filter if provided
-            if ($searchQuery) {
-                $query->whereHas('user', function ($q) use ($searchQuery) {
-                    $q->where('name', 'LIKE', "%{$searchQuery}%")
-                      ->orWhere('email', 'LIKE', "%{$searchQuery}%")
-                      ->orWhere('phone', 'LIKE', "%{$searchQuery}%");
-                });
-            }
-
-            // Apply pagination
-            $results = $query->orderByDesc('liked_at')->paginate($perPage);
-
-            $data = $results->map(function ($record) {
-                return [
-                    'user_id' => $record->user?->id,
-                    'name' => $record->user?->name,
-                    'email' => $record->user?->email,
-                    'phone' => $record->user?->phone,
-                    'liked_at' => $record->liked_at,
-                    'followed_at' => $record->created_at,
-                ];
-            });
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Favorites retrieved successfully',
-                'data' => [
-                    'total' => $results->total(),
-                    'per_page' => $results->perPage(),
-                    'current_page' => $results->currentPage(),
-                    'last_page' => $results->lastPage(),
-                    'favorites' => $data,
-                ],
-            ], 200);
-        } catch (Exception $e) {
-            Log::error('Get favorites error: ' . $e->getMessage());
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Failed to retrieve favorites: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Toggle astrologer online/offline status or specific service status.
-     * 
-     * @param Request $request
-     * @return JsonResponse
-     * 
-     * Query/Body Parameters:
-     * - type: (optional) 'chat', 'call', or 'video_call'
-     *   - If not provided: toggles is_online status
-     *   - type=chat: toggles chat_enabled status
-     *   - type=call: toggles call_enabled status
-     *   - type=video_call: toggles video_call_enabled status
-     */
-    public function toggleOnlineStatus(Request $request): JsonResponse
-    {
-        $user = $request->user();
-
-        if (!$user || !$user->astrologer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Astrologer profile not found.',
-            ], 404);
-        }
-
-        $astrologer = $user->astrologer;
-        $type = $request->input('type'); // Get type from query or body
-
-        // Determine which field to toggle based on type
-        if ($type === 'chat') {
-            // Toggle chat_enabled status
-            $astrologer->is_chat_enabled = !$astrologer->is_chat_enabled;
-            $fieldName = 'is_chat_enabled';
-            $displayName = 'Chat';
-        } elseif ($type === 'call') {
-            // Toggle call_enabled status
-            $astrologer->is_call_enabled = !$astrologer->is_call_enabled;
-            $fieldName = 'is_call_enabled';
-            $displayName = 'Call';
-        } elseif ($type === 'video_call') {
-            // Toggle video_call_enabled status
-            $astrologer->is_video_call_enabled = !$astrologer->is_video_call_enabled;
-            $fieldName = 'is_video_call_enabled';
-            $displayName = 'Video Call';
-        } else {
-            // Default: Toggle is_online status (when type is not provided)
-            $newOnlineStatus = !$astrologer->is_online;
-            $astrologer->is_online = $newOnlineStatus;
-            // Sync chat/call enabled flags with general online status for backward compatibility
-            $astrologer->is_chat_enabled = $newOnlineStatus;
-            $astrologer->is_call_enabled = $newOnlineStatus;
-            $astrologer->is_video_call_enabled = $newOnlineStatus;
-            $fieldName = 'is_online';
-            $displayName = 'Online';
-        }
-
-        $astrologer->save();
-
-        $isOnline = (bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled);
-        $isBusy = (bool) ($user->is_busy ?? false);
-
-        User::where('id', $user->id)->update(['is_online' => $isOnline]);
-
-        // Broadcast real-time availability to all clients
-        try {
-            app(\App\Services\PresenceService::class)->broadcastAstrologerAvailability(
-                $user->id,
-                $isOnline,
-                $isBusy,
-                $user->busy_session_id ?? null,
-                null
-            );
-        } catch (\Throwable $e) {
-            Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on toggle: " . $e->getMessage());
-        }
-
-        NotificationHelper::send(
-            $user->id,
-            "{$displayName} status updated",
-            "Your {$displayName} status has been " . ($astrologer->$fieldName ? 'enabled' : 'disabled') . '.',
-            [$fieldName => $astrologer->$fieldName]
-        );
-
-        // Prepare response data
-        $responseData = [
-            'astrologer_id' => $astrologer->id,
-            'availability_status' => ($user->is_busy ?? false) ? 'Engaged' : ((bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled) ? 'Online' : 'Offline'),
-            $fieldName => (bool) $astrologer->$fieldName,
-            'updated_at' => $astrologer->updated_at,
-        ];
-
-        return response()->json([
-            'status' => 'success',
-            'message' => "{$displayName} status updated successfully.",
-            'data' => $responseData,
-        ], 200);
-    }
-
-    /**
      * Get astrologer billing address.
      */
     public function getBillingAddress(Request $request): JsonResponse
@@ -2045,15 +1728,15 @@ class AstrologerAuthController extends Controller
 
         if (!$billingAddress) {
             return response()->json([
-                'status' => 'success',
+                'status'  => 'success',
                 'message' => 'No billing address found.',
-                'data' => ['billing_address' => null]
+                'data'    => ['billing_address' => null]
             ], 200);
         }
 
         return response()->json([
             'status' => 'success',
-            'data' => ['billing_address' => $billingAddress]
+            'data'   => ['billing_address' => $billingAddress]
         ], 200);
     }
 
@@ -2070,16 +1753,13 @@ class AstrologerAuthController extends Controller
         $validated = $request->validated();
         $astrologer = $user->astrologer;
 
-        // Update or create billing address
         $billingAddress = AstrologerBillingAddress::where('astrologer_id', $astrologer->id)->first();
 
         if ($billingAddress) {
-            // Update existing
             $billingAddress->update($validated);
             $message = 'Billing address updated successfully.';
             $statusCode = 200;
         } else {
-            // Create new
             $validated['astrologer_id'] = $astrologer->id;
             $billingAddress = AstrologerBillingAddress::create($validated);
             $message = 'Billing address added successfully.';
@@ -2087,11 +1767,204 @@ class AstrologerAuthController extends Controller
         }
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => $message,
-            'data' => ['billing_address' => $billingAddress]
+            'data'    => ['billing_address' => $billingAddress]
         ], $statusCode);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 5: COMMUNITY & AUDIENCE ENGAGEMENT
+    |--------------------------------------------------------------------------
+    | Manages followers, liked user lists, and favorite audience interactions.
+    */
+
+    /**
+     * Get logged-in astrologer's followers (community) with pagination.
+     */
+    public function getFollowers(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user || !$user->astrologer) {
+                return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'query'    => 'nullable|string|min:1|max:255',
+                'per_page' => 'nullable|integer|min:1|max:100',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+            }
+
+            $astrologer = $user->astrologer;
+            $searchQuery = $request->input('query');
+            $perPage = $request->input('per_page', 15);
+
+            $query = AstrologerCommunity::with('user')
+                ->where('astrologer_id', $astrologer->id);
+
+            if ($searchQuery) {
+                $query->whereHas('user', function ($q) use ($searchQuery) {
+                    $q->where('name', 'LIKE', "%{$searchQuery}%")
+                      ->orWhere('email', 'LIKE', "%{$searchQuery}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchQuery}%");
+                });
+            }
+
+            $results = $query->orderByDesc('created_at')->paginate($perPage);
+
+            $data = $results->map(function ($record) {
+                return [
+                    'user_id'     => $record->user?->id,
+                    'name'        => $record->user?->name,
+                    'email'       => $record->user?->email,
+                    'phone'       => $record->user?->phone,
+                    'is_liked'    => $record->is_liked,
+                    'liked_at'    => $record->liked_at,
+                    'followed_at' => $record->created_at,
+                ];
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Followers retrieved successfully',
+                'data'    => [
+                    'total'        => $results->total(),
+                    'per_page'     => $results->perPage(),
+                    'current_page' => $results->currentPage(),
+                    'last_page'    => $results->lastPage(),
+                    'followers'    => $data,
+                ],
+            ], 200);
+        } catch (Exception $e) {
+            Log::error('Get followers error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to retrieve followers: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Toggle like/unlike on a follower.
+     */
+    public function toggleFollowerLike(Request $request, $userId): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user || !$user->astrologer) {
+            return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+        }
+
+        $astrologer = $user->astrologer;
+        $follower = User::find($userId);
+
+        if (!$follower) {
+            return response()->json(['status' => 'error', 'message' => 'Follower user not found.'], 404);
+        }
+
+        $community = AstrologerCommunity::firstOrNew([
+            'astrologer_id' => $astrologer->id,
+            'user_id'       => $follower->id,
+        ]);
+
+        $community->is_liked = !$community->is_liked;
+        $community->liked_at = $community->is_liked ? Carbon::now() : null;
+        $community->save();
+
+        NotificationHelper::send(
+            $follower->id,
+            $community->is_liked ? 'You were liked' : 'You were unliked',
+            $community->is_liked ? "Astrologer {$user->name} liked you." : "Astrologer {$user->name} unliked you.",
+            ['astrologer_id' => $astrologer->id]
+        );
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => $community->is_liked ? 'Follower liked.' : 'Follower unliked.',
+            'data'    => [
+                'user_id'  => $follower->id,
+                'is_liked' => $community->is_liked,
+                'liked_at' => $community->liked_at,
+            ],
+        ], 200);
+    }
+
+    /**
+     * Get favorite (liked) followers for logged-in astrologer.
+     */
+    public function getFavorites(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            if (!$user || !$user->astrologer) {
+                return response()->json(['status' => 'error', 'message' => 'Astrologer profile not found.'], 404);
+            }
+
+            $validator = Validator::make($request->all(), [
+                'query'    => 'nullable|string|min:1|max:255',
+                'per_page' => 'nullable|integer|min:1|max:100',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['status' => 'error', 'message' => 'Validation failed', 'errors' => $validator->errors()], 422);
+            }
+
+            $astrologer = $user->astrologer;
+            $searchQuery = $request->input('query');
+            $perPage = $request->input('per_page', 15);
+
+            $query = AstrologerCommunity::with('user')
+                ->where('astrologer_id', $astrologer->id)
+                ->where('is_liked', true);
+
+            if ($searchQuery) {
+                $query->whereHas('user', function ($q) use ($searchQuery) {
+                    $q->where('name', 'LIKE', "%{$searchQuery}%")
+                      ->orWhere('email', 'LIKE', "%{$searchQuery}%")
+                      ->orWhere('phone', 'LIKE', "%{$searchQuery}%");
+                });
+            }
+
+            $results = $query->orderByDesc('liked_at')->paginate($perPage);
+
+            $data = $results->map(function ($record) {
+                return [
+                    'user_id'     => $record->user?->id,
+                    'name'        => $record->user?->name,
+                    'email'       => $record->user?->email,
+                    'phone'       => $record->user?->phone,
+                    'liked_at'    => $record->liked_at,
+                    'followed_at' => $record->created_at,
+                ];
+            });
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Favorites retrieved successfully',
+                'data'    => [
+                    'total'        => $results->total(),
+                    'per_page'     => $results->perPage(),
+                    'current_page' => $results->currentPage(),
+                    'last_page'    => $results->lastPage(),
+                    'favorites'    => $data,
+                ],
+            ], 200);
+        } catch (Exception $e) {
+            Log::error('Get favorites error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to retrieve favorites: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | SECTION 6: MODERATION & USER BLOCKING
+    |--------------------------------------------------------------------------
+    | Allows astrologers to block abusive users, unblock, and list blocked users.
+    */
 
     /**
      * Astrologer blocks a user.
@@ -2114,10 +1987,10 @@ class AstrologerAuthController extends Controller
         $userBlock = $blockService->block($user, $targetUser, $reason);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'User blocked successfully.',
-            'data' => [
-                'user_id' => $targetUser->id,
+            'data'    => [
+                'user_id'    => $targetUser->id,
                 'is_blocked' => true,
                 'blocked_at' => $userBlock->created_at,
             ],
@@ -2144,10 +2017,10 @@ class AstrologerAuthController extends Controller
         $blockService->unblock($user, $targetUser);
 
         return response()->json([
-            'status' => 'success',
+            'status'  => 'success',
             'message' => 'User unblocked successfully.',
-            'data' => [
-                'user_id' => $targetUser->id,
+            'data'    => [
+                'user_id'    => $targetUser->id,
                 'is_blocked' => false,
             ],
         ], 200);
@@ -2170,12 +2043,12 @@ class AstrologerAuthController extends Controller
 
         return response()->json([
             'status' => 'success',
-            'data' => [
+            'data'   => [
                 'current_page' => $paginated->currentPage(),
-                'data' => $paginated->items(),
-                'total' => $paginated->total(),
-                'per_page' => $paginated->perPage(),
-                'last_page' => $paginated->lastPage(),
+                'data'         => $paginated->items(),
+                'total'        => $paginated->total(),
+                'per_page'     => $paginated->perPage(),
+                'last_page'    => $paginated->lastPage(),
             ],
         ], 200);
     }
