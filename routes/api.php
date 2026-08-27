@@ -310,6 +310,8 @@ Route::prefix('v1')->group(function () {
 
             // Device Token Management (FCM)
             Route::post('/device-token',        [DeviceTokenController::class, 'store']);
+            Route::delete('/device-token',      [DeviceTokenController::class, 'remove']);
+            Route::post('/device-token/remove', [DeviceTokenController::class, 'remove']);
             Route::post('/remove-token',        [DeviceTokenController::class, 'remove']);
 
             // In-App Notification Center (Accessible to any authenticated account)

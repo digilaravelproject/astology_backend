@@ -330,8 +330,8 @@ class CallChatNotificationFlowTest extends TestCase
 
         $response->assertStatus(200);
 
-        // Old device token must now be deactivated
-        $this->assertFalse(UserDevice::where('user_id', $this->provider->id)->where('fcm_token', 'fcm_token_provider_456')->value('is_active'));
+        // Old device token must now be permanently deleted
+        $this->assertNull(UserDevice::where('user_id', $this->provider->id)->where('fcm_token', 'fcm_token_provider_456')->first());
 
         // New device token must be active
         $this->assertTrue(UserDevice::where('user_id', $this->provider->id)->where('fcm_token', 'fcm_token_new_device_789')->value('is_active'));

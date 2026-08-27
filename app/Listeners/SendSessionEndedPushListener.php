@@ -9,14 +9,11 @@ use App\Models\Wallet;
 use App\Services\Notification\PushNotificationPayload;
 use App\Services\NotificationService;
 use App\Services\PricingCalculatorService;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class SendSessionEndedPushListener implements ShouldQueue
+class SendSessionEndedPushListener
 {
-    use InteractsWithQueue;
 
     /**
      * Handle session termination events for Chat or Call.
