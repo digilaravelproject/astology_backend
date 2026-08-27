@@ -40,14 +40,24 @@ class NotificationController extends Controller
             $total = AppNotification::where('user_id', $userId)->count();
             $unread = AppNotification::where('user_id', $userId)->where('is_read', false)->count();
 
-            return ApiResponse::success([
-                'total'  => $total,
-                'unread' => $unread,
-            ], 'Notification counts retrieved');
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Notification counts retrieved',
+                'data'    => [
+                    'total'        => (int) $total,
+                    'unread'       => (int) $unread,
+                    'total_count'  => (int) $total,
+                    'unread_count' => (int) $unread,
+                    'count'        => (int) $unread,
+                ],
+            ], 200);
 
         } catch (Exception $e) {
             Log::error('Notification count error: ' . $e->getMessage());
-            return ApiResponse::error('Failed to fetch notification count', 500);
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to fetch notification count',
+            ], 500);
         }
     }
 
@@ -133,17 +143,24 @@ class NotificationController extends Controller
 
             $notification = AppNotification::where('id', $id)->where('user_id', $userId)->first();
             if (!$notification) {
-                return ApiResponse::error('Notification not found', 404);
+                return response()->json(['status' => 'error', 'message' => 'Notification not found.'], 404);
             }
 
             $notification->is_read = true;
             $notification->save();
 
-            return ApiResponse::success(['notification' => $notification], 'Notification marked as read');
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Notification marked as read',
+                'data'    => [
+                    'notification' => $notification,
+                    'unread_count' => (int) AppNotification::where('user_id', $userId)->where('is_read', false)->count(),
+                ],
+            ], 200);
 
         } catch (Exception $e) {
             Log::error('Notification markRead error: ' . $e->getMessage());
-            return ApiResponse::error('Failed to update notification status', 500);
+            return response()->json(['status' => 'error', 'message' => 'Failed to update notification status'], 500);
         }
     }
 
@@ -162,13 +179,18 @@ class NotificationController extends Controller
                 ->where('is_read', false)
                 ->update(['is_read' => true]);
 
-            return ApiResponse::success([
-                'updated_count' => $updated,
-            ], 'All notifications marked as read');
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'All notifications marked as read',
+                'data'    => [
+                    'updated_count' => $updated,
+                    'unread_count'  => 0,
+                ],
+            ], 200);
 
         } catch (Exception $e) {
             Log::error('Notification markAllRead error: ' . $e->getMessage());
-            return ApiResponse::error('Failed to mark all notifications as read', 500);
+            return response()->json(['status' => 'error', 'message' => 'Failed to mark all notifications as read'], 500);
         }
     }
 
@@ -185,16 +207,53 @@ class NotificationController extends Controller
 
             $notification = AppNotification::where('id', $id)->where('user_id', $userId)->first();
             if (!$notification) {
-                return ApiResponse::error('Notification not found', 404);
+                return response()->json(['status' => 'error', 'message' => 'Notification not found.'], 404);
             }
 
             $notification->delete();
 
-            return ApiResponse::success(null, 'Notification deleted successfully');
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Notification deleted successfully',
+                'data'    => [
+                    'id'           => (int) $id,
+                    'deleted'      => true,
+                    'unread_count' => (int) AppNotification::where('user_id', $userId)->where('is_read', false)->count(),
+                ],
+            ], 200);
 
         } catch (Exception $e) {
             Log::error('Notification destroy error: ' . $e->getMessage());
-            return ApiResponse::error('Failed to delete notification', 500);
+            return response()->json(['status' => 'error', 'message' => 'Failed to delete notification'], 500);
+        }
+    }
+
+    /**
+     * Delete all notifications for the authenticated user/astrologer.
+     */
+    public function deleteAll(Request $request): JsonResponse
+    {
+        try {
+            $userId = $this->resolveUserId($request);
+            if (!$userId) {
+                return ApiResponse::error('User identification required', 400);
+            }
+
+            $deleted = AppNotification::where('user_id', $userId)->delete();
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'All notifications deleted successfully',
+                'data'    => [
+                    'deleted_count' => $deleted,
+                    'unread_count'  => 0,
+                    'total_count'   => 0,
+                ],
+            ], 200);
+
+        } catch (Exception $e) {
+            Log::error('Notification deleteAll error: ' . $e->getMessage());
+            return response()->json(['status' => 'error', 'message' => 'Failed to delete all notifications'], 500);
         }
     }
 }
