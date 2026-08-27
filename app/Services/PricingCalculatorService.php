@@ -39,7 +39,7 @@ class PricingCalculatorService
 
         // 3. Fallback logic if no active offer exists
         if (!$activeOfferPivot) {
-            $globalAdminRate = (float) Setting::get('global_commission_percentage', Setting::get('global_admin_commission_rate', 20.00));
+            $globalAdminRate = (float) (Setting::get('global_admin_commission_rate') ?? Setting::get('global_commission_percentage') ?? 20.00);
             $adminShareAmount = ($basePrice * $globalAdminRate) / 100;
             $astrologerShareAmount = $basePrice - $adminShareAmount;
 

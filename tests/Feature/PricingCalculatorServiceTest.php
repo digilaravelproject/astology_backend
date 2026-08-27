@@ -27,12 +27,13 @@ class PricingCalculatorServiceTest extends TestCase
     public function it_calculates_correct_fallback_pricing_when_no_active_offer_exists()
     {
         // 1. Arrange settings
-        Setting::updateOrCreate(['key' => 'global_admin_commission_rate'], ['value' => '25.00']);
+        Setting::set('global_admin_commission_rate', '25.00');
 
         // 2. Create astrologer
         $user = User::factory()->create();
         $astrologer = Astrologer::create([
             'user_id' => $user->id,
+            'status' => 'approved',
             'chat_rate_per_minute' => 100.00,
             'call_rate_per_minute' => 200.00,
             'chat_enabled' => true,
@@ -63,6 +64,7 @@ class PricingCalculatorServiceTest extends TestCase
         $user = User::factory()->create();
         $astrologer = Astrologer::create([
             'user_id' => $user->id,
+            'status' => 'approved',
             'chat_rate_per_minute' => 100.00,
             'call_rate_per_minute' => 200.00,
             'chat_enabled' => true,
@@ -115,12 +117,13 @@ class PricingCalculatorServiceTest extends TestCase
     public function it_falls_back_when_an_offer_is_expired_or_inactive()
     {
         // 1. Arrange settings
-        Setting::updateOrCreate(['key' => 'global_admin_commission_rate'], ['value' => '20.00']);
+        Setting::set('global_admin_commission_rate', '20.00');
 
         // 2. Create astrologer
         $user = User::factory()->create();
         $astrologer = Astrologer::create([
             'user_id' => $user->id,
+            'status' => 'approved',
             'chat_rate_per_minute' => 100.00,
             'call_rate_per_minute' => 200.00,
             'chat_enabled' => true,
@@ -161,6 +164,7 @@ class PricingCalculatorServiceTest extends TestCase
         $user = User::factory()->create(['name' => 'Offer Astrologer']);
         $astrologer = Astrologer::create([
             'user_id' => $user->id,
+            'status' => 'approved',
             'chat_rate_per_minute' => 100.00,
             'call_rate_per_minute' => 200.00,
             'chat_enabled' => true,

@@ -34,6 +34,7 @@ class AstrologerService
     public static function flushCatalogCache(): void
     {
         Cache::increment('astrologers:catalog_version');
+        Cache::forget('active_busy_provider_ids');
     }
 
     /**
@@ -41,29 +42,41 @@ class AstrologerService
      */
     public function listAstrologers(array $filters, ?User $currentUser): array
     {
+        $chatCol = Schema::hasColumn('astrologers', 'is_chat_enabled') ? 'is_chat_enabled' : (Schema::hasColumn('astrologers', 'chat_enabled') ? 'chat_enabled' : null);
+        $callCol = Schema::hasColumn('astrologers', 'is_call_enabled') ? 'is_call_enabled' : (Schema::hasColumn('astrologers', 'call_enabled') ? 'call_enabled' : null);
+        $videoCol = Schema::hasColumn('astrologers', 'is_video_call_enabled') ? 'is_video_call_enabled' : (Schema::hasColumn('astrologers', 'video_call_enabled') ? 'video_call_enabled' : null);
+        $onlineCol = Schema::hasColumn('astrologers', 'is_online') ? 'is_online' : null;
+
+        $selectColumns = [
+            'id',
+            'user_id',
+            'years_of_experience',
+            'areas_of_expertise',
+            'languages',
+            'profile_photo',
+            'bio',
+            'status',
+            'chat_rate_per_minute',
+            'call_rate_per_minute',
+            'video_call_rate_per_minute',
+            'po_at_5_enabled',
+            'po_at_5_rate_per_minute',
+            'po_at_5_sessions',
+            'created_at',
+            'updated_at'
+        ];
+
+        foreach ([$chatCol, $callCol, $videoCol, $onlineCol] as $col) {
+            if ($col && !in_array($col, $selectColumns, true)) {
+                $selectColumns[] = $col;
+            }
+        }
+
+        // Filter out columns that don't exist in current database schema
+        $validSelectColumns = array_filter($selectColumns, fn ($c) => Schema::hasColumn('astrologers', $c));
+
         $query = Astrologer::where('status', 'approved')
-            ->select([
-                'id',
-                'user_id',
-                'years_of_experience',
-                'areas_of_expertise',
-                'languages',
-                'profile_photo',
-                'bio',
-                'status',
-                'is_online',
-                'is_chat_enabled',
-                'is_call_enabled',
-                'is_video_call_enabled',
-                'chat_rate_per_minute',
-                'call_rate_per_minute',
-                'video_call_rate_per_minute',
-                'po_at_5_enabled',
-                'po_at_5_rate_per_minute',
-                'po_at_5_sessions',
-                'created_at',
-                'updated_at'
-            ])
+            ->select($validSelectColumns)
             ->with([
                 'user' => function ($q) {
                     $q->select(['id', 'name', 'gender', 'profile_photo']);
@@ -98,9 +111,16 @@ class AstrologerService
         $isOnline = $filters['is_online'] ?? null;
         $sortBy = $filters['sort_by'] ?? null;
         $searchQuery = $filters['search_query'] ?? null;
+
         $priceColumn = $this->getPriceColumn();
 
-        if ($type === 'favourite') {
+        if ($type === 'chat' && $chatCol) {
+            $query->where($chatCol, true);
+        } elseif ($type === 'call' && $callCol) {
+            $query->where($callCol, true);
+        } elseif ($type === 'video_call' && $videoCol) {
+            $query->where($videoCol, true);
+        } elseif ($type === 'favourite') {
             if (!$currentUser) {
                 throw new \InvalidArgumentException('Authentication is required to fetch favourite astrologers.', 401);
             }
@@ -146,9 +166,23 @@ class AstrologerService
 
         if ($isOnline !== null && in_array((string) $isOnline, ['0', '1'], true)) {
             if ((int) $isOnline === 1) {
-                $query->where(function ($query) {
-                    $query->where('is_chat_enabled', true)
-                        ->orWhere('is_call_enabled', true);
+                $query->where(function ($query) use ($chatCol, $callCol, $videoCol, $onlineCol) {
+                    $hasAny = false;
+                    if ($chatCol) {
+                        $query->where($chatCol, true);
+                        $hasAny = true;
+                    }
+                    if ($callCol) {
+                        $hasAny ? $query->orWhere($callCol, true) : $query->where($callCol, true);
+                        $hasAny = true;
+                    }
+                    if ($videoCol) {
+                        $hasAny ? $query->orWhere($videoCol, true) : $query->where($videoCol, true);
+                        $hasAny = true;
+                    }
+                    if ($onlineCol) {
+                        $hasAny ? $query->orWhere($onlineCol, true) : $query->where($onlineCol, true);
+                    }
                 });
             }
         }
@@ -159,23 +193,50 @@ class AstrologerService
             });
         }
 
+        // 1. Primary Order: Online / Available astrologers always come FIRST on top
+        $onlineConditions = [];
+        if ($chatCol) $onlineConditions[] = "{$chatCol} = 1";
+        if ($callCol) $onlineConditions[] = "{$callCol} = 1";
+        if ($videoCol) $onlineConditions[] = "{$videoCol} = 1";
+        if ($onlineCol) $onlineConditions[] = "{$onlineCol} = 1";
+
+        if (!empty($onlineConditions)) {
+            $onlineRaw = implode(' OR ', $onlineConditions);
+            $query->orderByRaw("CASE WHEN ({$onlineRaw}) THEN 1 ELSE 2 END ASC");
+        }
+
+        // 2. Secondary Order: User-selected sorting criteria
         switch ($sortBy) {
             case 'price_low_to_high':
+            case 'price_asc':
                 if ($priceColumn) {
                     $query->orderBy($priceColumn, 'asc');
                 }
                 break;
             case 'price_high_to_low':
+            case 'price_desc':
                 if ($priceColumn) {
                     $query->orderBy($priceColumn, 'desc');
                 }
                 break;
             case 'experience_high_to_low':
+            case 'experience_desc':
+            case 'experience':
                 $query->orderBy('years_of_experience', 'desc');
                 break;
             case 'rating_high_to_low':
+            case 'rating_desc':
+            case 'rating':
+            case 'popular':
                 $query->orderByDesc('reviews_avg_rating');
                 break;
+            case 'orders_desc':
+            case 'orders':
+            case 'total_orders':
+                $query->orderByDesc('id');
+                break;
+            case 'latest':
+            case 'newest':
             default:
                 $query->orderBy('id', 'desc');
                 break;

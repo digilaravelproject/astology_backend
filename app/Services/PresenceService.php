@@ -173,6 +173,9 @@ class PresenceService
                     $isCallEnabled,
                     $isVideoCallEnabled
                 ));
+
+                // Invalidate astrologers catalog cache so next request gets updated online list instantly
+                \App\Services\AstrologerService::flushCatalogCache();
             }
         } catch (\Throwable $e) {
             Log::warning("Broadcasting AstrologerAvailabilityUpdated failed for user #{$userId}: " . $e->getMessage());
