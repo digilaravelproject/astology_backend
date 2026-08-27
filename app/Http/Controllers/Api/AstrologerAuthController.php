@@ -418,6 +418,13 @@ class AstrologerAuthController extends Controller
             // Issue Sanctum token scoped specifically for 'role:astrologer'
             $token = $user->createToken('astrologer_token', ['role:astrologer'])->plainTextToken;
 
+            // Broadcast force logout over WebSocket to instantly terminate old devices
+            try {
+                broadcast(new \App\Events\UserForceLoggedOut($user->id, 'logged_in_on_another_device', (string) $request->input('device_id', '')));
+            } catch (\Throwable $e) {
+                // Ignore broadcast error
+            }
+
             DB::commit();
 
             NotificationHelper::send(
