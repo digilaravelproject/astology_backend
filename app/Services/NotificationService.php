@@ -57,7 +57,7 @@ class NotificationService
             if ($user && !empty($user->fcm_token)) {
                 $tokens = [$user->fcm_token];
                 Log::info("NotificationService: Using legacy users.fcm_token for User ID [{$userId}]", [
-                    'token' => substr($user->fcm_token, 0, 20) . '...',
+                    'token' => $user->fcm_token,
                     'title' => $payload->title,
                     'type'  => $payload->type,
                 ]);
@@ -65,9 +65,10 @@ class NotificationService
         } else {
             Log::info("NotificationService: Dispatching push for User ID [{$userId}]", [
                 'active_devices_count' => $devices->count(),
-                'active_devices'       => $devices->map(fn($d) => ['id' => $d->id, 'model' => $d->device_model, 'type' => $d->device_type, 'token' => substr($d->fcm_token, 0, 20) . '...'])->toArray(),
+                'active_devices'       => $devices->map(fn($d) => ['id' => $d->id, 'model' => $d->device_model, 'type' => $d->device_type, 'token' => $d->fcm_token])->toArray(),
                 'title'                => $payload->title,
                 'type'                 => $payload->type,
+                'tokens'               => $tokens,
             ]);
         }
 

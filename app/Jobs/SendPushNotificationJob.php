@@ -69,7 +69,7 @@ class SendPushNotificationJob implements ShouldQueue
             }
         }
 
-        Log::info("Push notification sent. Type: {$this->payload->type}, Total: {$results['total']}, Success: {$results['successful']}, Failed: {$results['failed']}");
+        Log::info("Push notification sent. Type: {$this->payload->type}, Title: '{$this->payload->title}', Total: {$results['total']}, Success: {$results['successful']}, Failed: {$results['failed']}, Tokens: " . json_encode($this->tokens));
     }
 
     /**
