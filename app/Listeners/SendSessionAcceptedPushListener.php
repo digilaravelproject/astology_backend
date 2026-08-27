@@ -7,11 +7,14 @@ use App\Events\ChatAccepted;
 use App\Models\User;
 use App\Services\Notification\PushNotificationPayload;
 use App\Services\NotificationService;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class SendSessionAcceptedPushListener
+class SendSessionAcceptedPushListener implements ShouldQueue
 {
+    use InteractsWithQueue;
 
     /**
      * Handle incoming session acceptance events for Chat or Call.

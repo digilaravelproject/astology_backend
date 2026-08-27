@@ -5,11 +5,14 @@ namespace App\Listeners;
 use App\Events\CallInitiated;
 use App\Models\User;
 use App\Services\NotificationService;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class SendCallPushNotificationListener
+class SendCallPushNotificationListener implements ShouldQueue
 {
+    use InteractsWithQueue;
 
     public function handle(CallInitiated $event): void
     {

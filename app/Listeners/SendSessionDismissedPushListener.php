@@ -7,11 +7,14 @@ use App\Events\ChatDismissed;
 use App\Models\User;
 use App\Services\Notification\PushNotificationPayload;
 use App\Services\NotificationService;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-class SendSessionDismissedPushListener
+class SendSessionDismissedPushListener implements ShouldQueue
 {
+    use InteractsWithQueue;
 
     /**
      * Handle dismiss, reject, cancel, or missed events for Chat or Call.
