@@ -133,6 +133,21 @@ class Astrologer extends Model
     ];
 
     /**
+     * The attributes that should be hidden for serialization.
+     *
+     * @var array<int, string>
+     */
+    protected $hidden = [
+        'id_proof',
+        'id_proof_number',
+        'certificate',
+        'gst_number',
+        'otp',
+        'otp_expires_at',
+        'otp_verified_at',
+    ];
+
+    /**
      * The attributes that should be cast to native types.
      *
      * @var array<string, string>

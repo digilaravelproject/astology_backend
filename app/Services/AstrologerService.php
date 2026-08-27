@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
+use App\Helpers\CacheHelper;
 use App\Helpers\MediaHelper;
+use App\Http\Resources\AstrologerResource;
 use App\Models\Astrologer;
 use App\Models\AstrologerCommunity;
 use App\Models\AstrologerReview;
@@ -15,6 +17,7 @@ use App\Models\Package;
 use App\Models\AstrologerPackage;
 use App\Models\PackagePurchase;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -26,25 +29,58 @@ class AstrologerService
     ) {}
 
     /**
-     * List astrologers with filters and pricing overrides.
+     * Flush / Invalidate all astrologer catalog Redis cache in O(1) time.
+     */
+    public static function flushCatalogCache(): void
+    {
+        Cache::increment('astrologers:catalog_version');
+    }
+
+    /**
+     * List astrologers with filters, pagination, sanitized security fields, smart Redis caching and pricing overrides.
      */
     public function listAstrologers(array $filters, ?User $currentUser): array
     {
-        $query = Astrologer::with([
-            'user',
-            'skill',
-            'otherDetails',
-            'offers' => function ($q) {
-                $q->wherePivot('status', 'active')
-                    ->where('is_active', true)
-                    ->where(function ($query) {
-                        $query->whereNull('expires_at')
-                            ->orWhere('expires_at', '>', Carbon::now());
-                    });
-            },
-        ])
+        $query = Astrologer::where('status', 'approved')
+            ->select([
+                'id',
+                'user_id',
+                'years_of_experience',
+                'areas_of_expertise',
+                'languages',
+                'profile_photo',
+                'bio',
+                'status',
+                'is_online',
+                'is_chat_enabled',
+                'is_call_enabled',
+                'is_video_call_enabled',
+                'chat_rate_per_minute',
+                'call_rate_per_minute',
+                'video_call_rate_per_minute',
+                'po_at_5_enabled',
+                'po_at_5_rate_per_minute',
+                'po_at_5_sessions',
+                'created_at',
+                'updated_at'
+            ])
+            ->with([
+                'user' => function ($q) {
+                    $q->select(['id', 'name', 'gender', 'profile_photo']);
+                },
+                'skill',
+                'offers' => function ($q) {
+                    $q->wherePivot('status', 'active')
+                        ->where('is_active', true)
+                        ->where(function ($query) {
+                            $query->whereNull('expires_at')
+                                ->orWhere('expires_at', '>', Carbon::now());
+                        });
+                },
+            ])
             ->withAvg('reviews', 'rating');
 
+        $blockedUserIds = [];
         // Bidirectional Block Filtering: Hide astrologers who blocked the user or whom the user blocked
         if ($currentUser && !($filters['include_blocked'] ?? false)) {
             $blockedUserIds = $this->blockService->getAllBidirectionalBlockedUserIds($currentUser->id);
@@ -145,7 +181,31 @@ class AstrologerService
                 break;
         }
 
-        $busyProviderIds = \App\Helpers\CacheHelper::remember('active_busy_provider_ids', 15, function () {
+        // Pagination parameters
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $perPage = min(100, max(1, (int) ($filters['per_page'] ?? $filters['limit'] ?? 20)));
+
+        // Catalog version for instant atomic invalidation
+        $version = (int) Cache::get('astrologers:catalog_version', 1);
+
+        $filterHash = md5(json_encode([
+            'filters' => $filters,
+            'blocked' => $blockedUserIds,
+            'fav_user' => ($type === 'favourite' && $currentUser) ? $currentUser->id : null,
+        ]));
+
+        $cacheKey = "astrologers:v{$version}:catalog:{$filterHash}:p{$page}_l{$perPage}";
+
+        // Smart Redis Cache with Jitter & Stampede Protection (120s TTL +/- 20s)
+        [$totalCount, $rawAstrologers] = CacheHelper::remember($cacheKey, 120, function () use ($query, $page, $perPage) {
+            $count = $query->count();
+            $items = $query->forPage($page, $perPage)->get();
+            return [$count, $items];
+        }, -20, 20);
+
+        $astrologerUserIds = $rawAstrologers->pluck('user_id')->toArray();
+
+        $busyProviderIds = CacheHelper::remember('active_busy_provider_ids', 15, function () {
             $activeChatProviders = ChatSession::whereIn('status', ['accepted', 'ongoing'])
                 ->pluck('provider_id')
                 ->toArray();
@@ -153,27 +213,30 @@ class AstrologerService
                 ->pluck('provider_id')
                 ->toArray();
             return array_values(array_unique(array_merge($activeChatProviders, $activeCallProviders)));
-        });
+        }, -3, 3);
 
-        $rawAstrologers = $query->get();
-        $astrologerUserIds = $rawAstrologers->pluck('user_id')->toArray();
         $customPackages = AstrologerPackage::whereIn('astrologer_id', $astrologerUserIds)->get()->keyBy('astrologer_id');
-        $defaultPackage = \App\Helpers\CacheHelper::remember('package:default', 3600, function () {
+        $defaultPackage = CacheHelper::remember('package:default', 3600, function () {
             return Package::where('is_default', true)->first();
         });
 
-        // Batch query completed orders (chats + calls) for all listed astrologers
-        $completedChatCounts = ChatSession::whereIn('provider_id', $astrologerUserIds)
-            ->where('status', 'completed')
-            ->select('provider_id', DB::raw('count(*) as count'))
-            ->groupBy('provider_id')
-            ->pluck('count', 'provider_id');
+        // Batch query completed orders for current paginated astrologers with Jitter Caching (300s TTL)
+        $orderCountsHash = md5(json_encode($astrologerUserIds));
+        $completedChatCounts = CacheHelper::remember("astrologers:chat_counts:v{$version}:{$orderCountsHash}", 300, function () use ($astrologerUserIds) {
+            return ChatSession::whereIn('provider_id', $astrologerUserIds)
+                ->where('status', 'completed')
+                ->select('provider_id', DB::raw('count(*) as count'))
+                ->groupBy('provider_id')
+                ->pluck('count', 'provider_id');
+        }, -30, 30);
 
-        $completedCallCounts = CallSession::whereIn('provider_id', $astrologerUserIds)
-            ->where('status', 'completed')
-            ->select('provider_id', DB::raw('count(*) as count'))
-            ->groupBy('provider_id')
-            ->pluck('count', 'provider_id');
+        $completedCallCounts = CacheHelper::remember("astrologers:call_counts:v{$version}:{$orderCountsHash}", 300, function () use ($astrologerUserIds) {
+            return CallSession::whereIn('provider_id', $astrologerUserIds)
+                ->where('status', 'completed')
+                ->select('provider_id', DB::raw('count(*) as count'))
+                ->groupBy('provider_id')
+                ->pluck('count', 'provider_id');
+        }, -30, 30);
 
         $activePurchases = collect();
         $followedAstrologerIds = [];
@@ -195,8 +258,9 @@ class AstrologerService
         }
 
         $astrologers = $rawAstrologers->map(function ($astrologer) use ($busyProviderIds, $customPackages, $defaultPackage, $activePurchases, $currentUser, $completedChatCounts, $completedCallCounts, $followedAstrologerIds, $blockedUserIds) {
-            $avgRating = $astrologer->reviews_avg_rating;
-            $astrologer->avg_rating = $avgRating ? (float) number_format($avgRating, 2) : 0;
+            $avgRating = $astrologer->reviews_avg_rating ? (float) number_format($astrologer->reviews_avg_rating, 2) : 0.0;
+            $astrologer->avg_rating = $avgRating;
+            $astrologer->reviews_avg_rating = $avgRating;
 
             // Total orders: Base offset 120 + actual completed chats/calls
             $actualCompleted = ($completedChatCounts->get($astrologer->user_id, 0)) + ($completedCallCounts->get($astrologer->user_id, 0));
@@ -205,16 +269,26 @@ class AstrologerService
             $astrologer->orders_count = $totalOrders;
             $astrologer->orders_formatted = "{$totalOrders}+ orders";
 
-            $astrologer->is_online = (bool) ($astrologer->is_chat_enabled || $astrologer->is_call_enabled);
-            $astrologer->is_chat_enabled = (bool) $astrologer->is_chat_enabled;
-            $astrologer->is_call_enabled = (bool) $astrologer->is_call_enabled;
+            $isChatEnabled = (bool) ($astrologer->is_chat_enabled ?? $astrologer->chat_enabled ?? false);
+            $isCallEnabled = (bool) ($astrologer->is_call_enabled ?? $astrologer->call_enabled ?? false);
+            $isVideoCallEnabled = (bool) ($astrologer->is_video_call_enabled ?? $astrologer->video_call_enabled ?? false);
 
+            $astrologer->is_chat_enabled = $isChatEnabled;
+            $astrologer->is_call_enabled = $isCallEnabled;
+            $astrologer->is_video_call_enabled = $isVideoCallEnabled;
+            $astrologer->chat_enabled = $isChatEnabled;
+            $astrologer->call_enabled = $isCallEnabled;
+            $astrologer->video_call_enabled = $isVideoCallEnabled;
+
+            $isOnline = (bool) ($isChatEnabled || $isCallEnabled || $isVideoCallEnabled || $astrologer->is_online);
             $isBusy = in_array($astrologer->user_id, $busyProviderIds);
+
+            $astrologer->is_online = $isOnline;
             $astrologer->is_busy = $isBusy;
             if ($astrologer->user) {
                 $astrologer->user->is_busy = $isBusy;
             }
-            $astrologer->availability_status = $isBusy ? 'Engaged' : ($astrologer->is_online ? 'Online' : 'Offline');
+            $astrologer->availability_status = $isBusy ? 'Engaged' : ($isOnline ? 'Online' : 'Offline');
 
             $astrologer->is_followed = $currentUser ? in_array($astrologer->id, $followedAstrologerIds) : false;
             $astrologer->is_blocked = $currentUser ? in_array($astrologer->user_id, $blockedUserIds) : false;
@@ -228,8 +302,9 @@ class AstrologerService
             $astrologer->chat_rate_per_minute = (float) $chatPricing['customer_rate'];
             $astrologer->call_rate_per_minute = (float) $callPricing['customer_rate'];
 
-            $astrologer->has_offer = $chatPricing['has_offer'] || $callPricing['has_offer'];
-            if ($astrologer->has_offer && $astrologer->offers->isNotEmpty()) {
+            $hasOffer = $chatPricing['has_offer'] || $callPricing['has_offer'];
+            $astrologer->has_offer = $hasOffer;
+            if ($hasOffer && $astrologer->offers && $astrologer->offers->isNotEmpty()) {
                 $activeOffer = $astrologer->offers->first();
                 $astrologer->offer_details = [
                     'id' => $activeOffer->id,
@@ -253,7 +328,7 @@ class AstrologerService
                 'name' => $packageName,
                 'price' => $packageAmount,
                 'duration' => $packageDuration,
-                'is_purchase' => $purchase ? true : false,
+                'is_purchase' => (bool) $purchase,
                 'used_time' => $purchase ? (int) ($purchase->total_duration - $purchase->remaining_duration) : 0,
                 'remaining_time' => $purchase ? (int) $purchase->remaining_duration : 0
             ];
@@ -261,13 +336,27 @@ class AstrologerService
             return $astrologer;
         });
 
-        return ['astrologers' => $astrologers];
+        $resolvedAstrologers = collect(AstrologerResource::collection($astrologers)->resolve())
+            ->map(fn ($item) => (object) $item)
+            ->values()
+            ->all();
+
+        return [
+            'astrologers' => $resolvedAstrologers,
+            'pagination' => [
+                'current_page' => $page,
+                'per_page'     => $perPage,
+                'total'        => $totalCount,
+                'last_page'    => (int) ceil($totalCount / max(1, $perPage)),
+                'has_more'     => ($page * $perPage) < $totalCount,
+            ]
+        ];
     }
 
     /**
      * Get details of a single astrologer.
      */
-    public function getAstrologerDetails(int $id, ?User $currentUser): Astrologer
+    public function getAstrologerDetails(int $id, ?User $currentUser)
     {
         $astrologer = Astrologer::with([
             'user',

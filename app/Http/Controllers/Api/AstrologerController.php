@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\AstrologerResource;
 use App\Services\AstrologerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,7 +23,9 @@ class AstrologerController extends Controller
     {
         try {
             $filters = $request->only([
-                'type', 'min_price', 'max_price', 'skills', 'language', 'min_rating', 'is_online', 'sort_by', 'search_query', 'include_blocked'
+                'type', 'min_price', 'max_price', 'skills', 'language', 'min_rating',
+                'is_online', 'sort_by', 'search_query', 'include_blocked',
+                'page', 'per_page', 'limit'
             ]);
             $currentUser = Auth::guard('sanctum')->user() ?? $request->user();
 
@@ -59,7 +62,7 @@ class AstrologerController extends Controller
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'astrologer' => $astrologer,
+                    'astrologer' => new AstrologerResource($astrologer),
                 ],
             ], 200);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
