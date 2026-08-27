@@ -94,13 +94,15 @@ class UserAuthController extends Controller
                 ['phone' => $phone]
             );
 
+            $exposedOtp = (!app()->isProduction() && config('app.debug')) ? $otp : null;
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'OTP generated and saved.',
                 'data' => [
                     'phone' => $phone,
                     'user_id' => $user->id,
-                    'otp' => $otp,
+                    'otp' => $exposedOtp,
                     'expires_at' => $user->otp_expires_at,
                 ],
             ], 200);

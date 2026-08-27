@@ -295,12 +295,14 @@ class AstrologerAuthController extends Controller
                 ['phone' => $phone]
             );
 
+            $exposedOtp = (!app()->isProduction() && config('app.debug')) ? $otp : null;
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'OTP generated and saved.',
                 'data' => [
                     'phone' => $phone,
-                    'otp' => $otp,
+                    'otp' => $exposedOtp,
                     'expires_at' => $astrologer->otp_expires_at,
                 ],
             ], 200);
