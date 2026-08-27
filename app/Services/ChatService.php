@@ -570,18 +570,30 @@ class ChatService
     }
 
     /**
-     * Get the current active session (initiated or ongoing) for a user.
+     * Get the current active session (initiated, waiting, accepted or ongoing) for a user.
      */
     public function getActiveSession($userId)
     {
-        return \App\Models\ChatSession::with(['consumer', 'provider.astrologer'])
+        $session = \App\Models\ChatSession::with(['consumer', 'provider.astrologer', 'latestMessage'])
             ->where(function ($query) use ($userId) {
                 $query->where('consumer_id', $userId)
                       ->orWhere('provider_id', $userId);
             })
-            ->whereIn('status', ['initiated', 'accepted', 'ongoing'])
-            ->latest()
+            ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
+            ->orderByRaw("CASE WHEN status IN ('ongoing', 'active', 'accepted') THEN 1 WHEN status IN ('initiated', 'waiting') THEN 2 ELSE 3 END")
+            ->latest('id')
             ->first();
+
+        if ($session) {
+            if ($session->consumer) {
+                $session->consumer->profile_photo_url = \App\Helpers\MediaHelper::getUrl($session->consumer->profile_photo);
+            }
+            if ($session->provider) {
+                $session->provider->profile_photo_url = \App\Helpers\MediaHelper::getUrl($session->provider->profile_photo);
+            }
+        }
+
+        return $session;
     }
 
     /**

@@ -34,4 +34,73 @@ class ChatInitiated implements ShouldBroadcastNow
     {
         return 'ChatInitiated';
     }
+
+    /**
+     * Explicit payload so the astrologer frontend receives full consumer birth details on incoming chat ring.
+     */
+    public function broadcastWith(): array
+    {
+        $consumer = null;
+        if ($this->senderData instanceof \App\Models\User) {
+            $user = $this->senderData;
+            $consumer = [
+                'id'                  => (int) $user->id,
+                'name'                => $user->name,
+                'phone'               => $user->phone,
+                'gender'              => $user->gender,
+                'date_of_birth'       => $user->date_of_birth ? ($user->date_of_birth instanceof \Carbon\Carbon ? $user->date_of_birth->toISOString() : $user->date_of_birth) : null,
+                'time_of_birth'       => $user->time_of_birth,
+                'place_of_birth'      => $user->place_of_birth,
+                'latitude'            => $user->latitude ? (float) $user->latitude : null,
+                'longitude'           => $user->longitude ? (float) $user->longitude : null,
+                'city'                => $user->city,
+                'country'             => $user->country,
+                'languages'           => $user->languages ?? [],
+                'profile_photo'       => $user->profile_photo,
+                'profile_photo_url'   => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
+                'profile_completed'   => (bool) $user->profile_completed,
+            ];
+        } elseif (is_array($this->senderData)) {
+            $consumer = $this->senderData;
+            if (isset($consumer['profile_photo']) && !isset($consumer['profile_photo_url'])) {
+                $consumer['profile_photo_url'] = \App\Helpers\MediaHelper::getUrl($consumer['profile_photo']);
+            }
+        }
+
+        if (!$consumer && $this->session && $this->session->consumer) {
+            $user = $this->session->consumer;
+            $consumer = [
+                'id'                  => (int) $user->id,
+                'name'                => $user->name,
+                'phone'               => $user->phone,
+                'gender'              => $user->gender,
+                'date_of_birth'       => $user->date_of_birth ? ($user->date_of_birth instanceof \Carbon\Carbon ? $user->date_of_birth->toISOString() : $user->date_of_birth) : null,
+                'time_of_birth'       => $user->time_of_birth,
+                'place_of_birth'      => $user->place_of_birth,
+                'latitude'            => $user->latitude ? (float) $user->latitude : null,
+                'longitude'           => $user->longitude ? (float) $user->longitude : null,
+                'city'                => $user->city,
+                'country'             => $user->country,
+                'languages'           => $user->languages ?? [],
+                'profile_photo'       => $user->profile_photo,
+                'profile_photo_url'   => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
+                'profile_completed'   => (bool) $user->profile_completed,
+            ];
+        }
+
+        return [
+            'session' => [
+                'id'              => (int) $this->session->id,
+                'consumer_id'     => (int) $this->session->consumer_id,
+                'provider_id'     => (int) $this->session->provider_id,
+                'question'        => $this->session->question,
+                'status'          => $this->session->status, // 'initiated' or 'waiting'
+                'rate_per_minute' => (float) $this->session->rate_per_minute,
+                'created_at'      => optional($this->session->created_at)?->toISOString(),
+                'consumer'        => $consumer,
+            ],
+            'senderData' => $consumer,
+            'user'       => $consumer,
+        ];
+    }
 }

@@ -38,14 +38,28 @@ class CallController extends Controller
         ]);
 
         try {
-            $consumerId = $request->user()->id;
+            $consumer = $request->user();
+            $consumerId = $consumer->id;
             $session = $this->callService->initiateCall($consumerId, $request->provider_id);
+            $session->load(['consumer', 'provider']);
 
             broadcast(new CallInitiated($session, [
-                'id'            => $request->user()->id,
-                'name'          => $request->user()->name,
-                'profile_photo' => \App\Helpers\MediaHelper::getUrl($request->user()->profile_photo),
-                'offer'         => $request->offer,
+                'id'                  => (int) $consumer->id,
+                'name'                => $consumer->name,
+                'phone'               => $consumer->phone,
+                'gender'              => $consumer->gender,
+                'date_of_birth'       => $consumer->date_of_birth ? ($consumer->date_of_birth instanceof \Carbon\Carbon ? $consumer->date_of_birth->toISOString() : $consumer->date_of_birth) : null,
+                'time_of_birth'       => $consumer->time_of_birth,
+                'place_of_birth'      => $consumer->place_of_birth,
+                'latitude'            => $consumer->latitude ? (float) $consumer->latitude : null,
+                'longitude'           => $consumer->longitude ? (float) $consumer->longitude : null,
+                'city'                => $consumer->city,
+                'country'             => $consumer->country,
+                'languages'           => $consumer->languages ?? [],
+                'profile_photo'       => $consumer->profile_photo,
+                'profile_photo_url'   => \App\Helpers\MediaHelper::getUrl($consumer->profile_photo),
+                'profile_completed'   => (bool) $consumer->profile_completed,
+                'offer'               => $request->offer,
             ]));
 
             return ApiResponse::success(['session' => $session], 'Call initiated successfully');
@@ -231,23 +245,39 @@ class CallController extends Controller
             $userId = $request->user()->id;
 
             $sessions = CallSession::with([
-                'consumer:id,name,profile_photo',
+                'consumer:id,name,phone,gender,date_of_birth,time_of_birth,place_of_birth,latitude,longitude,city,country,languages,profile_photo,profile_completed',
             ])
             ->where('provider_id', $userId)
-            ->whereIn('status', ['initiated', 'ringing'])
-            ->latest()
+            ->whereIn('status', ['initiated', 'ringing', 'waiting'])
+            ->latest('id')
             ->get()
             ->map(function ($session) {
+                $consumer = $session->consumer;
+                $caller = $consumer ? [
+                    'id'                  => (int) $consumer->id,
+                    'name'                => $consumer->name,
+                    'phone'               => $consumer->phone,
+                    'gender'              => $consumer->gender,
+                    'date_of_birth'       => $consumer->date_of_birth ? ($consumer->date_of_birth instanceof \Carbon\Carbon ? $consumer->date_of_birth->toISOString() : $consumer->date_of_birth) : null,
+                    'time_of_birth'       => $consumer->time_of_birth,
+                    'place_of_birth'      => $consumer->place_of_birth,
+                    'latitude'            => $consumer->latitude ? (float) $consumer->latitude : null,
+                    'longitude'           => $consumer->longitude ? (float) $consumer->longitude : null,
+                    'city'                => $consumer->city,
+                    'country'             => $consumer->country,
+                    'languages'           => $consumer->languages ?? [],
+                    'profile_photo'       => $consumer->profile_photo,
+                    'profile_photo_url'   => \App\Helpers\MediaHelper::getUrl($consumer->profile_photo),
+                    'profile_completed'   => (bool) $consumer->profile_completed,
+                ] : null;
+
                 return [
-                    'id'          => $session->id,
+                    'id'          => (int) $session->id,
                     'status'      => $session->status,
-                    'caller'      => $session->consumer ? [
-                        'id'            => $session->consumer->id,
-                        'name'          => $session->consumer->name,
-                        'profile_photo' => \App\Helpers\MediaHelper::getUrl($session->consumer->profile_photo),
-                    ] : null,
-                    'created_at'  => $session->created_at->toISOString(),
-                    'expires_at'  => $session->created_at->addSeconds(60)->toISOString(),
+                    'caller'      => $caller,
+                    'consumer'    => $caller,
+                    'created_at'  => $session->created_at?->toISOString(),
+                    'expires_at'  => $session->created_at ? $session->created_at->addSeconds(60)->toISOString() : null,
                 ];
             });
 
@@ -271,7 +301,7 @@ class CallController extends Controller
             $userId = $request->user()->id;
 
             $session = CallSession::with([
-                'consumer:id,name,profile_photo,gender,date_of_birth,time_of_birth,place_of_birth,latitude,longitude',
+                'consumer:id,name,phone,gender,date_of_birth,time_of_birth,place_of_birth,latitude,longitude,city,country,languages,profile_photo,profile_completed',
                 'provider:id,name,profile_photo',
                 'provider.astrologer:user_id,call_rate_per_minute',
             ])
@@ -280,42 +310,52 @@ class CallController extends Controller
                   ->orWhere('provider_id', $userId);
             })
             ->whereIn('status', ['initiated', 'ringing', 'accepted', 'waiting', 'ongoing'])
-            ->latest()
+            ->orderByRaw("CASE WHEN status IN ('ongoing', 'accepted') THEN 1 WHEN status IN ('initiated', 'ringing', 'waiting') THEN 2 ELSE 3 END")
+            ->latest('id')
             ->first();
+
+            if (!$session) {
+                return ApiResponse::success(null, 'No active call session found');
+            }
 
             $isPrepaid = false;
             $remainingDurationSeconds = null;
             $packageInfo = null;
 
-            if ($session) {
-                $subSession = \App\Models\PackageSubSession::where('call_session_id', $session->id)
-                    ->whereNull('ended_at')
-                    ->first();
+            if ($session->consumer) {
+                $session->consumer->profile_photo_url = \App\Helpers\MediaHelper::getUrl($session->consumer->profile_photo);
+            }
+            if ($session->provider) {
+                $session->provider->profile_photo_url = \App\Helpers\MediaHelper::getUrl($session->provider->profile_photo);
+            }
 
-                if ($subSession) {
-                    $isPrepaid = true;
-                    $purchase = $subSession->purchase;
-                    if ($purchase) {
-                        $remainingDurationSeconds = (int) $purchase->remaining_duration;
-                        if ($subSession->started_at) {
-                            $elapsed = now()->diffInSeconds($subSession->started_at);
-                            $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
-                        }
+            $subSession = \App\Models\PackageSubSession::where('call_session_id', $session->id)
+                ->whereNull('ended_at')
+                ->first();
+
+            if ($subSession) {
+                $isPrepaid = true;
+                $purchase = $subSession->purchase;
+                if ($purchase) {
+                    $remainingDurationSeconds = (int) $purchase->remaining_duration;
+                    if ($subSession->started_at) {
+                        $elapsed = now()->diffInSeconds($subSession->started_at);
+                        $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
                     }
-
-                    $packageInfo = [
-                        'package_purchase_id'        => (int) $subSession->package_purchase_id,
-                        'package_sub_session_id'     => (int) $subSession->id,
-                        'remaining_duration_seconds' => $remainingDurationSeconds,
-                    ];
                 }
 
-                $session->billing_mode       = $isPrepaid ? 'prepaid' : 'normal';
-                $session->is_normal          = !$isPrepaid;
-                $session->is_prepaid         = $isPrepaid;
-                $session->is_package_session = $isPrepaid;
-                $session->package_info       = $packageInfo;
+                $packageInfo = [
+                    'package_purchase_id'        => (int) $subSession->package_purchase_id,
+                    'package_sub_session_id'     => (int) $subSession->id,
+                    'remaining_duration_seconds' => $remainingDurationSeconds,
+                ];
             }
+
+            $session->billing_mode       = $isPrepaid ? 'prepaid' : 'normal';
+            $session->is_normal          = !$isPrepaid;
+            $session->is_prepaid         = $isPrepaid;
+            $session->is_package_session = $isPrepaid;
+            $session->package_info       = $packageInfo;
 
             return ApiResponse::success(
                 [

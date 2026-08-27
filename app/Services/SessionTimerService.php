@@ -78,6 +78,7 @@ class SessionTimerService
 
             if ($mode === 'chat') {
                 $linkedSession = $this->chatService->initiateChat($userId, $astrologerId, $question);
+                $linkedSession->load(['consumer', 'provider']);
 
                 $user = \App\Models\User::find($userId);
                 if ($user) {
@@ -85,15 +86,28 @@ class SessionTimerService
                     broadcast(new ChatQueueUpdated($linkedSession->provider_id, $linkedSession, 'initiated'));
                 }
             } else {
-                $linkedSession = $this->callService->initiateCall($userId, $astrologerId);
+                $linkedSession = $this->callService->initiateCall($userId, $astrologerId, true);
+                $linkedSession->load(['consumer', 'provider']);
 
                 $user = \App\Models\User::find($userId);
                 if ($user) {
                     broadcast(new CallInitiated($linkedSession, [
-                        'id'            => $user->id,
-                        'name'          => $user->name,
-                        'profile_photo' => \App\Helpers\MediaHelper::getFullUrl($user->profile_photo),
-                        'offer'         => $offer ?? 'audio',
+                        'id'                  => (int) $user->id,
+                        'name'                => $user->name,
+                        'phone'               => $user->phone,
+                        'gender'              => $user->gender,
+                        'date_of_birth'       => $user->date_of_birth ? ($user->date_of_birth instanceof \Carbon\Carbon ? $user->date_of_birth->toISOString() : $user->date_of_birth) : null,
+                        'time_of_birth'       => $user->time_of_birth,
+                        'place_of_birth'      => $user->place_of_birth,
+                        'latitude'            => $user->latitude ? (float) $user->latitude : null,
+                        'longitude'           => $user->longitude ? (float) $user->longitude : null,
+                        'city'                => $user->city,
+                        'country'             => $user->country,
+                        'languages'           => $user->languages ?? [],
+                        'profile_photo'       => $user->profile_photo,
+                        'profile_photo_url'   => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
+                        'profile_completed'   => (bool) $user->profile_completed,
+                        'offer'               => $offer ?? 'audio',
                     ]));
                 }
             }

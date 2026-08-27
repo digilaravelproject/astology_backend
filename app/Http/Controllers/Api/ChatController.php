@@ -48,6 +48,7 @@ class ChatController extends Controller
                 $request->provider_id,
                 $request->input('question')
             );
+            $session->load(['consumer', 'provider']);
             
             // Broadcast ChatInitiated with full consumer details
             broadcast(new ChatInitiated($session, $request->user()));
@@ -401,14 +402,17 @@ class ChatController extends Controller
             $userId = $request->user()->id;
             $session = $this->chatService->getActiveSession($userId);
 
+            if (!$session) {
+                return ApiResponse::success(null, 'No active chat session found');
+            }
+
             $isPrepaid = false;
             $remainingDurationSeconds = null;
             $packageInfo = null;
 
-            if ($session) {
-                $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
-                    ->whereNull('ended_at')
-                    ->first();
+            $subSession = \App\Models\PackageSubSession::where('chat_session_id', $session->id)
+                ->whereNull('ended_at')
+                ->first();
 
                 if ($subSession) {
                     $isPrepaid = true;
@@ -428,12 +432,11 @@ class ChatController extends Controller
                     ];
                 }
 
-                $session->billing_mode       = $isPrepaid ? 'prepaid' : 'normal';
-                $session->is_normal          = !$isPrepaid;
-                $session->is_prepaid         = $isPrepaid;
-                $session->is_package_session = $isPrepaid;
-                $session->package_info       = $packageInfo;
-            }
+            $session->billing_mode       = $isPrepaid ? 'prepaid' : 'normal';
+            $session->is_normal          = !$isPrepaid;
+            $session->is_prepaid         = $isPrepaid;
+            $session->is_package_session = $isPrepaid;
+            $session->package_info       = $packageInfo;
             
             return ApiResponse::success([
                 'session'                    => $session,
@@ -481,6 +484,13 @@ class ChatController extends Controller
                     'message' => 'No current chat session found',
                     'data' => null
                 ], 200);
+            }
+
+            if ($session->consumer) {
+                $session->consumer->profile_photo_url = \App\Helpers\MediaHelper::getUrl($session->consumer->profile_photo);
+            }
+            if ($session->provider) {
+                $session->provider->profile_photo_url = \App\Helpers\MediaHelper::getUrl($session->provider->profile_photo);
             }
 
             $isPrepaid = false;
