@@ -414,23 +414,23 @@ class ChatController extends Controller
                 ->whereNull('ended_at')
                 ->first();
 
-                if ($subSession) {
-                    $isPrepaid = true;
-                    $purchase = $subSession->purchase;
-                    if ($purchase) {
-                        $remainingDurationSeconds = (int) $purchase->remaining_duration;
-                        if ($subSession->started_at) {
-                            $elapsed = now()->diffInSeconds($subSession->started_at);
-                            $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
-                        }
+            if ($subSession) {
+                $isPrepaid = true;
+                $purchase = $subSession->purchase;
+                if ($purchase) {
+                    $remainingDurationSeconds = (int) $purchase->remaining_duration;
+                    if ($subSession->started_at) {
+                        $elapsed = now()->diffInSeconds($subSession->started_at);
+                        $remainingDurationSeconds = max(0, $remainingDurationSeconds - (int) $elapsed);
                     }
-
-                    $packageInfo = [
-                        'package_purchase_id'        => (int) $subSession->package_purchase_id,
-                        'package_sub_session_id'     => (int) $subSession->id,
-                        'remaining_duration_seconds' => $remainingDurationSeconds,
-                    ];
                 }
+
+                $packageInfo = [
+                    'package_purchase_id'        => (int) $subSession->package_purchase_id,
+                    'package_sub_session_id'     => (int) $subSession->id,
+                    'remaining_duration_seconds' => $remainingDurationSeconds,
+                ];
+            }
 
             $session->billing_mode       = $isPrepaid ? 'prepaid' : 'normal';
             $session->is_normal          = !$isPrepaid;
