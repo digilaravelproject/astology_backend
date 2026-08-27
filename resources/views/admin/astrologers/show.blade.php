@@ -7,20 +7,42 @@
             <h1 class="text-3xl md:text-4xl font-bold text-slate-900 mb-1">Astrologer Profile</h1>
             <p class="text-sm text-slate-500">Review full astrologer details, documents, and service settings.</p>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <a href="{{ route('admin.astrologers.edit', $user->id) }}" class="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-sky-600 text-white shadow-sm hover:bg-sky-700 transition">
+        <div class="flex flex-wrap gap-2 items-center">
+            @if(optional($user)->astrologer?->status !== 'approved')
+                <form method="POST" action="{{ route('admin.astrologers.status', $user->id) }}" class="inline">
+                    @csrf
+                    <input type="hidden" name="status" value="approved">
+                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition font-bold text-sm">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Approve Profile</span>
+                    </button>
+                </form>
+            @endif
+
+            @if(optional($user)->astrologer?->status !== 'rejected')
+                <form method="POST" action="{{ route('admin.astrologers.status', $user->id) }}" class="inline">
+                    @csrf
+                    <input type="hidden" name="status" value="rejected">
+                    <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 text-white shadow-sm hover:bg-amber-700 transition font-bold text-sm">
+                        <i class="fas fa-times-circle"></i>
+                        <span>Reject</span>
+                    </button>
+                </form>
+            @endif
+
+            <a href="{{ route('admin.astrologers.edit', $user->id) }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-sky-600 text-white shadow-sm hover:bg-sky-700 transition text-sm">
                 <i class="fas fa-edit"></i>
                 <span>Edit</span>
             </a>
-            <form method="POST" action="{{ route('admin.astrologers.destroy', $user->id) }}" onsubmit="return confirm('Are you sure you want to delete this astrologer?');" class="inline">
+            <form method="POST" action="{{ route('admin.astrologers.destroy', $user->id) }}" onsubmit="return confirm('Are you sure you want to permanently delete this astrologer and all associated data? This action cannot be undone.');" class="inline">
                 @csrf
                 @method('DELETE')
-                <button type="submit" class="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-rose-600 text-white shadow-sm hover:bg-rose-700 transition">
+                <button type="submit" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 text-white shadow-sm hover:bg-rose-700 transition text-sm">
                     <i class="fas fa-trash-alt"></i>
                     <span>Delete</span>
                 </button>
             </form>
-            <a href="{{ route('admin.astrologers.index') }}" class="inline-flex items-center gap-2 px-5 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 transition">
+            <a href="{{ route('admin.astrologers.index') }}" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 transition text-sm">
                 <i class="fas fa-arrow-left"></i>
                 <span>Back</span>
             </a>

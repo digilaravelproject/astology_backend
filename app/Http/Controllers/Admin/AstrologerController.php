@@ -308,11 +308,138 @@ class AstrologerController extends Controller
         return $data;
     }
 
-    public function destroy($id)
+    /**
+     * Quick status update for astrologer from admin panel (e.g. approved, pending, rejected, suspended).
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate([
+            'status' => ['required', Rule::in(['pending', 'approved', 'rejected'])],
+        ]);
+
+        $user = User::where('user_type', 'astrologer')->findOrFail($id);
+        $astrologer = Astrologer::firstOrCreate(['user_id' => $user->id]);
+
+        $oldStatus = $astrologer->status;
+        $newStatus = $request->input('status');
+
+        $astrologer->status = $newStatus;
+        if ($newStatus === 'approved') {
+            // Ensure default pricing flags if not configured
+            if ($astrologer->chat_rate_per_minute === null) {
+                $astrologer->chat_rate_per_minute = Setting::get('default_chat_rate_per_minute', 15.00);
+            }
+            if ($astrologer->call_rate_per_minute === null) {
+                $astrologer->call_rate_per_minute = Setting::get('default_call_rate_per_minute', 15.00);
+            }
+        }
+        $astrologer->save();
+
+        // Flush catalog cache so mobile/frontend instantly gets updated listing
+        \App\Services\AstrologerService::flushCatalogCache();
+
+        // Broadcast availability update if needed
+        try {
+            $isOnline = (bool) ($astrologer->is_online || $astrologer->is_chat_enabled || $astrologer->is_call_enabled || $astrologer->is_video_call_enabled);
+            app(\App\Services\PresenceService::class)->broadcastAstrologerAvailability(
+                $user->id,
+                $newStatus === 'approved' ? $isOnline : false,
+                (bool) ($user->is_busy ?? false)
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Broadcast on admin astrologer status update failed: ' . $e->getMessage());
+        }
+
+        // Notify astrologer on approval or rejection
+        if ($oldStatus !== $newStatus) {
+            try {
+                if ($newStatus === 'approved') {
+                    \App\Services\NotificationHelper::send(
+                        userId: $user->id,
+                        title: 'Profile Approved! 🎉',
+                        body: 'Congratulations! Your astrologer profile has been approved. You can now go online and accept consultations.',
+                        meta: [
+                            'type'         => 'system',
+                            'screen_route' => '/profile',
+                        ]
+                    );
+                } elseif ($newStatus === 'rejected') {
+                    \App\Services\NotificationHelper::send(
+                        userId: $user->id,
+                        title: 'Profile Update Required ⚠️',
+                        body: 'Your astrologer profile could not be approved at this time. Please update your details or contact support.',
+                        meta: [
+                            'type'         => 'system',
+                            'screen_route' => '/profile',
+                        ]
+                    );
+                }
+            } catch (\Throwable $ne) {
+                Log::error('Astrologer status change notification failed: ' . $ne->getMessage());
+            }
+        }
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status'  => 'success',
+                'message' => "Astrologer status updated to {$newStatus} successfully.",
+                'data'    => [
+                    'id'     => $user->id,
+                    'status' => $newStatus,
+                ],
+            ]);
+        }
+
+        return redirect()->back()->with('success', "Astrologer status updated to {$newStatus} successfully.");
+    }
+
+    /**
+     * Completely and safely delete an astrologer, all associated records, media files and cache.
+     */
+    public function destroy(Request $request, $id)
     {
         $user = User::where('user_type', 'astrologer')->findOrFail($id);
-        $user->delete();
+        $astrologer = $user->astrologer;
 
-        return redirect()->route('admin.astrologers.index')->with('success', 'Astrologer deleted successfully.');
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $astrologer) {
+            // 1. Delete all uploaded documents and images from storage
+            try {
+                Storage::disk('public')->deleteDirectory('astrologers/' . $user->id);
+            } catch (\Throwable $e) {
+                Log::warning("Failed to delete astrologer storage directory: " . $e->getMessage());
+            }
+
+            // 2. Cascade delete all astrologer child relations
+            if ($astrologer) {
+                \App\Models\AstrologerBankAccount::where('astrologer_id', $astrologer->id)->orWhere('user_id', $user->id)->delete();
+                \App\Models\AstrologerGallery::where('astrologer_id', $astrologer->id)->delete();
+                \App\Models\AstrologerPhoneNumber::where('astrologer_id', $astrologer->id)->delete();
+                \App\Models\AstrologerSkill::where('astrologer_id', $astrologer->id)->delete();
+                \App\Models\AstrologerOtherDetail::where('astrologer_id', $astrologer->id)->delete();
+                \App\Models\AstrologerCommunity::where('astrologer_id', $astrologer->id)->orWhere('user_id', $user->id)->delete();
+                \App\Models\AstrologerReview::where('astrologer_id', $astrologer->id)->delete();
+                \App\Models\AstrologerPackage::where('astrologer_id', $user->id)->delete();
+                
+                // Detach any offers
+                $astrologer->offers()->detach();
+                $astrologer->delete();
+            }
+
+            // 3. Delete user account and tokens
+            $user->tokens()->delete();
+            $user->delete();
+
+            // 4. Invalidate Redis catalog cache
+            \App\Services\AstrologerService::flushCatalogCache();
+        });
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Astrologer and all associated data completely deleted successfully.',
+            ]);
+        }
+
+        return redirect()->route('admin.astrologers.index')->with('success', 'Astrologer and all associated data completely deleted successfully.');
     }
 }

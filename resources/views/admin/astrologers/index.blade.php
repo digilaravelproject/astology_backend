@@ -91,15 +91,17 @@
                             </td>
                             <td class="px-4 sm:px-6 py-4 text-center text-xs font-semibold text-gray whitespace-nowrap">{{ $astro->created_at?->format('d M Y') }}</td>
                             <td class="px-4 sm:px-6 py-4 whitespace-nowrap">
-                                @if($status === 'approved')
-                                    <span class="px-2.5 py-1 bg-success/10 text-success text-[10px] font-black rounded-lg uppercase tracking-widest border border-success/20">Approved</span>
-                                @elseif($status === 'pending')
-                                    <span class="px-2.5 py-1 bg-accent/10 text-accent text-[10px] font-black rounded-lg uppercase tracking-widest border border-accent/20">Pending</span>
-                                @elseif($status === 'rejected')
-                                    <span class="px-2.5 py-1 bg-danger/10 text-danger text-[10px] font-black rounded-lg uppercase tracking-widest border border-danger/20">Rejected</span>
-                                @else
-                                    <span class="px-2.5 py-1 bg-gray-lighter text-gray text-[10px] font-black rounded-lg uppercase tracking-widest">Inactive</span>
-                                @endif
+                                <form method="POST" action="{{ route('admin.astrologers.status', $astro->id) }}" class="inline-block">
+                                    @csrf
+                                    <select name="status" onchange="if(confirm('Change status of {{ addslashes($astro->name) }} to ' + this.options[this.selectedIndex].text + '?')) { this.form.submit(); } else { this.value = '{{ $status }}'; }" class="text-[11px] font-black px-2.5 py-1 rounded-lg border appearance-none cursor-pointer focus:outline-none transition-all shadow-2xs font-sans
+                                        {{ $status === 'approved' ? 'bg-success/10 text-success border-success/30 hover:bg-success/20' : '' }}
+                                        {{ $status === 'pending' ? 'bg-accent/10 text-accent border-accent/30 hover:bg-accent/20' : '' }}
+                                        {{ $status === 'rejected' ? 'bg-danger/10 text-danger border-danger/30 hover:bg-danger/20' : '' }}">
+                                        <option value="approved" {{ $status === 'approved' ? 'selected' : '' }}>Approved</option>
+                                        <option value="pending" {{ $status === 'pending' ? 'selected' : '' }}>Pending</option>
+                                        <option value="rejected" {{ $status === 'rejected' ? 'selected' : '' }}>Rejected</option>
+                                    </select>
+                                </form>
                             </td>
                             <td class="px-4 sm:px-6 py-4 text-right whitespace-nowrap">
                                 <div class="flex items-center justify-end gap-2">
@@ -109,6 +111,13 @@
                                     <a href="{{ route('admin.astrologers.edit', $astro->id) }}" class="w-8 h-8 rounded-lg bg-light text-gray hover:text-primary hover:bg-primary/10 transition-all flex items-center justify-center text-xs shadow-xs" title="Edit Astrologer">
                                         <i class="fas fa-edit"></i>
                                     </a>
+                                    <form method="POST" action="{{ route('admin.astrologers.destroy', $astro->id) }}" class="inline-block" onsubmit="return confirm('Are you sure you want to permanently delete astrologer \'{{ addslashes($astro->name) }}\' and all associated data, documents, and records? This action is irreversible.');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="w-8 h-8 rounded-lg bg-light text-gray hover:text-danger hover:bg-danger/10 transition-all flex items-center justify-center text-xs shadow-xs cursor-pointer" title="Delete Astrologer">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>

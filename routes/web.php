@@ -216,6 +216,7 @@ Route::prefix('admin')->group(function () {
         });
 
         // Core Astrologer CRUD
+        Route::post('astrologers/{id}/status', [AstrologerController::class, 'updateStatus'])->name('admin.astrologers.status');
         Route::resource('astrologers', AstrologerController::class)->names('admin.astrologers');
 
         // Order Management (Call & Chat Consultations)
