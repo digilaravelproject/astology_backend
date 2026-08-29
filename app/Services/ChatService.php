@@ -385,7 +385,7 @@ class ChatService
         return DB::transaction(function () use ($sessionId, $userId) {
             try {
                 $session = \App\Models\ChatSession::where('id', $sessionId)->lockForUpdate()->first();
-                if (!$session || !in_array($session->status, ['initiated', 'accepted', 'ongoing'])) {
+                if (!$session || !in_array($session->status, ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])) {
                     return $session;
                 }
 
@@ -452,15 +452,20 @@ class ChatService
 
                 // Update package sub-session if this is a prepaid package session
                 if ($isPackageSession) {
-                    $subSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                    $subSession = \App\Models\PackageSubSession::where(function ($q) use ($sessionId) {
+                            $q->where('chat_session_id', $sessionId)
+                              ->orWhere('call_session_id', $sessionId);
+                        })
                         ->whereNull('ended_at')
                         ->first();
+
                     if ($subSession) {
                         $purchase = \App\Models\PackagePurchase::where('id', $subSession->package_purchase_id)
                             ->lockForUpdate()
                             ->first();
                         if ($purchase) {
-                            $durationUsed = (int) min($durationSeconds, $purchase->remaining_duration);
+                            $totalElapsed = $subSession->started_at ? (int) $subSession->started_at->diffInSeconds($endTime) : $durationSeconds;
+                            $durationUsed = (int) min($totalElapsed, $purchase->remaining_duration);
                             
                             $subSession->update([
                                 'ended_at' => $endTime,
@@ -470,15 +475,14 @@ class ChatService
                                 'call_status' => 'disconnected',
                             ]);
                             
-                            $purchase->remaining_duration -= $durationUsed;
+                            $purchase->remaining_duration = max(0, (int) ($purchase->remaining_duration - $durationUsed));
                             if ($purchase->remaining_duration <= 0) {
-                                $purchase->remaining_duration = 0;
                                 $purchase->status = 'exhausted';
                             }
                             $purchase->save();
                             
                             // Broadcast termination state to both sides
-                            broadcast(new \App\Events\PackageSessionStateUpdated($subSession->toBannerArray(0), $purchase->user_id, $purchase->astrologer_id));
+                            broadcast(new \App\Events\PackageSessionStateUpdated($subSession->toBannerArray($purchase->remaining_duration), $purchase->user_id, $purchase->astrologer_id));
                             
                             // Broadcast termination if exhausted
                             if ($purchase->status === 'exhausted') {
@@ -495,7 +499,7 @@ class ChatService
                     'total_cost' => $totalCost,
                 ]);
 
-                // Clean up any stale or hanging sessions between these two users so they never auto-reopen
+                // Clean up any stale or hanging chat sessions between these two users so they never auto-reopen
                 \App\Models\ChatSession::where('consumer_id', $session->consumer_id)
                     ->where('provider_id', $session->provider_id)
                     ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
@@ -505,12 +509,23 @@ class ChatService
                         'ended_at' => $endTime,
                     ]);
 
+                // Also clean up any lingering active call session between these two users
+                \App\Models\CallSession::where('consumer_id', $session->consumer_id)
+                    ->where('provider_id', $session->provider_id)
+                    ->whereIn('status', ['initiated', 'ringing', 'accepted', 'ongoing'])
+                    ->update([
+                        'status'   => 'completed',
+                        'ended_at' => $endTime,
+                    ]);
+
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
                 
                 \App\Models\User::whereIn('id', [$session->consumer_id, $session->provider_id])
                     ->update(['is_busy' => false, 'busy_session_id' => null]);
                 
+                \App\Services\AstrologerService::flushCatalogCache();
+
                 $session->refresh();
                 return $session;
 
