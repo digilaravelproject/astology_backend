@@ -984,13 +984,6 @@ class AstrologerAuthController extends Controller
             Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on updateHomeStatus: " . $e->getMessage());
         }
 
-        NotificationHelper::send(
-            $user->id,
-            'Home status updated',
-            'Your home status and pricing settings have been updated.',
-            []
-        );
-
         return response()->json([
             'status'  => 'success',
             'message' => 'Home status updated successfully.',
@@ -1100,13 +1093,6 @@ class AstrologerAuthController extends Controller
             Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on updateHomeSettings: " . $e->getMessage());
         }
 
-        NotificationHelper::send(
-            $user->id,
-            'Rate settings updated',
-            'Your rate settings have been updated successfully.',
-            []
-        );
-
         return response()->json([
             'status'  => 'success',
             'message' => 'Rate settings updated successfully.',
@@ -1178,13 +1164,6 @@ class AstrologerAuthController extends Controller
         } catch (\Throwable $e) {
             Log::warning("Broadcasting AstrologerAvailabilityUpdated failed on toggle: " . $e->getMessage());
         }
-
-        NotificationHelper::send(
-            $user->id,
-            "{$displayName} status updated",
-            "Your {$displayName} status has been " . ($astrologer->$fieldName ? 'enabled' : 'disabled') . '.',
-            [$fieldName => $astrologer->$fieldName]
-        );
 
         $responseData = [
             'astrologer_id'       => $astrologer->id,
