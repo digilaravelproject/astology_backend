@@ -381,6 +381,13 @@ class PackageSessionEngineService
         }
         $purchase->save();
 
+        // 5. Explicitly free presence and clear busy flags for both participants
+        app(PresenceService::class)->setFree($purchase->user_id);
+        app(PresenceService::class)->setFree($purchase->astrologer_id);
+        User::whereIn('id', [$purchase->user_id, $purchase->astrologer_id])
+            ->update(['is_busy' => false, 'busy_session_id' => null]);
+        AstrologerService::flushCatalogCache();
+
         $bannerData = $subSession->toBannerArray($purchase->remaining_duration);
 
         broadcast(new PackageSessionTerminated(

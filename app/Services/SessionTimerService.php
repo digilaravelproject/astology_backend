@@ -280,10 +280,14 @@ class SessionTimerService
                             'error'           => $e->getMessage(),
                         ]);
                     }
-                } else {
-                    $this->presenceService->setFree($purchase->user_id);
-                    $this->presenceService->setFree($purchase->astrologer_id);
                 }
+
+                // Explicitly free presence and clear busy flags for both participants
+                $this->presenceService->setFree($purchase->user_id);
+                $this->presenceService->setFree($purchase->astrologer_id);
+                \App\Models\User::whereIn('id', [$purchase->user_id, $purchase->astrologer_id])
+                    ->update(['is_busy' => false, 'busy_session_id' => null]);
+                \App\Services\AstrologerService::flushCatalogCache();
 
                 $eventsToBroadcast[] = new PackageSessionStateUpdated(
                     $subSession->toBannerArray($purchase->remaining_duration),
