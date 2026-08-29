@@ -298,6 +298,17 @@ class SessionTimerService
                     }
                 }
 
+                // Clean up ANY lingering chat or call sessions between these two users
+                \App\Models\ChatSession::where('consumer_id', $purchase->user_id)
+                    ->where('provider_id', $purchase->astrologer_id)
+                    ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
+                    ->update(['status' => 'completed', 'ended_at' => $endTime]);
+
+                \App\Models\CallSession::where('consumer_id', $purchase->user_id)
+                    ->where('provider_id', $purchase->astrologer_id)
+                    ->whereIn('status', ['initiated', 'ringing', 'waiting', 'accepted', 'ongoing', 'active'])
+                    ->update(['status' => 'completed', 'ended_at' => $endTime]);
+
                 // Explicitly free presence and clear busy flags for both participants
                 $this->presenceService->setFree($purchase->user_id);
                 $this->presenceService->setFree($purchase->astrologer_id);

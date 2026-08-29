@@ -367,6 +367,12 @@ class PackageSessionEngineService
             }
         }
 
+        // Close any lingering call sessions between these two users
+        CallSession::where('consumer_id', $purchase->user_id)
+            ->where('provider_id', $purchase->astrologer_id)
+            ->whereIn('status', ['initiated', 'ringing', 'waiting', 'accepted', 'ongoing', 'active'])
+            ->update(['status' => 'completed', 'ended_at' => $now]);
+
         // 2. Close linked chat if active or initiated
         if ($subSession->chat_session_id) {
             $chat = ChatSession::find($subSession->chat_session_id);
@@ -380,6 +386,12 @@ class PackageSessionEngineService
                 }
             }
         }
+
+        // Close any lingering chat sessions between these two users
+        ChatSession::where('consumer_id', $purchase->user_id)
+            ->where('provider_id', $purchase->astrologer_id)
+            ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
+            ->update(['status' => 'completed', 'ended_at' => $now]);
 
         // 3. Compute accurate atomic duration used (1x rate)
         $totalElapsed = $subSession->started_at ? (int) $subSession->started_at->diffInSeconds($now) : 0;
