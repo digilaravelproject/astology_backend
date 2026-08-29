@@ -11,28 +11,37 @@ use App\Events\ChatInitiated;
 use App\Events\ChatQueueUpdated;
 use App\Events\PackageSessionStateUpdated;
 use App\Events\PackageSessionTerminated;
+use App\Helpers\MediaHelper;
 use App\Jobs\TerminatePackageSessionJob;
+use App\Models\CallSession;
+use App\Models\ChatSession;
 use App\Models\PackagePurchase;
 use App\Models\PackageSubSession;
+use App\Models\User;
+use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * SessionTimerService
+ * 
+ * Manages package sub-session lifecycle:
+ * - Sub-session Initiation & Channel Association
+ * - Timer Activation upon Astrologer Acceptance
+ * - Sub-session Termination, Billing Duration Deduction & Cleanup
+ */
 class SessionTimerService
 {
-    protected $presenceService;
-    protected $chatService;
-    protected $callService;
-
     public function __construct(
-        PresenceService $presenceService,
-        ChatService $chatService,
-        CallService $callService
-    ) {
-        $this->presenceService = $presenceService;
-        $this->chatService     = $chatService;
-        $this->callService     = $callService;
-    }
+        protected PresenceService $presenceService,
+        protected ChatService $chatService,
+        protected CallService $callService
+    ) {}
+
+    // =========================================================================
+    // 1. SUB-SESSION LIFECYCLE MANAGEMENT
+    // =========================================================================
 
     /**
      * Start a new package sub-session (chat or call).
@@ -68,7 +77,7 @@ class SessionTimerService
                 throw new Exception("A package sub-session is already active for you or the astrologer.", 422);
             }
 
-            // Close any abandoned ringing-phase sub-sessions before starting fresh.
+            // Close any abandoned ringing-phase sub-sessions before starting fresh
             PackageSubSession::whereNull('started_at')
                 ->whereNull('ended_at')
                 ->whereHas('purchase', function ($q) use ($userId, $astrologerId) {
@@ -81,7 +90,7 @@ class SessionTimerService
                 $linkedSession = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
                 $linkedSession->load(['consumer', 'provider']);
 
-                $user = \App\Models\User::find($userId);
+                $user = User::find($userId);
                 if ($user) {
                     broadcast(new ChatInitiated($linkedSession, $user));
                     broadcast(new ChatQueueUpdated($linkedSession->provider_id, $linkedSession, 'initiated'));
@@ -90,25 +99,25 @@ class SessionTimerService
                 $linkedSession = $this->callService->initiateCall($userId, $astrologerId, true);
                 $linkedSession->load(['consumer', 'provider']);
 
-                $user = \App\Models\User::find($userId);
+                $user = User::find($userId);
                 if ($user) {
                     broadcast(new CallInitiated($linkedSession, [
-                        'id'                  => (int) $user->id,
-                        'name'                => $user->name,
-                        'phone'               => $user->phone,
-                        'gender'              => $user->gender,
-                        'date_of_birth'       => $user->date_of_birth ? ($user->date_of_birth instanceof \Carbon\Carbon ? $user->date_of_birth->toISOString() : $user->date_of_birth) : null,
-                        'time_of_birth'       => $user->time_of_birth,
-                        'place_of_birth'      => $user->place_of_birth,
-                        'latitude'            => $user->latitude ? (float) $user->latitude : null,
-                        'longitude'           => $user->longitude ? (float) $user->longitude : null,
-                        'city'                => $user->city,
-                        'country'             => $user->country,
-                        'languages'           => $user->languages ?? [],
-                        'profile_photo'       => $user->profile_photo,
-                        'profile_photo_url'   => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-                        'profile_completed'   => (bool) $user->profile_completed,
-                        'offer'               => $offer ?? 'audio',
+                        'id'                => (int) $user->id,
+                        'name'              => $user->name,
+                        'phone'             => $user->phone,
+                        'gender'            => $user->gender,
+                        'date_of_birth'     => $user->date_of_birth ? ($user->date_of_birth instanceof Carbon ? $user->date_of_birth->toISOString() : $user->date_of_birth) : null,
+                        'time_of_birth'     => $user->time_of_birth,
+                        'place_of_birth'    => $user->place_of_birth,
+                        'latitude'          => $user->latitude ? (float) $user->latitude : null,
+                        'longitude'         => $user->longitude ? (float) $user->longitude : null,
+                        'city'              => $user->city,
+                        'country'           => $user->country,
+                        'languages'         => $user->languages ?? [],
+                        'profile_photo'     => $user->profile_photo,
+                        'profile_photo_url' => MediaHelper::getUrl($user->profile_photo),
+                        'profile_completed' => (bool) $user->profile_completed,
+                        'offer'             => $offer ?? 'audio',
                     ]));
                 }
             }
@@ -242,6 +251,7 @@ class SessionTimerService
                     throw new Exception("Unauthorized. You are not a participant in this package session.", 403);
                 }
 
+                $actorId         = $userId ?? $purchase->user_id;
                 $endTime         = now();
                 $durationSeconds = $subSession->started_at
                     ? (int) $subSession->started_at->diffInSeconds($endTime)
@@ -252,22 +262,22 @@ class SessionTimerService
                 $subSession->duration_used = $durationUsed;
                 $subSession->save();
 
-                $purchase->remaining_duration -= $durationUsed;
+                $purchase->remaining_duration = max(0, (int) ($purchase->remaining_duration - $durationUsed));
                 if ($purchase->remaining_duration <= 0) {
-                    $purchase->remaining_duration = 0;
                     $purchase->status = 'exhausted';
                 }
                 $purchase->save();
 
+                // 1. Close linked chat if present
                 if ($subSession->chat_session_id) {
                     try {
-                        $chatBefore = \App\Models\ChatSession::find($subSession->chat_session_id);
+                        $chatBefore = ChatSession::find($subSession->chat_session_id);
                         $wasInitiated = $chatBefore && in_array($chatBefore->status, ['initiated', 'waiting']);
                         $linkedChat = $this->chatService->endChat($subSession->chat_session_id);
                         if ($wasInitiated) {
-                            $eventsToBroadcast[] = new ChatDismissed($linkedChat, $userId ?? $purchase->user_id, 'cancelled');
+                            $eventsToBroadcast[] = new ChatDismissed($linkedChat, $actorId, 'cancelled');
                         } else {
-                            $eventsToBroadcast[] = new ChatEnded($linkedChat, $userId ?? $purchase->user_id);
+                            $eventsToBroadcast[] = new ChatEnded($linkedChat, $actorId);
                         }
                         $eventsToBroadcast[] = new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ended');
                     } catch (Exception $e) {
@@ -279,15 +289,16 @@ class SessionTimerService
                     }
                 }
 
+                // 2. Close linked call if present
                 if ($subSession->call_session_id) {
                     try {
-                        $callBefore = \App\Models\CallSession::find($subSession->call_session_id);
+                        $callBefore = CallSession::find($subSession->call_session_id);
                         $wasRinging = $callBefore && in_array($callBefore->status, ['initiated', 'ringing']);
                         $linkedCall = $this->callService->endCall($subSession->call_session_id);
                         if ($wasRinging) {
-                            $eventsToBroadcast[] = new CallDismissed($linkedCall, $userId ?? $purchase->user_id, 'cancelled');
+                            $eventsToBroadcast[] = new CallDismissed($linkedCall, $actorId, 'cancelled');
                         } else {
-                            $eventsToBroadcast[] = new CallEnded($linkedCall, $userId ?? $purchase->user_id);
+                            $eventsToBroadcast[] = new CallEnded($linkedCall, $actorId);
                         }
                     } catch (Exception $e) {
                         Log::warning('Could not end linked call session during sub-session end.', [
@@ -298,41 +309,12 @@ class SessionTimerService
                     }
                 }
 
-                // Clean up and notify ANY lingering chat or call sessions between these two users
-                $lingeringChats = \App\Models\ChatSession::where('consumer_id', $purchase->user_id)
-                    ->where('provider_id', $purchase->astrologer_id)
-                    ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
-                    ->get();
-                foreach ($lingeringChats as $lChat) {
-                    $wasInitiated = in_array($lChat->status, ['initiated', 'waiting']);
-                    $lChat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $endTime]);
-                    if ($wasInitiated) {
-                        $eventsToBroadcast[] = new ChatDismissed($lChat, $userId ?? $purchase->user_id, 'cancelled');
-                    } else {
-                        $eventsToBroadcast[] = new ChatEnded($lChat, $userId ?? $purchase->user_id);
-                    }
-                }
+                // 3. Clean up and collect events for any lingering chat or call sessions
+                $lingeringEvents = $this->closeAndBroadcastLingeringSessions($purchase->user_id, $purchase->astrologer_id, $actorId, $endTime);
+                $eventsToBroadcast = array_merge($eventsToBroadcast, $lingeringEvents);
 
-                $lingeringCalls = \App\Models\CallSession::where('consumer_id', $purchase->user_id)
-                    ->where('provider_id', $purchase->astrologer_id)
-                    ->whereIn('status', ['initiated', 'ringing', 'waiting', 'accepted', 'ongoing', 'active'])
-                    ->get();
-                foreach ($lingeringCalls as $lCall) {
-                    $wasRinging = in_array($lCall->status, ['initiated', 'ringing']);
-                    $lCall->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $endTime]);
-                    if ($wasRinging) {
-                        $eventsToBroadcast[] = new CallDismissed($lCall, $userId ?? $purchase->user_id, 'cancelled');
-                    } else {
-                        $eventsToBroadcast[] = new CallEnded($lCall, $userId ?? $purchase->user_id);
-                    }
-                }
-
-                // Explicitly free presence and clear busy flags for both participants
-                $this->presenceService->setFree($purchase->user_id);
-                $this->presenceService->setFree($purchase->astrologer_id);
-                \App\Models\User::whereIn('id', [$purchase->user_id, $purchase->astrologer_id])
-                    ->update(['is_busy' => false, 'busy_session_id' => null]);
-                \App\Services\AstrologerService::flushCatalogCache();
+                // 4. Free presence and flush catalog cache
+                $this->cleanupPresenceAndCache($purchase->user_id, $purchase->astrologer_id);
 
                 $eventsToBroadcast[] = new PackageSessionStateUpdated(
                     $subSession->toBannerArray($purchase->remaining_duration),
@@ -351,6 +333,7 @@ class SessionTimerService
                 return $subSession;
             });
 
+            // Dispatch all collected events outside transaction
             foreach ($eventsToBroadcast as $event) {
                 broadcast($event);
             }
@@ -377,8 +360,66 @@ class SessionTimerService
             ->whereNull('ended_at')
             ->whereHas('purchase', function ($q) use ($userId) {
                 $q->where('user_id', $userId)
-                    ->orWhere('astrologer_id', $userId);
+                  ->orWhere('astrologer_id', $userId);
             })
             ->first();
+    }
+
+    // =========================================================================
+    // 2. INTERNAL TEARDOWN HELPERS
+    // =========================================================================
+
+    /**
+     * Close lingering sessions and generate dismissal/end events.
+     */
+    protected function closeAndBroadcastLingeringSessions(int $userId, int $astrologerId, int $actorId, Carbon $endedAt): array
+    {
+        $events = [];
+
+        $lingeringChats = ChatSession::where('consumer_id', $userId)
+            ->where('provider_id', $astrologerId)
+            ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
+            ->get();
+
+        foreach ($lingeringChats as $chat) {
+            $wasInitiated = in_array($chat->status, ['initiated', 'waiting']);
+            $chat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $endedAt]);
+            if ($wasInitiated) {
+                $events[] = new ChatDismissed($chat, $actorId, 'cancelled');
+            } else {
+                $events[] = new ChatEnded($chat, $actorId);
+            }
+        }
+
+        $lingeringCalls = CallSession::where('consumer_id', $userId)
+            ->where('provider_id', $astrologerId)
+            ->whereIn('status', ['initiated', 'ringing', 'waiting', 'accepted', 'ongoing', 'active'])
+            ->get();
+
+        foreach ($lingeringCalls as $call) {
+            $wasRinging = in_array($call->status, ['initiated', 'ringing']);
+            $call->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $endedAt]);
+            if ($wasRinging) {
+                $events[] = new CallDismissed($call, $actorId, 'cancelled');
+            } else {
+                $events[] = new CallEnded($call, $actorId);
+            }
+        }
+
+        return $events;
+    }
+
+    /**
+     * Free presence status and flush astrologer catalog cache.
+     */
+    protected function cleanupPresenceAndCache(int $userId, int $astrologerId): void
+    {
+        $this->presenceService->setFree($userId);
+        $this->presenceService->setFree($astrologerId);
+
+        User::whereIn('id', [$userId, $astrologerId])
+            ->update(['is_busy' => false, 'busy_session_id' => null]);
+
+        AstrologerService::flushCatalogCache();
     }
 }

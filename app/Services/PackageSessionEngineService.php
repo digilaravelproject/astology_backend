@@ -5,33 +5,44 @@ namespace App\Services;
 use App\Events\CallDismissed;
 use App\Events\CallEnded;
 use App\Events\CallInitiated;
+use App\Events\ChatAccepted;
 use App\Events\ChatDismissed;
 use App\Events\ChatEnded;
 use App\Events\ChatInitiated;
 use App\Events\ChatQueueUpdated;
 use App\Events\PackageSessionStateUpdated;
 use App\Events\PackageSessionTerminated;
+use App\Helpers\MediaHelper;
 use App\Models\CallSession;
 use App\Models\ChatSession;
 use App\Models\PackagePurchase;
 use App\Models\PackageSubSession;
 use App\Models\User;
-use App\Services\NotificationHelper;
-use Illuminate\Support\Facades\Cache;
+use Carbon\Carbon;
+use Exception;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
+/**
+ * PackageSessionEngineService
+ * 
+ * Orchestrates multi-channel prepaid package sessions:
+ * - Subchannel spawning (Call/Chat)
+ * - Zero-deduction Channel Switching (Call <-> Chat)
+ * - Channel & Complete Session Termination
+ * - Heartbeat Tracking & Inactivity Watchdog
+ */
 class PackageSessionEngineService
 {
-    protected ChatService $chatService;
-    protected CallService $callService;
+    public function __construct(
+        protected ChatService $chatService,
+        protected CallService $callService,
+        protected PresenceService $presenceService
+    ) {}
 
-    public function __construct(ChatService $chatService, CallService $callService)
-    {
-        $this->chatService = $chatService;
-        $this->callService = $callService;
-    }
+    // =========================================================================
+    // 1. DURATION & CALCULATION UTILITIES
+    // =========================================================================
 
     /**
      * Get real-time remaining seconds for an active or paused sub-session.
@@ -57,7 +68,7 @@ class PackageSessionEngineService
         // Account for previous pause durations
         $activeElapsed = max(0, $totalElapsed - (int) $subSession->pause_duration_seconds);
 
-        // If currently paused, subtract time spent in current pause
+        // If currently paused, subtract time spent in current pause window
         if ($subSession->session_state === 'paused' && $subSession->paused_at) {
             $currentPause = (int) $subSession->paused_at->diffInSeconds($now);
             $activeElapsed = max(0, $activeElapsed - $currentPause);
@@ -67,13 +78,19 @@ class PackageSessionEngineService
         return max(0, $remaining);
     }
 
+    // =========================================================================
+    // 2. CHANNEL MANAGEMENT (SPAWN, SWITCH, TERMINATE)
+    // =========================================================================
+
     /**
      * Spawn an additional subchannel (Call or Chat) inside an active package session.
      */
     public function spawnSubchannel(int $subSessionId, string $channelType, int $actorId, array $options = []): array
     {
         return DB::transaction(function () use ($subSessionId, $channelType, $actorId, $options) {
-            $subSession = PackageSubSession::with(['purchase.user', 'purchase.astrologer.astrologer'])->lockForUpdate()->findOrFail($subSessionId);
+            $subSession = PackageSubSession::with(['purchase.user', 'purchase.astrologer.astrologer'])
+                ->lockForUpdate()
+                ->findOrFail($subSessionId);
             $purchase = $subSession->purchase;
 
             if ($purchase->user_id !== $actorId && $purchase->astrologer_id !== $actorId) {
@@ -84,7 +101,7 @@ class PackageSessionEngineService
                 throw new Exception("This package session is already ended or exhausted.", 422);
             }
 
-            // Ensure timer has started
+            // Ensure session timer is running
             if (is_null($subSession->started_at)) {
                 $subSession->started_at = now();
                 $subSession->session_state = 'in_progress';
@@ -95,7 +112,6 @@ class PackageSessionEngineService
             $user = $purchase->user;
 
             if ($channelType === 'call') {
-                // If call is not already active, spawn WebRTC call session
                 if (!$subSession->call_session_id || in_array($subSession->call_status, ['idle', 'disconnected', 'none'])) {
                     $linkedCall = $this->callService->initiateCall($userId, $astrologerId, true);
                     $subSession->call_session_id = $linkedCall->id;
@@ -103,17 +119,16 @@ class PackageSessionEngineService
 
                     if ($user) {
                         broadcast(new CallInitiated($linkedCall, [
-                            'id'            => $user->id,
-                            'name'          => $user->name,
-                            'profile_photo' => \App\Helpers\MediaHelper::getFullUrl($user->profile_photo),
-                            'offer'         => $options['offer'] ?? 'audio',
-                            'is_package'    => true,
-                            'sub_session_id'=> $subSession->id,
+                            'id'             => $user->id,
+                            'name'           => $user->name,
+                            'profile_photo'  => MediaHelper::getFullUrl($user->profile_photo),
+                            'offer'          => $options['offer'] ?? 'audio',
+                            'is_package'     => true,
+                            'sub_session_id' => $subSession->id,
                         ]));
                     }
                 }
             } elseif ($channelType === 'chat') {
-                // If chat is not already active, spawn Chat session
                 if (!$subSession->chat_session_id || in_array($subSession->chat_status, ['idle', 'closed', 'none'])) {
                     $question = $options['question'] ?? null;
                     $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
@@ -151,7 +166,9 @@ class PackageSessionEngineService
     public function switchChannel(int $subSessionId, string $fromChannel, string $toChannel, int $actorId, array $options = []): array
     {
         return DB::transaction(function () use ($subSessionId, $fromChannel, $toChannel, $actorId, $options) {
-            $subSession = PackageSubSession::with(['purchase.user', 'purchase.astrologer.astrologer'])->lockForUpdate()->findOrFail($subSessionId);
+            $subSession = PackageSubSession::with(['purchase.user', 'purchase.astrologer.astrologer'])
+                ->lockForUpdate()
+                ->findOrFail($subSessionId);
             $purchase = $subSession->purchase;
 
             if ($purchase->user_id !== $actorId && $purchase->astrologer_id !== $actorId) {
@@ -167,7 +184,7 @@ class PackageSessionEngineService
             $user = $purchase->user;
             $now = now();
 
-            // 1. If switching FROM call/chat, disconnect the previous subchannel gracefully ($0.00 charge)
+            // 1. Gracefully close the previous channel with zero cost ($0.00)
             if ($fromChannel === 'call' && $subSession->call_session_id) {
                 $subSession->call_status = 'disconnected';
                 $call = CallSession::find($subSession->call_session_id);
@@ -190,10 +207,9 @@ class PackageSessionEngineService
                 $subSession->session_state = 'in_progress';
             }
 
-            // 3. Initiate or preserve the target subchannel (Zero-Rate guaranteed)
+            // 3. Initiate or reactivate the target channel
             $newSessionData = [];
             if ($toChannel === 'call') {
-                // If call is not already ongoing, initiate a zero-cost package call
                 if (!$subSession->call_session_id || in_array($subSession->call_status, ['idle', 'disconnected', 'none'])) {
                     $linkedCall = $this->callService->initiateCall($userId, $astrologerId, true);
                     $subSession->call_session_id = $linkedCall->id;
@@ -202,24 +218,22 @@ class PackageSessionEngineService
 
                     if ($user) {
                         broadcast(new CallInitiated($linkedCall, [
-                            'id'            => $user->id,
-                            'name'          => $user->name,
-                            'profile_photo' => \App\Helpers\MediaHelper::getFullUrl($user->profile_photo),
-                            'offer'         => $options['offer'] ?? 'audio',
-                            'is_package'    => true,
-                            'sub_session_id'=> $subSession->id,
+                            'id'             => $user->id,
+                            'name'           => $user->name,
+                            'profile_photo'  => MediaHelper::getFullUrl($user->profile_photo),
+                            'offer'          => $options['offer'] ?? 'audio',
+                            'is_package'     => true,
+                            'sub_session_id' => $subSession->id,
                         ]));
                     }
                 }
-                // Keep chat active in background so user and astrologer can share charts/messages while on call
                 $subSession->mode = 'call';
             } elseif ($toChannel === 'chat') {
-                // If chat is not already active, initiate or reuse existing chat thread
                 if (!$subSession->chat_session_id || in_array($subSession->chat_status, ['idle', 'closed', 'none'])) {
                     $question = $options['question'] ?? null;
                     $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
-                    
-                    // Auto-activate chat session immediately (no redundant accept needed since already authenticated & in-call)
+
+                    // Auto-activate chat session immediately
                     $linkedChat->update([
                         'status'      => 'ongoing',
                         'started_at'  => $subSession->started_at ?? now(),
@@ -232,7 +246,7 @@ class PackageSessionEngineService
                     $newSessionData['chat_session_id'] = $linkedChat->id;
 
                     $linkedChat->load(['provider.astrologer', 'consumer']);
-                    broadcast(new \App\Events\ChatAccepted($linkedChat, $linkedChat->provider));
+                    broadcast(new ChatAccepted($linkedChat, $linkedChat->provider));
                     if ($user) {
                         broadcast(new ChatInitiated($linkedChat, $user));
                         broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ongoing'));
@@ -278,7 +292,9 @@ class PackageSessionEngineService
     public function terminateSubchannel(int $subSessionId, string $channelType, string $action, int $actorId): array
     {
         return DB::transaction(function () use ($subSessionId, $channelType, $action, $actorId) {
-            $subSession = PackageSubSession::with(['purchase.user', 'purchase.astrologer.astrologer'])->lockForUpdate()->findOrFail($subSessionId);
+            $subSession = PackageSubSession::with(['purchase.user', 'purchase.astrologer.astrologer'])
+                ->lockForUpdate()
+                ->findOrFail($subSessionId);
             $purchase = $subSession->purchase;
 
             if ($purchase->user_id !== $actorId && $purchase->astrologer_id !== $actorId) {
@@ -290,33 +306,20 @@ class PackageSessionEngineService
             $now = now();
 
             if (in_array($action, ['end_channel_only', 'channel_only'])) {
-                // Option 1: "End Call Only" or "End Chat Only"
                 if ($channelType === 'call') {
                     $subSession->call_status = 'disconnected';
                     if ($subSession->call_session_id) {
                         $call = CallSession::find($subSession->call_session_id);
-                        if ($call && !in_array($call->status, ['completed', 'missed', 'rejected'])) {
-                            $wasRinging = in_array($call->status, ['initiated', 'ringing']);
-                            $call->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $now]);
-                            if ($wasRinging) {
-                                broadcast(new CallDismissed($call, $userId, 'cancelled'));
-                            } else {
-                                broadcast(new CallEnded($call, $userId));
-                            }
+                        if ($call) {
+                            $this->closeCallSession($call, $userId, $now);
                         }
                     }
                 } elseif ($channelType === 'chat') {
                     $subSession->chat_status = 'closed';
                     if ($subSession->chat_session_id) {
                         $chat = ChatSession::find($subSession->chat_session_id);
-                        if ($chat && !in_array($chat->status, ['completed', 'cancelled', 'rejected', 'timeout'])) {
-                            $wasInitiated = in_array($chat->status, ['initiated', 'waiting']);
-                            $chat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $now]);
-                            if ($wasInitiated) {
-                                broadcast(new ChatDismissed($chat, $userId, 'cancelled'));
-                            } else {
-                                broadcast(new ChatEnded($chat, $userId));
-                            }
+                        if ($chat) {
+                            $this->closeChatSession($chat, $userId, $now);
                         }
                     }
                 }
@@ -324,7 +327,7 @@ class PackageSessionEngineService
                 // If both channels are now inactive, auto-terminate complete session
                 if (in_array($subSession->call_status, ['disconnected', 'idle', 'none']) &&
                     in_array($subSession->chat_status, ['closed', 'idle', 'none'])) {
-                    return $this->finalizeCompleteSession($subSession, $purchase);
+                    return $this->finalizeCompleteSession($subSession, $purchase, $actorId);
                 }
 
                 $subSession->save();
@@ -341,77 +344,43 @@ class PackageSessionEngineService
                 ];
             }
 
-            // Option 2: "End Complete Session"
-            return $this->finalizeCompleteSession($subSession, $purchase);
+            // Option 2: Complete Session Termination
+            return $this->finalizeCompleteSession($subSession, $purchase, $actorId);
         });
     }
+
+    // =========================================================================
+    // 3. COMPLETE SESSION FINALIZATION & TEARDOWN
+    // =========================================================================
 
     /**
      * Finalize and close the entire package session.
      */
-    protected function finalizeCompleteSession(PackageSubSession $subSession, PackagePurchase $purchase): array
+    protected function finalizeCompleteSession(PackageSubSession $subSession, PackagePurchase $purchase, ?int $actorId = null): array
     {
         $now = now();
+        $actorId = $actorId ?? $purchase->user_id;
 
-        // 1. Close and notify linked call if active or ringing
+        // 1. Close linked call if active
         if ($subSession->call_session_id) {
             $call = CallSession::find($subSession->call_session_id);
-            if ($call && !in_array($call->status, ['completed', 'missed', 'rejected'])) {
-                $wasRinging = in_array($call->status, ['initiated', 'ringing']);
-                $call->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $now]);
-                if ($wasRinging) {
-                    broadcast(new CallDismissed($call, $purchase->user_id, 'cancelled'));
-                } else {
-                    broadcast(new CallEnded($call, $purchase->user_id));
-                }
+            if ($call) {
+                $this->closeCallSession($call, $actorId, $now);
             }
         }
 
-        // Close and notify any lingering call sessions between these two users
-        $lingeringCalls = CallSession::where('consumer_id', $purchase->user_id)
-            ->where('provider_id', $purchase->astrologer_id)
-            ->whereIn('status', ['initiated', 'ringing', 'waiting', 'accepted', 'ongoing', 'active'])
-            ->get();
-        foreach ($lingeringCalls as $lCall) {
-            $wasRinging = in_array($lCall->status, ['initiated', 'ringing']);
-            $lCall->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $now]);
-            if ($wasRinging) {
-                broadcast(new CallDismissed($lCall, $purchase->user_id, 'cancelled'));
-            } else {
-                broadcast(new CallEnded($lCall, $purchase->user_id));
-            }
-        }
-
-        // 2. Close and notify linked chat if active or initiated
+        // 2. Close linked chat if active
         if ($subSession->chat_session_id) {
             $chat = ChatSession::find($subSession->chat_session_id);
-            if ($chat && !in_array($chat->status, ['completed', 'cancelled', 'rejected', 'timeout'])) {
-                $wasInitiated = in_array($chat->status, ['initiated', 'waiting']);
-                $chat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $now]);
-                if ($wasInitiated) {
-                    broadcast(new ChatDismissed($chat, $purchase->user_id, 'cancelled'));
-                } else {
-                    broadcast(new ChatEnded($chat, $purchase->user_id));
-                }
+            if ($chat) {
+                $this->closeChatSession($chat, $actorId, $now);
             }
         }
 
-        // Close and notify any lingering chat sessions between these two users
-        $lingeringChats = ChatSession::where('consumer_id', $purchase->user_id)
-            ->where('provider_id', $purchase->astrologer_id)
-            ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
-            ->get();
-        foreach ($lingeringChats as $lChat) {
-            $wasInitiated = in_array($lChat->status, ['initiated', 'waiting']);
-            $lChat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $now]);
-            if ($wasInitiated) {
-                broadcast(new ChatDismissed($lChat, $purchase->user_id, 'cancelled'));
-            } else {
-                broadcast(new ChatEnded($lChat, $purchase->user_id));
-            }
-        }
+        // 3. Clean up and broadcast termination to any lingering sessions between these two users
+        $this->cleanAndBroadcastLingeringSessions($purchase->user_id, $purchase->astrologer_id, $actorId, $now);
 
-        // 3. Compute accurate atomic duration used (1x rate)
+        // 4. Compute accurate atomic duration used (1x rate)
         $totalElapsed = $subSession->started_at ? (int) $subSession->started_at->diffInSeconds($now) : 0;
         $activeDuration = max(0, $totalElapsed - (int) $subSession->pause_duration_seconds);
         $durationDeducted = (int) min($activeDuration, $purchase->remaining_duration);
@@ -423,19 +392,15 @@ class PackageSessionEngineService
         $subSession->chat_status = 'closed';
         $subSession->save();
 
-        // 4. Update PackagePurchase balance
+        // 5. Update PackagePurchase balance
         $purchase->remaining_duration = max(0, (int) ($purchase->remaining_duration - $durationDeducted));
         if ($purchase->remaining_duration <= 0) {
             $purchase->status = 'exhausted';
         }
         $purchase->save();
 
-        // 5. Explicitly free presence and clear busy flags for both participants
-        app(PresenceService::class)->setFree($purchase->user_id);
-        app(PresenceService::class)->setFree($purchase->astrologer_id);
-        User::whereIn('id', [$purchase->user_id, $purchase->astrologer_id])
-            ->update(['is_busy' => false, 'busy_session_id' => null]);
-        AstrologerService::flushCatalogCache();
+        // 6. Free presence and flush catalog cache
+        $this->cleanupPresenceAndCache($purchase->user_id, $purchase->astrologer_id);
 
         $bannerData = $subSession->toBannerArray($purchase->remaining_duration);
 
@@ -456,6 +421,10 @@ class PackageSessionEngineService
             'remaining_seconds'  => $purchase->remaining_duration,
         ];
     }
+
+    // =========================================================================
+    // 4. HEARTBEAT & INACTIVITY WATCHDOG
+    // =========================================================================
 
     /**
      * Record client heartbeat ping from User or Astrologer.
@@ -519,7 +488,6 @@ class PackageSessionEngineService
 
                 broadcast(new PackageSessionStateUpdated($bannerData, $purchase->user_id, $purchase->astrologer_id));
 
-                // Dispatch push notification alerts
                 NotificationHelper::send(
                     $purchase->user_id,
                     "Session Paused ⏸️",
@@ -541,5 +509,91 @@ class PackageSessionEngineService
         }
 
         return $pausedCount;
+    }
+
+    // =========================================================================
+    // 5. INTERNAL REUSABLE TEARDOWN HELPERS
+    // =========================================================================
+
+    /**
+     * Close a call session and broadcast the appropriate event.
+     */
+    protected function closeCallSession(CallSession $call, int $actorId, Carbon $endedAt): void
+    {
+        if (in_array($call->status, ['completed', 'missed', 'rejected'])) {
+            return;
+        }
+
+        $wasRinging = in_array($call->status, ['initiated', 'ringing']);
+        $call->update([
+            'status'   => $wasRinging ? 'missed' : 'completed',
+            'ended_at' => $endedAt,
+        ]);
+
+        if ($wasRinging) {
+            broadcast(new CallDismissed($call, $actorId, 'cancelled'));
+        } else {
+            broadcast(new CallEnded($call, $actorId));
+        }
+    }
+
+    /**
+     * Close a chat session and broadcast the appropriate event.
+     */
+    protected function closeChatSession(ChatSession $chat, int $actorId, Carbon $endedAt): void
+    {
+        if (in_array($chat->status, ['completed', 'cancelled', 'rejected', 'timeout'])) {
+            return;
+        }
+
+        $wasInitiated = in_array($chat->status, ['initiated', 'waiting']);
+        $chat->update([
+            'status'   => $wasInitiated ? 'cancelled' : 'completed',
+            'ended_at' => $endedAt,
+        ]);
+
+        if ($wasInitiated) {
+            broadcast(new ChatDismissed($chat, $actorId, 'cancelled'));
+        } else {
+            broadcast(new ChatEnded($chat, $actorId));
+        }
+    }
+
+    /**
+     * Find, close and broadcast termination events to any lingering sessions between two users.
+     */
+    protected function cleanAndBroadcastLingeringSessions(int $userId, int $astrologerId, int $actorId, Carbon $endedAt): void
+    {
+        $lingeringCalls = CallSession::where('consumer_id', $userId)
+            ->where('provider_id', $astrologerId)
+            ->whereIn('status', ['initiated', 'ringing', 'waiting', 'accepted', 'ongoing', 'active'])
+            ->get();
+
+        foreach ($lingeringCalls as $call) {
+            $this->closeCallSession($call, $actorId, $endedAt);
+        }
+
+        $lingeringChats = ChatSession::where('consumer_id', $userId)
+            ->where('provider_id', $astrologerId)
+            ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
+            ->get();
+
+        foreach ($lingeringChats as $chat) {
+            $this->closeChatSession($chat, $actorId, $endedAt);
+        }
+    }
+
+    /**
+     * Reset presence and flush astrologer catalog cache.
+     */
+    protected function cleanupPresenceAndCache(int $userId, int $astrologerId): void
+    {
+        $this->presenceService->setFree($userId);
+        $this->presenceService->setFree($astrologerId);
+
+        User::whereIn('id', [$userId, $astrologerId])
+            ->update(['is_busy' => false, 'busy_session_id' => null]);
+
+        AstrologerService::flushCatalogCache();
     }
 }
