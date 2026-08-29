@@ -10,9 +10,8 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Models\CallSession;
 use App\Events\ChatAssistanceInitiated;
-use App\Events\ChatAssistanceMessageSent;
-use App\Events\ChatAssistanceMessageStatusUpdated;
-use App\Events\ChatAssistanceLimitReached;
+use App\Events\MessageSent;
+use App\Events\MessageStatusUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -151,8 +150,6 @@ class ChatAssistanceService
                         'limit_configured' => $limitConfig
                     ]);
 
-                    broadcast(new ChatAssistanceLimitReached($senderId));
-
                     throw new Exception("Daily message reply limit reached. You cannot send more replies today.");
                 }
 
@@ -196,8 +193,8 @@ class ChatAssistanceService
         }
         $message->load('sender');
 
-        // Broadcast real-time message OUTSIDE transaction
-        event(new ChatAssistanceMessageSent($message, $receiverId));
+        // Broadcast real-time message OUTSIDE transaction using unified MessageSent event
+        event(new MessageSent($message, $receiverId));
 
         return $message;
     }
@@ -295,7 +292,7 @@ class ChatAssistanceService
 
         $senderToNotify = ($session->consumer_id == $userId) ? $session->provider_id : $session->consumer_id;
 
-        broadcast(new ChatAssistanceMessageStatusUpdated(
+        broadcast(new MessageStatusUpdated(
             $messageIds,
             $status,
             $senderToNotify,

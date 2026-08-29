@@ -7,12 +7,9 @@ use App\Models\LiveSessionParticipant;
 use App\Models\LiveComment;
 use App\Models\User;
 use App\Events\NewLiveComment;
-use App\Events\UserJoinedLiveSession;
-use App\Events\UserLeftLiveSession;
 use App\Events\ViewerCountUpdated;
 use App\Events\LiveSessionStarted;
 use App\Events\LiveSessionEnded;
-use App\Events\AstrologerBroadcastStarted;
 use App\Events\AstrologerMediaStatusChanged;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
@@ -120,20 +117,14 @@ class LiveSessionService
         }
 
         try {
-            broadcast(new ViewerCountUpdated($session->id, $session->viewer_count));
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to broadcast viewer count on join', ['error' => $e->getMessage()]);
-        }
-
-        try {
-            broadcast(new UserJoinedLiveSession($session->id, [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
+            broadcast(new ViewerCountUpdated($session->id, $session->viewer_count, 'joined', [
+                'user_id'     => $user->id,
+                'user_name'   => $user->name,
                 'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-                'joined_at' => now()->toISOString(),
+                'joined_at'   => now()->toISOString(),
             ]));
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to broadcast UserJoinedLiveSession', ['error' => $e->getMessage()]);
+            \Illuminate\Support\Facades\Log::error('Failed to broadcast viewer count on join', ['error' => $e->getMessage()]);
         }
 
         $lastComments = LiveComment::with('user:id,name,profile_photo')
@@ -177,20 +168,14 @@ class LiveSessionService
         }
 
         try {
-            broadcast(new ViewerCountUpdated($session->id, $session->viewer_count));
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to broadcast viewer count on leave', ['error' => $e->getMessage()]);
-        }
-
-        try {
-            broadcast(new UserLeftLiveSession($session->id, [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
+            broadcast(new ViewerCountUpdated($session->id, $session->viewer_count, 'left', [
+                'user_id'     => $user->id,
+                'user_name'   => $user->name,
                 'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-                'left_at' => now()->toISOString(),
+                'left_at'     => now()->toISOString(),
             ]));
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Failed to broadcast UserLeftLiveSession', ['error' => $e->getMessage()]);
+            \Illuminate\Support\Facades\Log::error('Failed to broadcast viewer count on leave', ['error' => $e->getMessage()]);
         }
     }
 
@@ -651,9 +636,9 @@ class LiveSessionService
         );
 
         try {
-            broadcast(new AstrologerBroadcastStarted($liveSession->fresh()));
+            broadcast(new LiveSessionStarted($liveSession->fresh()));
         } catch (\Exception $e) {
-            Log::error('Failed to broadcast AstrologerBroadcastStarted', ['error' => $e->getMessage()]);
+            Log::error('Failed to broadcast LiveSessionStarted', ['error' => $e->getMessage()]);
         }
 
         if (!$liveSession->is_live_notified) {

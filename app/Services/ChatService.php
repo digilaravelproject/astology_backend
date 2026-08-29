@@ -477,9 +477,6 @@ class ChatService
                             }
                             $purchase->save();
                             
-                            // Broadcast package sub-session ended event
-                            broadcast(new \App\Events\PackageSubSessionEnded($subSession, $purchase->remaining_duration, $userId));
-                            
                             // Broadcast termination state to both sides
                             broadcast(new \App\Events\PackageSessionStateUpdated($subSession->toBannerArray(0), $purchase->user_id, $purchase->astrologer_id));
                             

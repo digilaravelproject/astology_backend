@@ -7,9 +7,8 @@ use App\Events\CallInitiated;
 use App\Events\ChatEnded;
 use App\Events\ChatInitiated;
 use App\Events\ChatQueueUpdated;
+use App\Events\PackageSessionStateUpdated;
 use App\Events\PackageSessionTerminated;
-use App\Events\PackageSubSessionEnded;
-use App\Events\PackageSubSessionStarted;
 use App\Jobs\TerminatePackageSessionJob;
 use App\Models\PackagePurchase;
 use App\Models\PackageSubSession;
@@ -188,7 +187,11 @@ class SessionTimerService
                 TerminatePackageSessionJob::dispatch($subSession->id)
                     ->delay(now()->addSeconds($purchase->remaining_duration));
 
-                broadcast(new PackageSubSessionStarted($subSession, $purchase->remaining_duration));
+                broadcast(new PackageSessionStateUpdated(
+                    $subSession->toBannerArray($purchase->remaining_duration),
+                    $purchase->user_id,
+                    $purchase->astrologer_id
+                ));
 
                 return $subSession;
             });
@@ -282,7 +285,11 @@ class SessionTimerService
                     $this->presenceService->setFree($purchase->astrologer_id);
                 }
 
-                $eventsToBroadcast[] = new PackageSubSessionEnded($subSession, $purchase->remaining_duration, $userId);
+                $eventsToBroadcast[] = new PackageSessionStateUpdated(
+                    $subSession->toBannerArray($purchase->remaining_duration),
+                    $purchase->user_id,
+                    $purchase->astrologer_id
+                );
 
                 if ($isForceTerminated || $purchase->status === 'exhausted') {
                     $msg = $isForceTerminated

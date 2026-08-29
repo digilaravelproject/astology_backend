@@ -14,11 +14,15 @@ class ViewerCountUpdated implements ShouldBroadcastNow
 
     public $liveSessionId;
     public $viewerCount;
+    public $action;
+    public $user;
 
-    public function __construct($liveSessionId, $viewerCount)
+    public function __construct($liveSessionId, $viewerCount, ?string $action = null, ?array $user = null)
     {
         $this->liveSessionId = $liveSessionId;
         $this->viewerCount = $viewerCount;
+        $this->action = $action;
+        $this->user = $user;
     }
 
     public function broadcastOn(): array
@@ -35,9 +39,19 @@ class ViewerCountUpdated implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
-        return [
+        $data = [
             'live_session_id' => $this->liveSessionId,
-            'viewer_count' => $this->viewerCount,
+            'viewer_count'    => $this->viewerCount,
         ];
+
+        if ($this->action) {
+            $data['action'] = $this->action;
+        }
+
+        if ($this->user) {
+            $data['user'] = $this->user;
+        }
+
+        return $data;
     }
 }

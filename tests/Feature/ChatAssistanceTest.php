@@ -132,7 +132,7 @@ class ChatAssistanceTest extends TestCase
         ]);
         $responseMessage->assertStatus(200);
 
-        \Illuminate\Support\Facades\Event::assertDispatched(\App\Events\ChatAssistanceMessageSent::class, function ($event) use ($astrologer) {
+        \Illuminate\Support\Facades\Event::assertDispatched(\App\Events\MessageSent::class, function ($event) use ($astrologer) {
             $payload = $event->broadcastWith();
             return $payload['messageData']['message'] === 'Hello' && $payload['receiverId'] === $astrologer->id;
         });

@@ -4,7 +4,6 @@ namespace App\Events;
 
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
@@ -25,6 +24,7 @@ class ChatAccepted implements ShouldBroadcastNow
 
     /**
      * Get the channels the event should broadcast on.
+     * Broadcasts to consumer, provider, and chat room channels.
      *
      * @return array<int, \Illuminate\Broadcasting\Channel>
      */
@@ -32,6 +32,8 @@ class ChatAccepted implements ShouldBroadcastNow
     {
         return [
             new PrivateChannel('user.' . $this->session->consumer_id),
+            new PrivateChannel('user.' . $this->session->provider_id),
+            new PrivateChannel('chat.' . $this->session->id),
         ];
     }
 
@@ -41,5 +43,17 @@ class ChatAccepted implements ShouldBroadcastNow
     public function broadcastAs(): string
     {
         return 'ChatAccepted';
+    }
+
+    /**
+     * Get data to broadcast.
+     */
+    public function broadcastWith(): array
+    {
+        return [
+            'session'      => $this->session,
+            'provider'     => $this->providerData ?? $this->session->provider,
+            'providerData' => $this->providerData ?? $this->session->provider,
+        ];
     }
 }

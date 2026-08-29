@@ -16,11 +16,31 @@ class CallEnded implements ShouldBroadcastNow
 
     public $session;
     public $endedById;
+    public $billing;
 
-    public function __construct($session, $endedById)
+    public function __construct($session, $endedById, $billing = null)
     {
         $this->session = $session;
         $this->endedById = $endedById;
+
+        if (is_array($billing)) {
+            $this->billing = $billing;
+        } else {
+            $durationSeconds = (int) ($session->duration_seconds ?? 0);
+            $totalCost = (float) ($session->total_cost ?? 0.00);
+
+            $this->billing = [
+                'duration_seconds' => $durationSeconds,
+                'user_details' => [
+                    'duration_seconds' => $durationSeconds,
+                    'amount_deducted' => $totalCost,
+                ],
+                'astrologer_details' => [
+                    'duration_seconds' => $durationSeconds,
+                    'amount_added' => $totalCost,
+                ],
+            ];
+        }
     }
 
     /**
@@ -58,6 +78,7 @@ class CallEnded implements ShouldBroadcastNow
             'session'       => $this->session,
             'ended_by_id'   => $this->endedById,
             'ended_by_role' => $endedByRole,  // 'user' | 'astrologer'
+            'billing'       => $this->billing,
         ];
     }
 }

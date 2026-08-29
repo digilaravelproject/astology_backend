@@ -27,6 +27,7 @@ class ChatInitiated implements ShouldBroadcastNow
     {
         return [
             new PrivateChannel('user.' . $this->session->provider_id),
+            new PrivateChannel('chat.' . $this->session->id),
         ];
     }
     

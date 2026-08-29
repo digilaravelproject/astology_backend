@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Events\ChatAssistanceMessageSent;
+use App\Events\MessageSent;
 use App\Models\Astrologer;
 use App\Models\ChatAssistanceMessage;
 use App\Models\ChatAssistanceSession;
@@ -55,7 +55,7 @@ class ChatAssistanceReplyTest extends TestCase
 
     public function test_send_chat_assistance_message_without_reply(): void
     {
-        Event::fake([ChatAssistanceMessageSent::class]);
+        Event::fake([MessageSent::class]);
         Sanctum::actingAs($this->user);
 
         $response = $this->postJson("/api/v1/chat-assistance/{$this->assistanceSession->id}/message", [
@@ -76,7 +76,7 @@ class ChatAssistanceReplyTest extends TestCase
 
     public function test_send_chat_assistance_message_with_reply(): void
     {
-        Event::fake([ChatAssistanceMessageSent::class]);
+        Event::fake([MessageSent::class]);
 
         $initialMsg = ChatAssistanceMessage::create([
             'chat_assistance_session_id' => $this->assistanceSession->id,
@@ -106,7 +106,7 @@ class ChatAssistanceReplyTest extends TestCase
             'reply_to_id' => $initialMsg->id,
         ]);
 
-        Event::assertDispatched(ChatAssistanceMessageSent::class, function ($event) use ($initialMsg) {
+        Event::assertDispatched(MessageSent::class, function ($event) use ($initialMsg) {
             $msg = $event->messageData;
             return $msg->reply_to_id === $initialMsg->id && $msg->replyTo->id === $initialMsg->id;
         });
