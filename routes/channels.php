@@ -83,6 +83,17 @@ Broadcast::channel('chat-assistance.{sessionId}', function ($user, $sessionId) {
         || (int) $user->id === (int) $session->provider_id;
 }, ['guards' => ['sanctum']]);
 
+Broadcast::channel('chat_assistance.{sessionId}', function ($user, $sessionId) {
+    $session = ChatAssistanceSession::find((int) $sessionId);
+
+    if (!$session) {
+        return false;
+    }
+
+    return (int) $user->id === (int) $session->consumer_id
+        || (int) $user->id === (int) $session->provider_id;
+}, ['guards' => ['sanctum']]);
+
 /*
 |--------------------------------------------------------------------------
 | 5. Live Stream Broadcasting Presence Channel

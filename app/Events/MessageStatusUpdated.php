@@ -42,7 +42,19 @@ class MessageStatusUpdated implements ShouldBroadcastNow
 
     public function broadcastOn(): array
     {
-        return [new PrivateChannel('user.' . $this->receiverId)];
+        $channels = [];
+
+        if (!empty($this->receiverId)) {
+            $channels[] = new PrivateChannel('user.' . $this->receiverId);
+        }
+
+        if (!empty($this->sessionId)) {
+            $channels[] = new PrivateChannel('chat.' . $this->sessionId);
+            $channels[] = new PrivateChannel('chat-assistance.' . $this->sessionId);
+            $channels[] = new PrivateChannel('chat_assistance.' . $this->sessionId);
+        }
+
+        return $channels;
     }
 
     public function broadcastAs(): string

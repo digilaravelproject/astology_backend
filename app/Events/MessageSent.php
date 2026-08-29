@@ -55,12 +55,29 @@ class MessageSent implements ShouldBroadcastNow
                 $channels[] = new PrivateChannel('user.' . $this->receiverId);
             }
 
-            $sessionId = is_array($this->messageData)
+            $senderId = is_array($this->messageData)
+                ? ($this->messageData['sender_id'] ?? null)
+                : ($this->messageData->sender_id ?? null);
+
+            if (!empty($senderId) && (int) $senderId !== (int) $this->receiverId) {
+                $channels[] = new PrivateChannel('user.' . $senderId);
+            }
+
+            $chatSessionId = is_array($this->messageData)
                 ? ($this->messageData['chat_session_id'] ?? null)
                 : ($this->messageData->chat_session_id ?? null);
 
-            if (!empty($sessionId)) {
-                $channels[] = new PrivateChannel('chat.' . $sessionId);
+            if (!empty($chatSessionId)) {
+                $channels[] = new PrivateChannel('chat.' . $chatSessionId);
+            }
+
+            $assistanceSessionId = is_array($this->messageData)
+                ? ($this->messageData['chat_assistance_session_id'] ?? null)
+                : ($this->messageData->chat_assistance_session_id ?? null);
+
+            if (!empty($assistanceSessionId)) {
+                $channels[] = new PrivateChannel('chat-assistance.' . $assistanceSessionId);
+                $channels[] = new PrivateChannel('chat_assistance.' . $assistanceSessionId);
             }
         } catch (Throwable $e) {
             Log::error('Failed to resolve broadcast channels in MessageSent event: ' . $e->getMessage(), [
@@ -96,6 +113,7 @@ class MessageSent implements ShouldBroadcastNow
     {
         try {
             return [
+                'message'     => $this->messageData,
                 'messageData' => $this->messageData,
                 'receiverId'  => $this->receiverId,
             ];
@@ -105,6 +123,7 @@ class MessageSent implements ShouldBroadcastNow
             ]);
 
             return [
+                'message'     => null,
                 'messageData' => null,
                 'receiverId'  => $this->receiverId,
             ];
