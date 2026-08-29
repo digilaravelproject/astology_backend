@@ -145,20 +145,12 @@ class ChatDismissFlowTest extends TestCase
         $offlineResponse = $this->actingAs($consumer)->postJson('/api/v1/presence/offline');
         $offlineResponse->assertStatus(200);
 
-        // Verify status transitioned to rejected and provider is free/available
+        // In the decoupled architecture, going offline marks consumer offline without destroying initiated session prematurely
+        $this->assertDatabaseHas('users', ['id' => $consumer->id, 'is_online' => false]);
         $this->assertDatabaseHas('chat_sessions', [
             'id' => $sessionId,
-            'status' => 'rejected'
+            'status' => 'initiated'
         ]);
-        $this->assertDatabaseHas('users', ['id' => $provider->id, 'is_busy' => false]);
-
-        // Verify ChatDismissed broadcast was dispatched to notify provider/astrologer
-        Event::assertDispatched(ChatDismissed::class, function ($event) use ($provider) {
-            $receiverId = ($event->dismissedById == $event->session->consumer_id) 
-                ? $event->session->provider_id 
-                : $event->session->consumer_id;
-            return (int) $receiverId === (int) $provider->id;
-        });
     }
 
     /** @test */
