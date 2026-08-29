@@ -77,7 +77,7 @@ class SessionTimerService
                 ->update(['ended_at' => now()]);
 
             if ($mode === 'chat') {
-                $linkedSession = $this->chatService->initiateChat($userId, $astrologerId, $question);
+                $linkedSession = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
                 $linkedSession->load(['consumer', 'provider']);
 
                 $user = \App\Models\User::find($userId);

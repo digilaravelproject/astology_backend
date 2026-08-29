@@ -60,12 +60,8 @@ class ChatService
                 $pricing = $this->pricingCalculator->calculate($astrologer, 'chat');
                 $rate = (float) $pricing['customer_rate'];
 
-                // Check if user has an active prepaid package with this astrologer
-                $hasActivePackage = $isPackageChat || \App\Models\PackagePurchase::where('user_id', $consumerId)
-                    ->where('astrologer_id', $providerId)
-                    ->where('status', 'active')
-                    ->where('remaining_duration', '>', 0)
-                    ->exists();
+                // Check if this is an explicitly initiated prepaid package chat
+                $hasActivePackage = $isPackageChat;
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -176,12 +172,7 @@ class ChatService
 
                 // If this is a package session, allow in-session channel transition
                 $isPrepaid = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists()
-                    || (float) $session->rate_per_minute <= 0
-                    || \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
-                        ->where('astrologer_id', $session->provider_id)
-                        ->where('status', 'active')
-                        ->where('remaining_duration', '>', 0)
-                        ->exists();
+                    || (float) $session->rate_per_minute <= 0;
 
                 if (!$isPrepaid && ($isChatBusy || $isCallBusy)) {
                     throw new Exception("You are already in an active session.");
@@ -419,11 +410,7 @@ class ChatService
                 
                 // Skip charging if this is a prepaid package session or rate is 0.00
                 $isPackageSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists()
-                    || (float) $session->rate_per_minute <= 0
-                    || \App\Models\PackagePurchase::where('user_id', $session->consumer_id)
-                        ->where('astrologer_id', $session->provider_id)
-                        ->where('status', 'active')
-                        ->exists();
+                    || (float) $session->rate_per_minute <= 0;
 
                 $finalCost = $isPackageSession ? 0.00 : (ceil($durationSeconds / 60) * $session->rate_per_minute);
                 
