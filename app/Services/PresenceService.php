@@ -42,8 +42,8 @@ class PresenceService
                 ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                 ->first();
 
-            $isBusy = ($activeChat || $activeCall || (bool) $user->is_busy);
-            $sessionId = $activeChat ? $activeChat->id : ($activeCall ? $activeCall->id : $user->busy_session_id);
+            $isBusy = ($activeChat || $activeCall) ? true : false;
+            $sessionId = $activeChat ? $activeChat->id : ($activeCall ? $activeCall->id : null);
             $sessionType = $activeChat ? 'chat' : ($activeCall ? 'call' : null);
 
             $wasOnline = (bool) $user->is_online;

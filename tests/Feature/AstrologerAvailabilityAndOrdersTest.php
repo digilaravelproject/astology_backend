@@ -44,10 +44,15 @@ class AstrologerAvailabilityAndOrdersTest extends TestCase
         Astrologer::create([
             'user_id' => $this->provider->id,
             'is_online' => true,
+            'is_approved' => true,
+            'status' => 'approved',
+            'approval_status' => 'approved',
             'chat_rate_per_minute' => 10.00,
             'call_rate_per_minute' => 12.00,
             'chat_enabled' => true,
             'call_enabled' => true,
+            'is_chat_enabled' => true,
+            'is_call_enabled' => true,
         ]);
         Wallet::create(['user_id' => $this->provider->id, 'balance' => 100.00]);
     }
