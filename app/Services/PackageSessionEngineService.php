@@ -404,11 +404,13 @@ class PackageSessionEngineService
 
         $bannerData = $subSession->toBannerArray($purchase->remaining_duration);
 
-        broadcast(new PackageSessionTerminated(
-            $purchase,
-            'Package session ended.',
-            $subSession->mode ?? 'chat'
-        ));
+        if ($purchase->status === 'exhausted' || $purchase->remaining_duration <= 0) {
+            broadcast(new PackageSessionTerminated(
+                $purchase,
+                'Your package session has exhausted all remaining balance.',
+                $subSession->mode ?? 'chat'
+            ));
+        }
         broadcast(new PackageSessionStateUpdated($bannerData, $purchase->user_id, $purchase->astrologer_id));
 
         return [
