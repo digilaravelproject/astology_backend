@@ -167,17 +167,20 @@ class PackageSessionEngineService
             $user = $purchase->user;
             $now = now();
 
-            // 1. If switching FROM call, disconnect the audio/video call gracefully ($0.00 charge)
+            // 1. If switching FROM call/chat, disconnect the previous subchannel gracefully ($0.00 charge)
             if ($fromChannel === 'call' && $subSession->call_session_id) {
                 $subSession->call_status = 'disconnected';
                 $call = CallSession::find($subSession->call_session_id);
                 if ($call && $call->status !== 'completed') {
                     $call->update(['status' => 'completed', 'ended_at' => $now, 'rate_per_minute' => 0.00, 'total_cost' => 0.00]);
-                    broadcast(new CallEnded($call, [
-                        'is_package'     => true,
-                        'sub_session_id' => $subSession->id,
-                        'action'         => 'switch_channel',
-                    ]));
+                    broadcast(new CallEnded($call, $userId));
+                }
+            } elseif ($fromChannel === 'chat' && $subSession->chat_session_id) {
+                $subSession->chat_status = 'closed';
+                $chat = ChatSession::find($subSession->chat_session_id);
+                if ($chat && !in_array($chat->status, ['completed', 'cancelled', 'rejected', 'timeout'])) {
+                    $chat->update(['status' => 'completed', 'ended_at' => $now, 'rate_per_minute' => 0.00, 'total_cost' => 0.00]);
+                    broadcast(new ChatEnded($chat, $userId));
                 }
             }
 
@@ -228,6 +231,8 @@ class PackageSessionEngineService
                     $newSessionData['chat_session'] = $linkedChat->fresh();
                     $newSessionData['chat_session_id'] = $linkedChat->id;
 
+                    $linkedChat->load(['provider.astrologer', 'consumer']);
+                    broadcast(new \App\Events\ChatAccepted($linkedChat, $linkedChat->provider));
                     if ($user) {
                         broadcast(new ChatInitiated($linkedChat, $user));
                         broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ongoing'));

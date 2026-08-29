@@ -277,7 +277,9 @@ class SessionTimerService
                             'error'           => $e->getMessage(),
                         ]);
                     }
-                } elseif ($subSession->call_session_id) {
+                }
+
+                if ($subSession->call_session_id) {
                     try {
                         $callBefore = \App\Models\CallSession::find($subSession->call_session_id);
                         $wasRinging = $callBefore && in_array($callBefore->status, ['initiated', 'ringing']);
