@@ -383,7 +383,11 @@ class PackageSessionEngineService
 
         $bannerData = $subSession->toBannerArray($purchase->remaining_duration);
 
-        broadcast(new PackageSessionTerminated($subSession, $purchase->remaining_duration));
+        broadcast(new PackageSessionTerminated(
+            $purchase,
+            'Package session ended.',
+            $subSession->mode ?? 'chat'
+        ));
         broadcast(new PackageSessionStateUpdated($bannerData, $purchase->user_id, $purchase->astrologer_id));
 
         return [

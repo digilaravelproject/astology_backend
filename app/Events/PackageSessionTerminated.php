@@ -21,11 +21,16 @@ class PackageSessionTerminated implements ShouldBroadcastNow
     /**
      * Create a new event instance.
      */
-    public function __construct($purchase, string $message, string $mode)
+    public function __construct($purchase, string $message = 'Package session ended.', string $mode = 'chat')
     {
-        $this->purchase = $purchase;
+        if ($purchase instanceof \App\Models\PackageSubSession) {
+            $this->purchase = $purchase->purchase ?? $purchase->load('purchase')->purchase;
+            $this->mode = $purchase->mode ?? $mode;
+        } else {
+            $this->purchase = $purchase;
+            $this->mode = $mode;
+        }
         $this->message = $message;
-        $this->mode = $mode;
     }
 
     /**
@@ -33,6 +38,10 @@ class PackageSessionTerminated implements ShouldBroadcastNow
      */
     public function broadcastOn(): array
     {
+        if (!$this->purchase) {
+            return [];
+        }
+
         return [
             new PrivateChannel('user.' . $this->purchase->user_id),
             new PrivateChannel('user.' . $this->purchase->astrologer_id),
@@ -42,5 +51,17 @@ class PackageSessionTerminated implements ShouldBroadcastNow
     public function broadcastAs(): string
     {
         return 'PackageSessionTerminated';
+    }
+
+    public function broadcastWith(): array
+    {
+        return [
+            'purchase'            => $this->purchase,
+            'package_purchase_id' => $this->purchase?->id,
+            'mode'                => $this->mode,
+            'message'             => $this->message,
+            'remaining_duration'  => $this->purchase?->remaining_duration ?? 0,
+            'package_status'      => $this->purchase?->status ?? 'exhausted',
+        ];
     }
 }
