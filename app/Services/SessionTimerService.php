@@ -298,16 +298,34 @@ class SessionTimerService
                     }
                 }
 
-                // Clean up ANY lingering chat or call sessions between these two users
-                \App\Models\ChatSession::where('consumer_id', $purchase->user_id)
+                // Clean up and notify ANY lingering chat or call sessions between these two users
+                $lingeringChats = \App\Models\ChatSession::where('consumer_id', $purchase->user_id)
                     ->where('provider_id', $purchase->astrologer_id)
                     ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
-                    ->update(['status' => 'completed', 'ended_at' => $endTime]);
+                    ->get();
+                foreach ($lingeringChats as $lChat) {
+                    $wasInitiated = in_array($lChat->status, ['initiated', 'waiting']);
+                    $lChat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $endTime]);
+                    if ($wasInitiated) {
+                        $eventsToBroadcast[] = new ChatDismissed($lChat, $userId ?? $purchase->user_id, 'cancelled');
+                    } else {
+                        $eventsToBroadcast[] = new ChatEnded($lChat, $userId ?? $purchase->user_id);
+                    }
+                }
 
-                \App\Models\CallSession::where('consumer_id', $purchase->user_id)
+                $lingeringCalls = \App\Models\CallSession::where('consumer_id', $purchase->user_id)
                     ->where('provider_id', $purchase->astrologer_id)
                     ->whereIn('status', ['initiated', 'ringing', 'waiting', 'accepted', 'ongoing', 'active'])
-                    ->update(['status' => 'completed', 'ended_at' => $endTime]);
+                    ->get();
+                foreach ($lingeringCalls as $lCall) {
+                    $wasRinging = in_array($lCall->status, ['initiated', 'ringing']);
+                    $lCall->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $endTime]);
+                    if ($wasRinging) {
+                        $eventsToBroadcast[] = new CallDismissed($lCall, $userId ?? $purchase->user_id, 'cancelled');
+                    } else {
+                        $eventsToBroadcast[] = new CallEnded($lCall, $userId ?? $purchase->user_id);
+                    }
+                }
 
                 // Explicitly free presence and clear busy flags for both participants
                 $this->presenceService->setFree($purchase->user_id);

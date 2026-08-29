@@ -353,7 +353,7 @@ class PackageSessionEngineService
     {
         $now = now();
 
-        // 1. Close linked call if active or ringing
+        // 1. Close and notify linked call if active or ringing
         if ($subSession->call_session_id) {
             $call = CallSession::find($subSession->call_session_id);
             if ($call && !in_array($call->status, ['completed', 'missed', 'rejected'])) {
@@ -367,13 +367,22 @@ class PackageSessionEngineService
             }
         }
 
-        // Close any lingering call sessions between these two users
-        CallSession::where('consumer_id', $purchase->user_id)
+        // Close and notify any lingering call sessions between these two users
+        $lingeringCalls = CallSession::where('consumer_id', $purchase->user_id)
             ->where('provider_id', $purchase->astrologer_id)
             ->whereIn('status', ['initiated', 'ringing', 'waiting', 'accepted', 'ongoing', 'active'])
-            ->update(['status' => 'completed', 'ended_at' => $now]);
+            ->get();
+        foreach ($lingeringCalls as $lCall) {
+            $wasRinging = in_array($lCall->status, ['initiated', 'ringing']);
+            $lCall->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $now]);
+            if ($wasRinging) {
+                broadcast(new CallDismissed($lCall, $purchase->user_id, 'cancelled'));
+            } else {
+                broadcast(new CallEnded($lCall, $purchase->user_id));
+            }
+        }
 
-        // 2. Close linked chat if active or initiated
+        // 2. Close and notify linked chat if active or initiated
         if ($subSession->chat_session_id) {
             $chat = ChatSession::find($subSession->chat_session_id);
             if ($chat && !in_array($chat->status, ['completed', 'cancelled', 'rejected', 'timeout'])) {
@@ -387,11 +396,20 @@ class PackageSessionEngineService
             }
         }
 
-        // Close any lingering chat sessions between these two users
-        ChatSession::where('consumer_id', $purchase->user_id)
+        // Close and notify any lingering chat sessions between these two users
+        $lingeringChats = ChatSession::where('consumer_id', $purchase->user_id)
             ->where('provider_id', $purchase->astrologer_id)
             ->whereIn('status', ['initiated', 'waiting', 'accepted', 'ongoing', 'active'])
-            ->update(['status' => 'completed', 'ended_at' => $now]);
+            ->get();
+        foreach ($lingeringChats as $lChat) {
+            $wasInitiated = in_array($lChat->status, ['initiated', 'waiting']);
+            $lChat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $now]);
+            if ($wasInitiated) {
+                broadcast(new ChatDismissed($lChat, $purchase->user_id, 'cancelled'));
+            } else {
+                broadcast(new ChatEnded($lChat, $purchase->user_id));
+            }
+        }
 
         // 3. Compute accurate atomic duration used (1x rate)
         $totalElapsed = $subSession->started_at ? (int) $subSession->started_at->diffInSeconds($now) : 0;
