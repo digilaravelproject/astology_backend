@@ -32,6 +32,7 @@ class LiveSessionService
             ->where('session_type', 'public')
             ->latest('id')
             ->get()
+            ->unique('astrologer_id')
             ->map(fn($session) => $this->formatSessionListItem($session));
     }
 
@@ -279,6 +280,20 @@ class LiveSessionService
             'max_participants' => $data['max_participants'] ?? 100,
         ];
 
+        if ($isInstant) {
+            // Auto-complete any previous ongoing session of this astrologer to prevent duplicate active cards
+            LiveSession::where('astrologer_id', $astrologerId)
+                ->where('status', 'ongoing')
+                ->update([
+                    'status' => 'completed',
+                    'is_broadcasting' => false,
+                    'is_camera_on' => false,
+                    'is_audio_on' => false,
+                    'current_participants' => 0,
+                    'viewer_count' => 0,
+                ]);
+        }
+
         $liveSession = LiveSession::create($liveSessionData);
 
         if ($isInstant) {
@@ -452,6 +467,19 @@ class LiveSessionService
         if ($liveSession->status !== 'upcoming') {
             throw new \Exception('Only upcoming sessions can be started');
         }
+
+        // Auto-complete any other ongoing sessions for this astrologer
+        LiveSession::where('astrologer_id', $astrologerId)
+            ->where('status', 'ongoing')
+            ->where('id', '!=', $sessionId)
+            ->update([
+                'status' => 'completed',
+                'is_broadcasting' => false,
+                'is_camera_on' => false,
+                'is_audio_on' => false,
+                'current_participants' => 0,
+                'viewer_count' => 0,
+            ]);
 
         $liveSession->update([
             'status' => 'ongoing',

@@ -64,7 +64,7 @@ class LiveSessionController extends Controller
                 $request->all()
             );
 
-            return ApiResponse::success($result, 'Live session created successfully', 201);
+            return ApiResponse::success($result, 'Live session created successfully', 200);
         } catch (Exception $e) {
             Log::error('Failed to create live session', [
                 'error' => $e->getMessage(),

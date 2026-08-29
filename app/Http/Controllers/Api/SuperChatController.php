@@ -88,7 +88,7 @@ class SuperChatController extends Controller
 
         try {
             $data = $this->liveSessionService->addComment($id, $request->user(), $request->message);
-            return ApiResponse::success($data, 'Comment sent successfully', 201);
+            return ApiResponse::success($data, 'Comment sent successfully', 200);
         } catch (\RuntimeException $e) {
             return ApiResponse::error($e->getMessage(), 400);
         } catch (Exception $e) {
@@ -123,7 +123,7 @@ class SuperChatController extends Controller
                 'amount' => $result['superChat']->amount,
                 'message' => $result['superChat']->message,
                 'created_at' => $result['superChat']->created_at->toISOString(),
-            ], 'Super Chat sent successfully', 201);
+            ], 'Super Chat sent successfully', 200);
         } catch (Exception $e) {
             $code = $e->getCode() ?: 500;
             return ApiResponse::error($e->getMessage(), $code);
