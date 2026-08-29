@@ -614,6 +614,11 @@ class ChatService
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
 
+                // Close any orphaned PackageSubSession linked to this cancelled chat
+                \App\Models\PackageSubSession::where('chat_session_id', $sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now(), 'session_state' => 'terminated']);
+
                 $session->refresh();
                 return $session;
 

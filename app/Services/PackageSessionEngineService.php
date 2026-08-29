@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Events\CallDismissed;
 use App\Events\CallEnded;
 use App\Events\CallInitiated;
+use App\Events\ChatDismissed;
 use App\Events\ChatEnded;
 use App\Events\ChatInitiated;
 use App\Events\ChatQueueUpdated;
@@ -288,26 +290,28 @@ class PackageSessionEngineService
                     $subSession->call_status = 'disconnected';
                     if ($subSession->call_session_id) {
                         $call = CallSession::find($subSession->call_session_id);
-                        if ($call && $call->status !== 'completed') {
-                            $call->update(['status' => 'completed', 'ended_at' => $now]);
-                            broadcast(new CallEnded($call, [
-                                'is_package' => true,
-                                'sub_session_id' => $subSession->id,
-                                'action' => 'end_channel_only',
-                            ]));
+                        if ($call && !in_array($call->status, ['completed', 'missed', 'rejected'])) {
+                            $wasRinging = in_array($call->status, ['initiated', 'ringing']);
+                            $call->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $now]);
+                            if ($wasRinging) {
+                                broadcast(new CallDismissed($call, $userId, 'cancelled'));
+                            } else {
+                                broadcast(new CallEnded($call, $userId));
+                            }
                         }
                     }
                 } elseif ($channelType === 'chat') {
                     $subSession->chat_status = 'closed';
                     if ($subSession->chat_session_id) {
                         $chat = ChatSession::find($subSession->chat_session_id);
-                        if ($chat && $chat->status !== 'completed') {
-                            $chat->update(['status' => 'completed', 'ended_at' => $now]);
-                            broadcast(new ChatEnded($chat, [
-                                'is_package' => true,
-                                'sub_session_id' => $subSession->id,
-                                'action' => 'end_channel_only',
-                            ]));
+                        if ($chat && !in_array($chat->status, ['completed', 'cancelled', 'rejected', 'timeout'])) {
+                            $wasInitiated = in_array($chat->status, ['initiated', 'waiting']);
+                            $chat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $now]);
+                            if ($wasInitiated) {
+                                broadcast(new ChatDismissed($chat, $userId, 'cancelled'));
+                            } else {
+                                broadcast(new ChatEnded($chat, $userId));
+                            }
                         }
                     }
                 }
@@ -344,21 +348,31 @@ class PackageSessionEngineService
     {
         $now = now();
 
-        // 1. Close linked call if active
+        // 1. Close linked call if active or ringing
         if ($subSession->call_session_id) {
             $call = CallSession::find($subSession->call_session_id);
-            if ($call && $call->status !== 'completed') {
-                $call->update(['status' => 'completed', 'ended_at' => $now]);
-                broadcast(new CallEnded($call, ['is_package' => true, 'sub_session_id' => $subSession->id]));
+            if ($call && !in_array($call->status, ['completed', 'missed', 'rejected'])) {
+                $wasRinging = in_array($call->status, ['initiated', 'ringing']);
+                $call->update(['status' => $wasRinging ? 'missed' : 'completed', 'ended_at' => $now]);
+                if ($wasRinging) {
+                    broadcast(new CallDismissed($call, $purchase->user_id, 'cancelled'));
+                } else {
+                    broadcast(new CallEnded($call, $purchase->user_id));
+                }
             }
         }
 
-        // 2. Close linked chat if active
+        // 2. Close linked chat if active or initiated
         if ($subSession->chat_session_id) {
             $chat = ChatSession::find($subSession->chat_session_id);
-            if ($chat && $chat->status !== 'completed') {
-                $chat->update(['status' => 'completed', 'ended_at' => $now]);
-                broadcast(new ChatEnded($chat, ['is_package' => true, 'sub_session_id' => $subSession->id]));
+            if ($chat && !in_array($chat->status, ['completed', 'cancelled', 'rejected', 'timeout'])) {
+                $wasInitiated = in_array($chat->status, ['initiated', 'waiting']);
+                $chat->update(['status' => $wasInitiated ? 'cancelled' : 'completed', 'ended_at' => $now]);
+                if ($wasInitiated) {
+                    broadcast(new ChatDismissed($chat, $purchase->user_id, 'cancelled'));
+                } else {
+                    broadcast(new ChatEnded($chat, $purchase->user_id));
+                }
             }
         }
 

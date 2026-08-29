@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Events\CallDismissed;
 use App\Events\CallEnded;
 use App\Events\CallInitiated;
+use App\Events\ChatDismissed;
 use App\Events\ChatEnded;
 use App\Events\ChatInitiated;
 use App\Events\ChatQueueUpdated;
@@ -259,8 +261,14 @@ class SessionTimerService
 
                 if ($subSession->chat_session_id) {
                     try {
+                        $chatBefore = \App\Models\ChatSession::find($subSession->chat_session_id);
+                        $wasInitiated = $chatBefore && in_array($chatBefore->status, ['initiated', 'waiting']);
                         $linkedChat = $this->chatService->endChat($subSession->chat_session_id);
-                        $eventsToBroadcast[] = new ChatEnded($linkedChat, $userId ?? $purchase->user_id);
+                        if ($wasInitiated) {
+                            $eventsToBroadcast[] = new ChatDismissed($linkedChat, $userId ?? $purchase->user_id, 'cancelled');
+                        } else {
+                            $eventsToBroadcast[] = new ChatEnded($linkedChat, $userId ?? $purchase->user_id);
+                        }
                         $eventsToBroadcast[] = new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ended');
                     } catch (Exception $e) {
                         Log::warning('Could not end linked chat session during sub-session end.', [
@@ -271,8 +279,14 @@ class SessionTimerService
                     }
                 } elseif ($subSession->call_session_id) {
                     try {
+                        $callBefore = \App\Models\CallSession::find($subSession->call_session_id);
+                        $wasRinging = $callBefore && in_array($callBefore->status, ['initiated', 'ringing']);
                         $linkedCall = $this->callService->endCall($subSession->call_session_id);
-                        $eventsToBroadcast[] = new CallEnded($linkedCall, $userId ?? $purchase->user_id);
+                        if ($wasRinging) {
+                            $eventsToBroadcast[] = new CallDismissed($linkedCall, $userId ?? $purchase->user_id, 'cancelled');
+                        } else {
+                            $eventsToBroadcast[] = new CallEnded($linkedCall, $userId ?? $purchase->user_id);
+                        }
                     } catch (Exception $e) {
                         Log::warning('Could not end linked call session during sub-session end.', [
                             'sub_session_id'  => $subSessionId,

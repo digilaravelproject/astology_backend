@@ -126,8 +126,8 @@ class CallController extends Controller
             $consumerId = $request->user()->id;
             $session    = $this->callService->cancelCall($sessionId, $consumerId);
 
-            // CallDismissed broadcasts to BOTH channels so the astrologer's ring screen closes
-            broadcast(new CallDismissed($session, $consumerId, 'missed'));
+            // CallDismissed broadcasts to user.{id} and call.{id} so astrologer's ring screen closes
+            broadcast(new CallDismissed($session, $consumerId, 'cancelled'));
 
             return ApiResponse::success(null, 'Call cancelled successfully');
 
@@ -143,11 +143,19 @@ class CallController extends Controller
     public function endCall(Request $request, $sessionId)
     {
         try {
-            $userId  = $request->user()->id;
+            $userId = $request->user()->id;
+            $sessionBefore = \App\Models\CallSession::find($sessionId);
+            $wasRinging = $sessionBefore && in_array($sessionBefore->status, ['initiated', 'ringing']);
+
             $session = $this->callService->endCall($sessionId, $userId);
 
-            // Notify the OTHER participant their call has ended
-            broadcast(new CallEnded($session, $userId));
+            if ($wasRinging) {
+                // If caller hung up before astrologer answered, dismiss the incoming call screen
+                broadcast(new CallDismissed($session, $userId, 'cancelled'));
+            } else {
+                // Notify participants their call has ended
+                broadcast(new CallEnded($session, $userId));
+            }
 
             return ApiResponse::success(['session' => $session], 'Call ended successfully');
 

@@ -459,6 +459,11 @@ class CallService
                 $this->presenceService->setFree($session->consumer_id);
                 $this->presenceService->setFree($session->provider_id);
 
+                // Close any orphaned PackageSubSession linked to this cancelled call
+                \App\Models\PackageSubSession::where('call_session_id', $sessionId)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => now(), 'session_state' => 'terminated']);
+
                 $session->refresh();
                 return $session;
 

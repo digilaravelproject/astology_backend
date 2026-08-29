@@ -93,8 +93,18 @@ class ChatController extends Controller
     public function endChat(Request $request, $sessionId)
     {
         try {
-            $session = $this->chatService->endChat($sessionId, $request->user()->id);
-            broadcast(new ChatEnded($session, $request->user()->id));
+            $userId = $request->user()->id;
+            $sessionBefore = \App\Models\ChatSession::find($sessionId);
+            $wasInitiated = $sessionBefore && in_array($sessionBefore->status, ['initiated', 'waiting']);
+
+            $session = $this->chatService->endChat($sessionId, $userId);
+
+            if ($wasInitiated) {
+                broadcast(new \App\Events\ChatDismissed($session, $userId, 'cancelled'));
+            } else {
+                broadcast(new ChatEnded($session, $userId));
+            }
+
             if ($session) {
                 broadcast(new ChatQueueUpdated($session->provider_id, $session, 'ended'));
             }
