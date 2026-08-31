@@ -81,6 +81,16 @@ class ChatService
 
                 // Dynamic check for consumer (bypassed if switching within an active package session)
                 if (!$hasActivePackage) {
+                    // Check if consumer is currently in an active prepaid package session with this specific astrologer
+                    $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
+                        $q->where('user_id', $consumerId)
+                          ->where('astrologer_id', $providerId);
+                    })->whereNull('ended_at')->exists();
+
+                    if ($activePackageSubSession) {
+                        throw new Exception("You are currently in an active prepaid package session with this astrologer. Please use the switch channel feature.");
+                    }
+
                     $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
                         ->whereIn('status', ['accepted', 'ongoing'])
                         ->exists();
