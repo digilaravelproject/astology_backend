@@ -3,12 +3,14 @@
 namespace App\Services\Notification;
 
 use App\Models\AdminFcmSetting;
+use App\Models\User;
 use App\Models\UserDevice;
 use Firebase\JWT\JWT;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
+use Throwable;
 
 class FcmChannelDriver
 {
@@ -144,7 +146,7 @@ class FcmChannelDriver
                 $expiresIn = (int) ($data['expires_in'] ?? 3600);
 
                 if ($accessToken) {
-                    // Cache for slightly less than expiration (e.g. 50 minutes)
+                    // Cache for slightly less than expiration (50 minutes)
                     Cache::put($cacheKey, $accessToken, max(60, $expiresIn - 600));
                     return $accessToken;
                 }
@@ -167,7 +169,8 @@ class FcmChannelDriver
      */
     public function sendToToken(string $deviceToken, PushNotificationPayload $payload): array
     {
-        if (empty(trim($deviceToken))) {
+        $token = trim($deviceToken);
+        if (empty($token)) {
             return ['success' => false, 'error' => 'Device token is empty', 'unregistered' => false];
         }
 
@@ -186,7 +189,7 @@ class FcmChannelDriver
         }
 
         $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
-        $messageBody = $this->buildMessagePayload($deviceToken, $payload);
+        $messageBody = $this->buildMessagePayload($token, $payload, false);
 
         try {
             $response = Http::withHeaders([
@@ -196,15 +199,15 @@ class FcmChannelDriver
 
             if ($response->successful()) {
                 $resData = $response->json();
-                Log::info("FCM Sent Successfully to token [{$deviceToken}]", [
+                Log::info("FCM Sent Successfully to token [" . substr($token, 0, 15) . "...]", [
                     'type'       => $payload->type,
                     'title'      => $payload->title,
                     'message_id' => $resData['name'] ?? null,
                 ]);
                 return [
-                    'success'    => true,
-                    'message_id' => $resData['name'] ?? null,
-                    'error'      => null,
+                    'success'      => true,
+                    'message_id'   => $resData['name'] ?? null,
+                    'error'        => null,
                     'unregistered' => false,
                 ];
             }
@@ -223,7 +226,7 @@ class FcmChannelDriver
                || str_contains($errorMessage, 'Requested entity was not found');
 
             if ($isUnregistered) {
-                $this->handleDeadToken($deviceToken);
+                $this->handleDeadToken($token);
             }
 
             Log::warning("FCM Send Failed [{$statusCode} - {$errorCode}]: {$errorMessage}");
@@ -247,24 +250,122 @@ class FcmChannelDriver
     }
 
     /**
-     * Send push notification to multiple device tokens in batch.
+     * Send push notification to multiple device tokens using high-throughput HTTP connection pooling.
+     * Replaces serialized synchronous loops with concurrent parallel dispatching.
+     *
+     * @param array $deviceTokens
+     * @param PushNotificationPayload $payload
+     * @param int $concurrency Number of concurrent parallel requests per pool batch (default 30)
+     * @return array
      */
-    public function sendToTokens(array $deviceTokens, PushNotificationPayload $payload): array
+    public function sendToTokens(array $deviceTokens, PushNotificationPayload $payload, int $concurrency = 30): array
     {
+        $uniqueTokens = array_values(array_unique(array_filter($deviceTokens)));
         $results = [
-            'total'      => count($deviceTokens),
+            'total'      => count($uniqueTokens),
             'successful' => 0,
             'failed'     => 0,
             'details'    => [],
         ];
 
-        foreach (array_unique(array_filter($deviceTokens)) as $token) {
-            $res = $this->sendToToken($token, $payload);
-            $results['details'][$token] = $res;
-            if ($res['success']) {
-                $results['successful']++;
-            } else {
+        if (empty($uniqueTokens)) {
+            return $results;
+        }
+
+        if (!$this->isConfigured()) {
+            foreach ($uniqueTokens as $token) {
                 $results['failed']++;
+                $results['details'][$token] = [
+                    'success'      => false,
+                    'error'        => 'FCM is not configured or disabled',
+                    'unregistered' => false,
+                ];
+            }
+            return $results;
+        }
+
+        $projectId = $this->getProjectId();
+        $accessToken = $this->getAccessToken();
+        if (!$projectId || !$accessToken) {
+            foreach ($uniqueTokens as $token) {
+                $results['failed']++;
+                $results['details'][$token] = [
+                    'success'      => false,
+                    'error'        => 'FCM credentials missing or invalid',
+                    'unregistered' => false,
+                ];
+            }
+            return $results;
+        }
+
+        $url = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
+        // Dispatch in concurrent parallel chunks
+        $chunks = array_chunk($uniqueTokens, max(1, $concurrency));
+        foreach ($chunks as $chunk) {
+            try {
+                $responses = Http::pool(function ($pool) use ($chunk, $payload, $url, $accessToken) {
+                    foreach ($chunk as $token) {
+                        $body = $this->buildMessagePayload($token, $payload, false);
+                        $pool->as($token)->withHeaders([
+                            'Authorization' => "Bearer {$accessToken}",
+                            'Content-Type'  => 'application/json; UTF-8',
+                        ])->timeout(10)->post($url, ['message' => $body]);
+                    }
+                });
+
+                foreach ($chunk as $token) {
+                    $response = $responses[$token] ?? null;
+
+                    if ($response instanceof \Illuminate\Http\Client\Response && $response->successful()) {
+                        $resData = $response->json();
+                        $results['successful']++;
+                        $results['details'][$token] = [
+                            'success'      => true,
+                            'message_id'   => $resData['name'] ?? null,
+                            'error'        => null,
+                            'unregistered' => false,
+                        ];
+                    } else {
+                        $results['failed']++;
+                        $statusCode = $response instanceof \Illuminate\Http\Client\Response ? $response->status() : 0;
+                        $errorJson = $response instanceof \Illuminate\Http\Client\Response ? $response->json() : [];
+                        $errorCode = $errorJson['error']['details'][0]['errorCode'] ?? $errorJson['error']['status'] ?? 'HTTP_FAIL';
+                        $errorMessage = $errorJson['error']['message'] ?? ($response instanceof Throwable ? $response->getMessage() : 'Unknown network failure');
+
+                        $isUnregistered = in_array($errorCode, [
+                            'UNREGISTERED',
+                            'NOT_FOUND',
+                            'INVALID_ARGUMENT',
+                        ]) || str_contains($errorMessage, 'registration-token-not-registered')
+                           || str_contains($errorMessage, 'Requested entity was not found');
+
+                        if ($isUnregistered) {
+                            $this->handleDeadToken($token);
+                        }
+
+                        $results['details'][$token] = [
+                            'success'      => false,
+                            'message_id'   => null,
+                            'error'        => "{$errorCode}: {$errorMessage}",
+                            'unregistered' => $isUnregistered,
+                        ];
+                    }
+                }
+            } catch (Throwable $e) {
+                Log::error("FCM Connection Pool Exception: " . $e->getMessage());
+                // Mark remaining tokens in this chunk as failed
+                foreach ($chunk as $token) {
+                    if (!isset($results['details'][$token])) {
+                        $results['failed']++;
+                        $results['details'][$token] = [
+                            'success'      => false,
+                            'message_id'   => null,
+                            'error'        => $e->getMessage(),
+                            'unregistered' => false,
+                        ];
+                    }
+                }
             }
         }
 
@@ -272,11 +373,12 @@ class FcmChannelDriver
     }
 
     /**
-     * Build HTTP v1 Message Payload structure.
+     * Build standard FCM HTTP v1 Message Payload structure.
+     * Complies strictly with RFC 7540 and official Google FCM specifications.
      */
     protected function buildMessagePayload(string $deviceToken, PushNotificationPayload $payload): array
     {
-        $channelId = match ($payload->type) {
+        $channelId = $payload->channelId ?: match ($payload->type) {
             'call' => $this->setting?->call_channel_id ?? 'call_channel',
             'chat' => $this->setting?->chat_channel_id ?? 'chat_channel',
             'live_stream', 'live' => $this->setting?->live_channel_id ?? 'live_session_channel',
@@ -300,33 +402,15 @@ class FcmChannelDriver
             ? $payload->sound
             : ($this->setting?->default_sound ?? 'default');
 
-        // All string key-values for data block
-        $dataMap = [];
-        foreach ($payload->customData as $k => $v) {
-            $dataMap[(string) $k] = is_array($v) ? json_encode($v) : (string) $v;
-        }
-
-        // Add standard keys to data map
-        $dataMap['type'] = (string) $payload->type;
-        $dataMap['click_action'] = (string) $payload->clickAction;
-        $dataMap['play_sound'] = $isSoundEnabled ? '1' : '0';
-        $dataMap['sound'] = $isSoundEnabled ? (string) $sound : '';
-
-        if ($payload->referenceId) {
-            $dataMap['reference_id'] = (string) $payload->referenceId;
-        }
-        $dataMap['title'] = (string) $payload->title;
-        $dataMap['body'] = (string) $payload->body;
-        if ($payload->imageUrl) {
-            $dataMap['image'] = (string) $payload->imageUrl;
-        }
+        // Extract strictly string-sanitized data map
+        $dataMap = $payload->getSanitizedData($isSoundEnabled, $sound);
 
         $message = [
             'token' => $deviceToken,
             'data'  => $dataMap,
         ];
 
-        // If NOT data-only, attach standard notification block for OS system trays
+        // If NOT data-only, attach standard notification block for OS system tray
         if (!$payload->isDataOnly) {
             $message['notification'] = [
                 'title' => $payload->title,
@@ -348,8 +432,11 @@ class FcmChannelDriver
                 'notification_priority'   => 'PRIORITY_HIGH',
                 'default_vibrate_timings' => $isSoundEnabled,
                 'visibility'              => 'PUBLIC',
-                'click_action'            => $payload->clickAction,
             ];
+
+            if (!empty($payload->clickAction)) {
+                $androidNotif['click_action'] = $payload->clickAction;
+            }
 
             if ($channelId) {
                 $androidNotif['channel_id'] = $channelId;
@@ -373,8 +460,16 @@ class FcmChannelDriver
         // Apple APNs configuration
         $apsPayload = [
             'content-available' => 1,
+            'mutable-content'   => 1,
             'badge'             => 1,
         ];
+
+        if (!$payload->isDataOnly) {
+            $apsPayload['alert'] = [
+                'title' => $payload->title,
+                'body'  => $payload->body,
+            ];
+        }
 
         if ($isSoundEnabled) {
             $apsPayload['sound'] = $sound === 'default' ? 'default' : "{$sound}.caf";
@@ -382,10 +477,33 @@ class FcmChannelDriver
 
         $message['apns'] = [
             'headers' => [
-                'apns-priority' => ($payload->priority === 'high' || $payload->type === 'call') ? '10' : '10',
+                'apns-priority'  => ($payload->priority === 'high' || $payload->type === 'call') ? '10' : '10',
+                'apns-push-type' => $payload->isDataOnly ? 'background' : 'alert',
             ],
             'payload' => [
                 'aps' => $apsPayload,
+            ],
+        ];
+
+        // Webpush configuration
+        $webpushNotif = [
+            'title' => $payload->title,
+            'body'  => $payload->body,
+            'icon'  => $payload->imageUrl ?? '/logo.png',
+            'badge' => '/favicon.ico',
+        ];
+
+        if ($payload->imageUrl) {
+            $webpushNotif['image'] = $payload->imageUrl;
+        }
+
+        $message['webpush'] = [
+            'headers' => [
+                'Urgency' => ($payload->priority === 'high' || $payload->type === 'call') ? 'high' : 'normal',
+            ],
+            'notification' => $webpushNotif,
+            'fcm_options' => [
+                'link' => $payload->customData['click_action'] ?? $payload->clickAction ?? '/',
             ],
         ];
 
@@ -393,15 +511,20 @@ class FcmChannelDriver
     }
 
     /**
-     * Automatically mark dead token as inactive in database.
+     * Automatically mark dead token as inactive in database and clear legacy mirror.
      */
     protected function handleDeadToken(string $token): void
     {
         try {
+            // 1. Deactivate in user_devices table
             UserDevice::where('fcm_token', $token)->update(['is_active' => false]);
-            Log::info("FCM: Marked invalid/unregistered token as inactive: " . substr($token, 0, 15) . "...");
+
+            // 2. Clear legacy mirror in users table to prevent zombie retries
+            User::where('fcm_token', $token)->update(['fcm_token' => null]);
+
+            Log::info("FCM: Marked dead token as inactive in devices and cleared legacy user mirror: " . substr($token, 0, 15) . "...");
         } catch (Exception $e) {
-            Log::error("FCM: Failed to deactivate token: " . $e->getMessage());
+            Log::error("FCM: Failed to deactivate dead token: " . $e->getMessage());
         }
     }
 
