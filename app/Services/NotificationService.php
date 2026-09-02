@@ -49,7 +49,7 @@ class NotificationService
             ->active()
             ->get(['id', 'device_model', 'device_type', 'fcm_token']);
 
-        $tokens = $devices->pluck('fcm_token')->filter()->toArray();
+        $tokens = $devices->pluck('fcm_token')->filter()->unique()->values()->toArray();
 
         // If user has legacy fcm_token on users table and no active device registered yet, fallback to it
         if (empty($tokens)) {
