@@ -89,6 +89,9 @@ class ChatInitiated implements ShouldBroadcastNow
             ];
         }
 
+        $subSession = \App\Models\PackageSubSession::where('chat_session_id', $this->session->id)->first();
+        $isPackage = !is_null($subSession) || (float) $this->session->rate_per_minute <= 0;
+
         return [
             'session' => [
                 'id'              => (int) $this->session->id,
@@ -97,11 +100,17 @@ class ChatInitiated implements ShouldBroadcastNow
                 'question'        => $this->session->question,
                 'status'          => $this->session->status, // 'initiated' or 'waiting'
                 'rate_per_minute' => (float) $this->session->rate_per_minute,
+                'is_package'      => $isPackage,
+                'is_prepaid'      => $isPackage,
+                'sub_session_id'  => $subSession?->id,
                 'created_at'      => optional($this->session->created_at)?->toISOString(),
                 'consumer'        => $consumer,
             ],
-            'senderData' => $consumer,
-            'user'       => $consumer,
+            'senderData'     => $consumer,
+            'user'           => $consumer,
+            'is_package'     => $isPackage,
+            'is_prepaid'     => $isPackage,
+            'sub_session_id' => $subSession?->id,
         ];
     }
 }

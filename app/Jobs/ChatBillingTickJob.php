@@ -37,8 +37,9 @@ class ChatBillingTickJob implements ShouldQueue
                 }
 
                 // 🛡️ PREPAID / PACKAGE SESSION FAIL-SAFE GUARD:
-                // Only skip wallet debit if this is explicitly a PackageSubSession or rate_per_minute <= 0
+                // Only skip wallet debit if this specific session is tied to a PackageSubSession or rate_per_minute <= 0
                 $isPrepaid = \App\Models\PackageSubSession::where('chat_session_id', $this->sessionId)->exists()
+                    || \App\Models\PackageSubSession::where('call_session_id', $this->sessionId)->exists()
                     || (float) $session->rate_per_minute <= 0;
 
                 if ($isPrepaid) {

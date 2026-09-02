@@ -204,9 +204,13 @@ class PackageSessionController extends Controller
             );
 
             return response()->json([
-                'success' => true,
-                'message' => ucfirst($request->channel_type) . ' channel spawned successfully.',
-                'data'    => $result,
+                'success'         => true,
+                'message'         => ucfirst($request->channel_type) . ' channel spawned successfully.',
+                'chat_session_id' => $result['chat_session_id'] ?? null,
+                'call_session_id' => $result['call_session_id'] ?? null,
+                'chat_status'     => $result['chat_status'] ?? null,
+                'call_status'     => $result['call_status'] ?? null,
+                'data'            => $result,
             ], 200);
         } catch (Exception $e) {
             return response()->json([
