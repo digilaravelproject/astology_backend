@@ -98,9 +98,6 @@ class CallInitiated implements ShouldBroadcastNow
             ];
         }
 
-        $subSession = \App\Models\PackageSubSession::where('call_session_id', $this->session->id)->first();
-        $isPackage = !is_null($subSession) || (float) $this->session->rate_per_minute <= 0;
-
         return [
             'session' => [
                 'id'              => (int) $this->session->id,
@@ -109,17 +106,11 @@ class CallInitiated implements ShouldBroadcastNow
                 'status'          => $this->session->status, // 'initiated' or 'waiting'
                 'rate_per_minute' => (float) $this->session->rate_per_minute,
                 'call_type'       => $this->session->call_type ?? 'audio',
-                'is_package'      => $isPackage,
-                'is_prepaid'      => $isPackage,
-                'sub_session_id'  => $subSession?->id,
                 'created_at'      => optional($this->session->created_at)?->toISOString(),
                 'consumer'        => $consumer,
             ],
-            'callerData'     => $consumer,
-            'user'           => $consumer,
-            'is_package'     => $isPackage,
-            'is_prepaid'     => $isPackage,
-            'sub_session_id' => $subSession?->id,
+            'callerData' => $consumer,
+            'user'       => $consumer,
         ];
     }
 }

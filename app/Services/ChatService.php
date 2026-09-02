@@ -418,9 +418,8 @@ class ChatService
                 $endTime = now();
                 $durationSeconds = $session->started_at ? (int) $session->started_at->diffInSeconds($endTime) : 0;
                 
-                // Skip charging only if this specific session is tied to a prepaid PackageSubSession or rate is 0.00
+                // Skip charging if this is a prepaid package session or rate is 0.00
                 $isPackageSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists()
-                    || \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
                     || (float) $session->rate_per_minute <= 0;
 
                 $finalCost = $isPackageSession ? 0.00 : (ceil($durationSeconds / 60) * $session->rate_per_minute);
@@ -469,16 +468,6 @@ class ChatService
                         })
                         ->whereNull('ended_at')
                         ->first();
-
-                    if (!$subSession) {
-                        $subSession = \App\Models\PackageSubSession::whereHas('purchase', function ($q) use ($session) {
-                                $q->where('user_id', $session->consumer_id)
-                                  ->where('astrologer_id', $session->provider_id);
-                            })
-                            ->whereNull('ended_at')
-                            ->latest('id')
-                            ->first();
-                    }
 
                     if ($subSession) {
                         $purchase = \App\Models\PackagePurchase::where('id', $subSession->package_purchase_id)

@@ -153,10 +153,6 @@ class PackageSessionEngineService
 
             return [
                 'sub_session'        => $subSession->fresh(),
-                'chat_session_id'    => $subSession->chat_session_id,
-                'call_session_id'    => $subSession->call_session_id,
-                'chat_status'        => $subSession->chat_status,
-                'call_status'        => $subSession->call_status,
                 'banner_data'        => $bannerData,
                 'remaining_seconds'  => $remaining,
             ];
