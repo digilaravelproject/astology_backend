@@ -264,7 +264,7 @@ class LiveSessionService
             // Strip legacy [Gift: ...] prefix if stored in database
             $cleanedMessage = preg_replace('/^\[Gift:\s*[^\]]+\]\s*/i', '', $rawMessage);
             if (empty(trim($cleanedMessage))) {
-                $cleanedMessage = $matchedGift ? "Sent a {$matchedGift['title']} 🎁" : 'Sent a gift 🎁';
+                $cleanedMessage = $matchedGift ? "Sent a {$matchedGift['title']} " : 'Sent a gift ';
             }
 
             return [

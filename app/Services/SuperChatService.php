@@ -28,7 +28,7 @@ class SuperChatService
         $amount = (float) $gift->price;
         $astrologerUserId = $session->astrologer->user_id;
         $sanitizedUserMessage = $message ? ContentSanitizerService::sanitize($message) : '';
-        $cleanGiftMessage = !empty(trim($sanitizedUserMessage)) ? $sanitizedUserMessage : "Sent a {$gift->title} 🎁";
+        $cleanGiftMessage = !empty(trim($sanitizedUserMessage)) ? $sanitizedUserMessage : "Sent a {$gift->title} ";
 
         $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $cleanGiftMessage) {
             $firstUserId = min($user->id, $astrologerUserId);
