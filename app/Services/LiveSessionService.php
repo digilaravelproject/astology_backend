@@ -907,4 +907,41 @@ class LiveSessionService
             ]);
         }
     }
+
+    /**
+     * Forcefully terminate all currently ongoing live sessions and broadcast updates.
+     */
+    public function terminateAllOngoingSessions(): int
+    {
+        $ongoing = LiveSession::where('status', 'ongoing')->get();
+        $count = $ongoing->count();
+
+        foreach ($ongoing as $session) {
+            $session->update([
+                'status'          => 'completed',
+                'is_broadcasting' => false,
+                'is_camera_on'    => false,
+                'is_audio_on'     => false,
+                'room_uuid'       => null,
+            ]);
+
+            LiveSessionParticipant::where('live_session_id', $session->id)
+                ->whereNull('left_at')
+                ->update(['left_at' => now()]);
+
+            try {
+                broadcast(new LiveSessionEnded($session));
+            } catch (\Throwable $e) {
+                // Ignore room broadcast failure
+            }
+        }
+
+        try {
+            $this->broadcastActiveSessionsUpdate('ended');
+        } catch (\Throwable $e) {
+            // Ignore list broadcast failure
+        }
+
+        return $count;
+    }
 }
