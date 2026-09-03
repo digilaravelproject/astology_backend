@@ -34,6 +34,8 @@ class LiveSessionStarted implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         $astrologerUser = $this->liveSession->astrologer?->user;
+        $activeSessions = app(\App\Services\LiveSessionService::class)->getActiveSessions()->values()->toArray();
+
         return [
             'id' => $this->liveSession->id,
             'title' => $this->liveSession->title,
@@ -44,6 +46,7 @@ class LiveSessionStarted implements ShouldBroadcastNow
             ] : null,
             'viewer_count' => $this->liveSession->viewer_count,
             'is_broadcasting' => $this->liveSession->is_broadcasting,
+            'active_sessions' => $activeSessions,
         ];
     }
 }

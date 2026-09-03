@@ -34,11 +34,14 @@ class LiveSessionEnded implements ShouldBroadcastNow
 
     public function broadcastWith(): array
     {
+        $activeSessions = app(\App\Services\LiveSessionService::class)->getActiveSessions()->values()->toArray();
+
         return [
             'id' => $this->liveSession->id,
             'astrologer_id' => $this->liveSession->astrologer_id,
             'title' => $this->liveSession->title,
             'status' => 'ended',
+            'active_sessions' => $activeSessions,
         ];
     }
 }

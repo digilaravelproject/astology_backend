@@ -10,6 +10,7 @@ use App\Events\NewLiveComment;
 use App\Events\ViewerCountUpdated;
 use App\Events\LiveSessionStarted;
 use App\Events\LiveSessionEnded;
+use App\Events\ActiveLiveSessionsUpdated;
 use App\Events\AstrologerMediaStatusChanged;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
@@ -337,6 +338,7 @@ class LiveSessionService
             $freshSession = $liveSession->fresh(['astrologer.user']);
             try {
                 broadcast(new LiveSessionStarted($freshSession));
+                $this->broadcastActiveSessionsUpdate('started', $freshSession);
             } catch (\Exception $e) {
                 Log::error('Failed to broadcast LiveSessionStarted on create', ['error' => $e->getMessage()]);
             }
@@ -525,6 +527,7 @@ class LiveSessionService
         $freshSession = $liveSession->fresh(['astrologer.user']);
         try {
             broadcast(new LiveSessionStarted($freshSession));
+            $this->broadcastActiveSessionsUpdate('started', $freshSession);
         } catch (\Exception $e) {
             Log::error('Failed to broadcast LiveSessionStarted on start', ['error' => $e->getMessage()]);
         }
@@ -594,6 +597,7 @@ class LiveSessionService
 
         try {
             broadcast(new LiveSessionEnded($freshSession));
+            $this->broadcastActiveSessionsUpdate('ended', $freshSession);
         } catch (\Exception $e) {
             Log::error('Failed to broadcast LiveSessionEnded', ['error' => $e->getMessage()]);
         }
@@ -688,7 +692,9 @@ class LiveSessionService
         );
 
         try {
-            broadcast(new LiveSessionStarted($liveSession->fresh()));
+            $freshBroadcastSession = $liveSession->fresh();
+            broadcast(new LiveSessionStarted($freshBroadcastSession));
+            $this->broadcastActiveSessionsUpdate('started', $freshBroadcastSession);
         } catch (\Exception $e) {
             Log::error('Failed to broadcast LiveSessionStarted', ['error' => $e->getMessage()]);
         }
@@ -892,5 +898,23 @@ class LiveSessionService
                 'date_of_birth' => $astrologer->date_of_birth?->format('Y-m-d'),
             ] : null,
         ];
+    }
+
+    /**
+     * Broadcast the updated list of currently active live sessions.
+     */
+    public function broadcastActiveSessionsUpdate(string $action, ?LiveSession $session = null): void
+    {
+        try {
+            $activeSessions = $this->getActiveSessions()->values()->toArray();
+            $sessionData = $session ? $this->formatSessionListItem($session) : null;
+
+            broadcast(new ActiveLiveSessionsUpdated($action, $activeSessions, $sessionData));
+        } catch (\Exception $e) {
+            Log::error('Failed to broadcast ActiveLiveSessionsUpdated', [
+                'action' => $action,
+                'error'  => $e->getMessage(),
+            ]);
+        }
     }
 }
