@@ -234,10 +234,38 @@ class LiveSessionService
             ->orderBy('id', $sortDirection)
             ->paginate($perPage);
 
-        $data = $comments->map(function ($comment) use ($currentUserId) {
+        // Fetch gifts lookup for matching gift comments and attaching gift photo
+        $allGifts = \App\Models\Gift::all();
+        $giftsLookup = [];
+        foreach ($allGifts as $g) {
+            $giftsLookup[strtoupper(trim($g->title))] = [
+                'id'       => $g->id,
+                'title'    => $g->title,
+                'icon_url' => $g->icon_url,
+            ];
+        }
+
+        $data = $comments->map(function ($comment) use ($currentUserId, $giftsLookup) {
             $isSelf = $currentUserId && ((int) $comment->user_id === (int) $currentUserId);
             $rawName = $comment->user->name ?? 'Unknown';
             $displayName = $isSelf ? 'You' : $rawName;
+
+            // Detect if this comment corresponds to a gift
+            $rawMessage = $comment->message ?? '';
+            $matchedGift = null;
+
+            foreach ($giftsLookup as $titleUpper => $giftData) {
+                if (stripos($rawMessage, $titleUpper) !== false) {
+                    $matchedGift = $giftData;
+                    break;
+                }
+            }
+
+            // Strip legacy [Gift: ...] prefix if stored in database
+            $cleanedMessage = preg_replace('/^\[Gift:\s*[^\]]+\]\s*/i', '', $rawMessage);
+            if (empty(trim($cleanedMessage))) {
+                $cleanedMessage = $matchedGift ? "Sent a {$matchedGift['title']} 🎁" : 'Sent a gift 🎁';
+            }
 
             return [
                 'id'          => $comment->id,
@@ -247,7 +275,11 @@ class LiveSessionService
                 'sender_name' => $rawName,
                 'is_self'     => (bool) $isSelf,
                 'user_avatar' => $comment->user->profile_photo ? \App\Helpers\MediaHelper::getUrl($comment->user->profile_photo) : null,
-                'message'     => $comment->message,
+                'message'     => $cleanedMessage,
+                'is_gift'     => !is_null($matchedGift),
+                'gift'        => $matchedGift,
+                'gift_icon'   => $matchedGift['icon_url'] ?? null,
+                'gift_photo'  => $matchedGift['icon_url'] ?? null,
                 'created_at'  => $comment->created_at->toISOString(),
             ];
         });

@@ -28,8 +28,9 @@ class SuperChatService
         $amount = (float) $gift->price;
         $astrologerUserId = $session->astrologer->user_id;
         $sanitizedUserMessage = $message ? ContentSanitizerService::sanitize($message) : '';
+        $cleanGiftMessage = !empty(trim($sanitizedUserMessage)) ? $sanitizedUserMessage : "Sent a {$gift->title} 🎁";
 
-        $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $sanitizedUserMessage) {
+        $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $cleanGiftMessage) {
             $firstUserId = min($user->id, $astrologerUserId);
             $secondUserId = max($user->id, $astrologerUserId);
 
@@ -49,7 +50,7 @@ class SuperChatService
                 'user_id'            => $user->id,
                 'astrologer_id'      => $session->astrologer_id,
                 'amount'             => $amount,
-                'message'            => $sanitizedUserMessage ?: null,
+                'message'            => $cleanGiftMessage,
                 'transaction_status' => 'pending',
             ]);
 
@@ -63,17 +64,29 @@ class SuperChatService
             return $superChat->fresh();
         }, 3);
 
-        // Broadcast to live room (SuperChatReceived with gift details and photo)
+        // Persist in LiveComment so it is never lost when user backs out and re-enters the live room
+        $liveComment = null;
+        try {
+            $liveComment = \App\Models\LiveComment::create([
+                'live_session_id' => $session->id,
+                'user_id'         => $user->id,
+                'message'         => $cleanGiftMessage,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to persist LiveComment for super chat', ['error' => $e->getMessage()]);
+        }
+
+        // Broadcast ONCE to live room via SuperChatReceived (includes gift details and photo)
         try {
             broadcast(new SuperChatReceived($session->id, [
-                'id'          => $superChat->id,
+                'id'          => $liveComment?->id ?? $superChat->id,
                 'user_id'     => $user->id,
                 'user_name'   => $user->name,
                 'name'        => $user->name,
                 'sender_name' => $user->name,
                 'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
                 'amount'      => $amount,
-                'message'     => $superChat->message ?? '',
+                'message'     => $cleanGiftMessage,
                 'gift'        => [
                     'id'       => $gift->id,
                     'title'    => $gift->title,
