@@ -54,8 +54,14 @@ class CallService
                 $pricing = $pricingCalculator->calculate($astrologer, 'call');
                 $rate = (float) $pricing['customer_rate'];
 
-                // Check if this is an explicitly initiated prepaid package call
-                $hasActivePackage = $isPackageCall;
+                // Check if this is an explicitly initiated prepaid package call OR if consumer is currently in an active prepaid package session with this astrologer
+                $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
+                    $q->where('user_id', $consumerId)
+                      ->where('astrologer_id', $providerId)
+                      ->where('status', 'active');
+                })->whereNull('ended_at')->first();
+
+                $hasActivePackage = $isPackageCall || !is_null($activePackageSubSession);
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -75,16 +81,6 @@ class CallService
 
                 // Dynamic check for consumer (bypassed if switching within an active package session)
                 if (!$hasActivePackage) {
-                    // Check if consumer is currently in an active prepaid package session with this specific astrologer
-                    $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
-                        $q->where('user_id', $consumerId)
-                          ->where('astrologer_id', $providerId);
-                    })->whereNull('ended_at')->exists();
-
-                    if ($activePackageSubSession) {
-                        throw new Exception("You are currently in an active prepaid package session with this astrologer. Please use the switch channel feature.");
-                    }
-
                     $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
                         ->whereIn('status', ['accepted', 'ongoing'])
                         ->exists();
@@ -124,6 +120,15 @@ class CallService
                     'status'          => $status,
                     'rate_per_minute' => $effectiveRate,
                 ]);
+
+                // If consumer is in an active package sub-session, auto-link this call channel
+                if ($activePackageSubSession) {
+                    $activePackageSubSession->update([
+                        'call_session_id' => $session->id,
+                        'call_status'     => 'ringing',
+                        'mode'            => 'call',
+                    ]);
+                }
 
                 if ($status === 'initiated') {
                     // Dispatch timeout cleanup (60 seconds ringing timeout)
@@ -282,6 +287,22 @@ class CallService
                 // Skip charging if this is a prepaid package session or rate is 0.00
                 $isPackageSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
                     || (float) $session->rate_per_minute <= 0;
+
+                if (!$isPackageSession) {
+                    $linkedSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($session) {
+                        $q->where('user_id', $session->consumer_id)
+                          ->where('astrologer_id', $session->provider_id)
+                          ->where('status', 'active');
+                    })->whereNull('ended_at')->first();
+
+                    if ($linkedSubSession) {
+                        $isPackageSession = true;
+                        $linkedSubSession->update([
+                            'call_session_id' => $sessionId,
+                            'call_status'     => 'disconnected',
+                        ]);
+                    }
+                }
 
                 $finalCost = $isPackageSession ? 0.00 : $this->calculateCost($durationSeconds, $session->rate_per_minute);
                 

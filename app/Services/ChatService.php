@@ -60,8 +60,14 @@ class ChatService
                 $pricing = $this->pricingCalculator->calculate($astrologer, 'chat');
                 $rate = (float) $pricing['customer_rate'];
 
-                // Check if this is an explicitly initiated prepaid package chat
-                $hasActivePackage = $isPackageChat;
+                // Check if this is an explicitly initiated prepaid package chat OR if consumer is currently in an active prepaid package session with this astrologer
+                $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
+                    $q->where('user_id', $consumerId)
+                      ->where('astrologer_id', $providerId)
+                      ->where('status', 'active');
+                })->whereNull('ended_at')->first();
+
+                $hasActivePackage = $isPackageChat || !is_null($activePackageSubSession);
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -81,16 +87,6 @@ class ChatService
 
                 // Dynamic check for consumer (bypassed if switching within an active package session)
                 if (!$hasActivePackage) {
-                    // Check if consumer is currently in an active prepaid package session with this specific astrologer
-                    $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
-                        $q->where('user_id', $consumerId)
-                          ->where('astrologer_id', $providerId);
-                    })->whereNull('ended_at')->exists();
-
-                    if ($activePackageSubSession) {
-                        throw new Exception("You are currently in an active prepaid package session with this astrologer. Please use the switch channel feature.");
-                    }
-
                     $isConsumerChatBusy = \App\Models\ChatSession::where('consumer_id', $consumerId)
                         ->whereIn('status', ['accepted', 'ongoing'])
                         ->exists();
@@ -129,6 +125,15 @@ class ChatService
                     'rate_per_minute' => $effectiveRate,
                     'question'        => $question,
                 ]);
+
+                // If consumer is in an active package sub-session, auto-link this chat channel
+                if ($activePackageSubSession) {
+                    $activePackageSubSession->update([
+                        'chat_session_id' => $session->id,
+                        'chat_status'     => ($status === 'ongoing' ? 'active' : 'idle'),
+                        'mode'            => 'chat',
+                    ]);
+                }
                 
                 if ($status === 'initiated') {
                     // Dispatch timeout cleanup (120 seconds ringing timeout)
@@ -421,6 +426,22 @@ class ChatService
                 // Skip charging if this is a prepaid package session or rate is 0.00
                 $isPackageSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists()
                     || (float) $session->rate_per_minute <= 0;
+
+                if (!$isPackageSession) {
+                    $linkedSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($session) {
+                        $q->where('user_id', $session->consumer_id)
+                          ->where('astrologer_id', $session->provider_id)
+                          ->where('status', 'active');
+                    })->whereNull('ended_at')->first();
+
+                    if ($linkedSubSession) {
+                        $isPackageSession = true;
+                        $linkedSubSession->update([
+                            'chat_session_id' => $sessionId,
+                            'chat_status'     => 'closed',
+                        ]);
+                    }
+                }
 
                 $finalCost = $isPackageSession ? 0.00 : (ceil($durationSeconds / 60) * $session->rate_per_minute);
                 
