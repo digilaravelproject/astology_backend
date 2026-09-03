@@ -224,7 +224,15 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'throttle:tiered'])->group(function () {
         Route::post('/gifts/send',              [GiftController::class, 'send']);
         Route::get('/astrologers/{id}/gifts',   [GiftController::class, 'astrologerGifts']);
+
+        // Global Wallet Verification Aliases
+        Route::post('/wallet/topup/verify',     [WalletController::class, 'verifyTopup']);
+        Route::post('/wallet/verify',           [WalletController::class, 'verifyTopup']);
+        Route::post('/razorpay/verify',         [WalletController::class, 'verifyTopup']);
     });
+
+    // Public Razorpay Webhook (Direct Gateway Callback)
+    Route::post('/razorpay/webhook',            [WalletController::class, 'handleWebhook']);
 
     /*
     |--------------------------------------------------------------------------
@@ -296,6 +304,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/wallet/topup/verify',         [WalletController::class, 'verifyTopup']);
             Route::post('/wallet/verify-topup',         [WalletController::class, 'verifyTopup']);
             Route::post('/wallet/topup-verify',         [WalletController::class, 'verifyTopup']);
+            Route::post('/wallet/verify',               [WalletController::class, 'verifyTopup']);
+            Route::post('/wallet/recharge/verify',      [WalletController::class, 'verifyTopup']);
             Route::get('/wallet/transactions',          [WalletController::class, 'transactions']);
             Route::get('/wallet/transactions/{id}',     [WalletController::class, 'transactionDetail']);
             Route::get('/wallet/transactions/{id}/invoice', [WalletController::class, 'downloadInvoice']);

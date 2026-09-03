@@ -60,6 +60,12 @@ class WalletController extends Controller
             'amount.min' => 'The minimum recharge amount is ₹' . number_format($minRecharge, 2) . '.',
         ]);
 
+        Log::info('📥 [Razorpay Create Topup] User requesting wallet top-up', [
+            'user_id' => $user->id,
+            'amount_requested' => $request->input('amount'),
+            'ip' => $request->ip(),
+        ]);
+
         try {
             $baseAmount = (float)$request->input('amount');
             $wallet = Wallet::firstOrCreate(
@@ -88,6 +94,10 @@ class WalletController extends Controller
             );
 
             if ($razorpayResult['status'] !== 'success') {
+                Log::error('❌ [Razorpay Create Topup] Failed to create Razorpay order', [
+                    'user_id' => $user->id,
+                    'error' => $razorpayResult['message'] ?? 'Unknown error',
+                ]);
                 return response()->json([
                     'status' => 'error',
                     'message' => $razorpayResult['message'] ?? 'Failed to create Razorpay order.',
@@ -115,6 +125,15 @@ class WalletController extends Controller
                 ],
             ]);
 
+            Log::info('✅ [Razorpay Create Topup] Order created successfully', [
+                'user_id' => $user->id,
+                'order_id' => $razorpayOrder['id'],
+                'amount_paise' => $amountInPaise,
+                'base_amount' => $baseAmount,
+                'total_payable' => $totalPayable,
+                'transaction_id' => $transaction->id,
+            ]);
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Top-up order created. Proceed to payment.',
@@ -138,8 +157,11 @@ class WalletController extends Controller
                 ],
             ], 201);
 
-        } catch (\Exception $e) {
-            Log::error('Create topup error: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            Log::error('❌ [Razorpay Create Topup] Exception: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'trace' => $e->getTraceAsString(),
+            ]);
             return response()->json(['status' => 'error', 'message' => 'Failed to initiate top-up: ' . $e->getMessage()], 500);
         }
     }
@@ -149,139 +171,285 @@ class WalletController extends Controller
      */
     public function verifyTopup(Request $request): JsonResponse
     {
+        Log::info('📥 [Razorpay Verify Topup] Incoming Request', [
+            'url'         => $request->fullUrl(),
+            'method'      => $request->method(),
+            'user_id'     => $request->user()?->id,
+            'ip'          => $request->ip(),
+            'all_input'   => $request->all(),
+            'bearer_sent' => $request->bearerToken() ? 'YES (token present)' : 'NO (missing)',
+        ]);
+
         $user = $request->user();
         if (!$user) {
+            Log::warning('⚠️ [Razorpay Verify Topup] Rejected: Unauthenticated user');
             return response()->json(['status' => 'error', 'message' => 'Unauthenticated.'], 401);
         }
 
-        $request->validate([
-            'razorpay_order_id' => ['required', 'string'],
-            'razorpay_payment_id' => ['required', 'string'],
-            'razorpay_signature' => ['required', 'string'],
+        // Support multiple naming conventions from different Flutter/Frontend SDKs
+        $orderId = $request->input('razorpay_order_id') 
+            ?? $request->input('order_id') 
+            ?? $request->input('razorpayOrderId') 
+            ?? $request->input('orderId');
+
+        $paymentId = $request->input('razorpay_payment_id') 
+            ?? $request->input('payment_id') 
+            ?? $request->input('razorpayPaymentId') 
+            ?? $request->input('paymentId');
+
+        $signature = $request->input('razorpay_signature') 
+            ?? $request->input('signature') 
+            ?? $request->input('razorpaySignature');
+
+        Log::info('🔍 [Razorpay Verify Topup] Parsed Parameters', [
+            'user_id'    => $user->id,
+            'order_id'   => $orderId,
+            'payment_id' => $paymentId,
+            'signature'  => $signature ? (substr($signature, 0, 10) . '...') : null,
         ]);
 
+        if (empty($orderId) || empty($paymentId)) {
+            Log::error('❌ [Razorpay Verify Topup] Missing required parameters', [
+                'has_order_id'   => !empty($orderId),
+                'has_payment_id' => !empty($paymentId),
+                'has_signature'  => !empty($signature),
+                'raw_input'      => $request->all(),
+            ]);
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Missing required payment parameters (order_id and payment_id are required).',
+            ], 422);
+        }
+
         try {
-            // Verify Razorpay signature
-            $isSignatureValid = $this->razorpayService->verifySignature(
-                $request->input('razorpay_order_id'),
-                $request->input('razorpay_payment_id'),
-                $request->input('razorpay_signature')
-            );
+            $isVerified = false;
 
-            if (!$isSignatureValid) {
-                return response()->json(['status' => 'error', 'message' => 'Payment signature verification failed.'], 422);
+            // 1. First attempt: Verify cryptographic signature if present
+            if (!empty($signature)) {
+                $isVerified = $this->razorpayService->verifySignature($orderId, $paymentId, $signature);
+                Log::info('🔐 [Razorpay Verify Topup] Signature Verification Result', [
+                    'order_id'   => $orderId,
+                    'payment_id' => $paymentId,
+                    'valid'      => $isVerified,
+                ]);
             }
 
-            $taxService = app(\App\Services\WalletTaxService::class);
-
-            // Execute in DB Transaction with deadlock retry (3 attempts)
-            $result = DB::transaction(function () use ($user, $request, $taxService) {
-                $wallet = Wallet::where('user_id', $user->id)->lockForUpdate()->first();
-                if (!$wallet) {
-                    $wallet = Wallet::create(['user_id' => $user->id, 'balance' => 0]);
-                }
-
-                $transaction = WalletTransaction::where('wallet_id', $wallet->id)
-                    ->where('provider_order_id', $request->input('razorpay_order_id'))
-                    ->where('status', 'pending')
-                    ->lockForUpdate()
-                    ->first();
-
-                // Idempotency: If transaction is already completed, return existing record
-                if (!$transaction) {
-                    $completed = WalletTransaction::where('wallet_id', $wallet->id)
-                        ->where('provider_order_id', $request->input('razorpay_order_id'))
-                        ->where('status', 'completed')
-                        ->first();
-
-                    if ($completed) {
-                        return [
-                            'wallet' => $wallet,
-                            'transaction' => $completed,
-                            'already_processed' => true,
-                        ];
-                    }
-
-                    throw new Exception('Pending top-up transaction already processed or not found.', 404);
-                }
-
-                // Generate sequential Tax Invoice Number
-                $invoiceNumber = $taxService->generateInvoiceNumber('REC', $transaction->id);
-
-                // Set balance before and after (credit base amount only)
-                $transaction->balance_before = $wallet->balance;
-                $transaction->balance_after = $wallet->balance + $transaction->amount;
-                $transaction->provider_payment_id = $request->input('razorpay_payment_id');
-                $transaction->status = 'completed';
-                $transaction->invoice_number = $invoiceNumber;
-                $transaction->meta = array_merge($transaction->meta ?? [], [
-                    'verified_at' => now()->toDateTimeString(),
-                    'signature' => $request->input('razorpay_signature'),
-                ]);
-                $transaction->save();
-
-                // Credit wallet balance with the base recharge amount strictly
-                $wallet->balance += $transaction->amount;
-                $wallet->save();
-
-                return [
-                    'wallet' => $wallet,
-                    'transaction' => $transaction,
-                    'already_processed' => false,
-                ];
-            }, 3);
-
-            $wallet = $result['wallet'];
-            $transaction = $result['transaction'];
-
-            if (!$result['already_processed']) {
-                Log::info('Wallet credited with base amount', [
-                    'user_id' => $wallet->user_id,
-                    'base_amount' => $transaction->amount,
-                    'total_paid' => $transaction->total_amount,
-                    'gst_amount' => $transaction->gst_amount,
-                    'new_balance' => $wallet->balance,
-                    'invoice_number' => $transaction->invoice_number,
+            // 2. Second attempt (Fallback): Query Razorpay API directly if signature failed or wasn't sent
+            if (!$isVerified) {
+                Log::warning('⚠️ [Razorpay Verify Topup] Signature missing or failed. Checking Razorpay API directly for payment: ' . $paymentId);
+                $paymentCheck = $this->razorpayService->getPayment($paymentId);
+                Log::info('📡 [Razorpay Verify Topup] Direct Razorpay API Response', [
+                    'paymentCheck' => $paymentCheck,
                 ]);
 
-                // Dispatch Push & In-App Notification
-                try {
-                    $walletPayload = \App\Services\Notification\PushNotificationPayload::forSystem(
-                        title: 'Wallet Recharged! 💳',
-                        body: '₹' . number_format($transaction->amount, 2) . ' added to your wallet. New Balance: ₹' . number_format($wallet->balance, 2),
-                        type: 'wallet',
-                        referenceId: (string) $transaction->id,
-                        extra: [
-                            'amount'          => (string) $transaction->amount,
-                            'new_balance'     => (string) $wallet->balance,
-                            'invoice_number'  => (string) $transaction->invoice_number,
-                            'screen_route'    => '/wallet',
-                        ]
-                    );
-                    \App\Services\NotificationService::sendToUser($user->id, $walletPayload, saveInApp: true);
-                } catch (\Throwable $ne) {
-                    Log::error('Wallet topup notification failed: ' . $ne->getMessage());
+                if (
+                    ($paymentCheck['status'] ?? '') === 'success' &&
+                    in_array(($paymentCheck['data']['status'] ?? ''), ['captured', 'authorized']) &&
+                    (($paymentCheck['data']['order_id'] ?? '') === $orderId)
+                ) {
+                    Log::info('✅ [Razorpay Verify Topup] Payment confirmed directly via Razorpay API');
+                    $isVerified = true;
                 }
             }
+
+            if (!$isVerified) {
+                Log::error('❌ [Razorpay Verify Topup] Payment verification completely failed for order: ' . $orderId);
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Payment signature verification failed.',
+                ], 422);
+            }
+
+            // Locate the pending transaction (or check if already completed)
+            $wallet = Wallet::firstOrCreate(['user_id' => $user->id], ['balance' => 0]);
+            $transaction = WalletTransaction::where('wallet_id', $wallet->id)
+                ->where('provider_order_id', $orderId)
+                ->first();
+
+            // Fallback: search across all wallets if user re-registered or session differed
+            if (!$transaction) {
+                $transaction = WalletTransaction::where('provider_order_id', $orderId)->first();
+            }
+
+            if (!$transaction) {
+                Log::error('❌ [Razorpay Verify Topup] Transaction record not found for order: ' . $orderId);
+                return response()->json([
+                    'status'  => 'error',
+                    'message' => 'Transaction record not found for order: ' . $orderId,
+                ], 404);
+            }
+
+            // Perform atomic credit
+            $result = $this->creditPendingTransaction($transaction, $paymentId, $signature, 'verify_api');
+
+            Log::info('🎉 [Razorpay Verify Topup] Verification Complete', [
+                'user_id'           => $user->id,
+                'order_id'          => $orderId,
+                'payment_id'        => $paymentId,
+                'already_processed' => $result['already_processed'],
+                'new_balance'       => $result['wallet']->balance,
+            ]);
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'Top-up verified and wallet credited.',
-                'data' => [
-                    'wallet' => $wallet,
-                    'transaction' => $transaction,
-                    'invoice_url' => url("/api/v1/user/wallet/transactions/{$transaction->id}/invoice"),
+                'status'  => 'success',
+                'message' => $result['already_processed']
+                    ? 'Payment already verified and wallet credited.'
+                    : 'Top-up verified and wallet credited successfully.',
+                'data'    => [
+                    'wallet'      => $result['wallet']->fresh(),
+                    'transaction' => $result['transaction'],
+                    'invoice_url' => url("/api/v1/user/wallet/transactions/{$result['transaction']->id}/invoice"),
                 ],
             ], 200);
 
-        } catch (Exception $e) {
-            $code = $e->getCode();
-            if ($code === 404) {
-                return response()->json(['status' => 'error', 'message' => $e->getMessage()], 404);
-            }
-            Log::error('Verify topup error: ' . $e->getMessage());
-            return response()->json(['status' => 'error', 'message' => 'Failed to verify payment.'], 500);
+        } catch (\Throwable $e) {
+            Log::error('💥 [Razorpay Verify Topup] Exception: ' . $e->getMessage(), [
+                'user_id' => $user->id,
+                'order_id' => $orderId,
+                'trace'   => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to verify payment: ' . $e->getMessage(),
+            ], 500);
         }
+    }
+
+    /**
+     * Atomically credit a pending wallet transaction, issue invoice and dispatch notifications.
+     */
+    public function creditPendingTransaction(
+        WalletTransaction $transaction,
+        string $paymentId,
+        ?string $signature = null,
+        string $source = 'verify'
+    ): array {
+        $taxService = app(\App\Services\WalletTaxService::class);
+
+        return DB::transaction(function () use ($transaction, $paymentId, $signature, $source, $taxService) {
+            $lockedTx = WalletTransaction::where('id', $transaction->id)->lockForUpdate()->first();
+            if (!$lockedTx) {
+                throw new \Exception("Transaction {$transaction->id} not found.");
+            }
+
+            $wallet = Wallet::where('id', $lockedTx->wallet_id)->lockForUpdate()->first();
+            if (!$wallet) {
+                $wallet = Wallet::create(['user_id' => $lockedTx->wallet?->user_id ?? 0, 'balance' => 0]);
+            }
+
+            // Idempotency: If already completed, do not credit twice
+            if ($lockedTx->status === 'completed') {
+                return [
+                    'wallet' => $wallet,
+                    'transaction' => $lockedTx,
+                    'already_processed' => true,
+                ];
+            }
+
+            // Generate sequential Tax Invoice Number
+            $invoiceNumber = $taxService->generateInvoiceNumber('REC', $lockedTx->id);
+
+            $lockedTx->balance_before = $wallet->balance;
+            $lockedTx->balance_after = $wallet->balance + $lockedTx->amount;
+            $lockedTx->provider_payment_id = $paymentId;
+            $lockedTx->status = 'completed';
+            $lockedTx->invoice_number = $invoiceNumber;
+            $lockedTx->meta = array_merge($lockedTx->meta ?? [], [
+                'verified_at'     => now()->toDateTimeString(),
+                'verified_source' => $source,
+                'signature'       => $signature,
+            ]);
+            $lockedTx->save();
+
+            // Credit wallet balance with the base recharge amount strictly
+            $wallet->balance += $lockedTx->amount;
+            $wallet->save();
+
+            Log::info("💰 [Wallet Recharged] Balance updated for User #{$wallet->user_id}", [
+                'user_id'        => $wallet->user_id,
+                'credit_amount'  => $lockedTx->amount,
+                'total_paid'     => $lockedTx->total_amount,
+                'new_balance'    => $wallet->balance,
+                'invoice_number' => $invoiceNumber,
+                'source'         => $source,
+                'payment_id'     => $paymentId,
+            ]);
+
+            // Dispatch Push & In-App Notification
+            try {
+                $walletPayload = \App\Services\Notification\PushNotificationPayload::forSystem(
+                    title: 'Wallet Recharged! 💳',
+                    body: '₹' . number_format($lockedTx->amount, 2) . ' added to your wallet. New Balance: ₹' . number_format($wallet->balance, 2),
+                    type: 'wallet',
+                    referenceId: (string) $lockedTx->id,
+                    extra: [
+                        'amount'          => (string) $lockedTx->amount,
+                        'new_balance'     => (string) $wallet->balance,
+                        'invoice_number'  => (string) $invoiceNumber,
+                        'screen_route'    => '/wallet',
+                    ]
+                );
+                \App\Services\NotificationService::sendToUser($wallet->user_id, $walletPayload, saveInApp: true);
+            } catch (\Throwable $ne) {
+                Log::error('Wallet topup notification failed: ' . $ne->getMessage());
+            }
+
+            return [
+                'wallet' => $wallet,
+                'transaction' => $lockedTx,
+                'already_processed' => false,
+            ];
+        }, 3);
+    }
+
+    /**
+     * Handle incoming asynchronous Razorpay Webhooks (order.paid, payment.captured)
+     */
+    public function handleWebhook(Request $request): JsonResponse
+    {
+        $payload = $request->all();
+        $event = $payload['event'] ?? 'unknown';
+
+        Log::info("🔔 [Razorpay Webhook] Received webhook event: {$event}", [
+            'event'   => $event,
+            'payload' => $payload,
+        ]);
+
+        if (!in_array($event, ['payment.captured', 'order.paid'])) {
+            return response()->json(['status' => 'ignored', 'message' => 'Event not handled.'], 200);
+        }
+
+        $paymentEntity = $payload['payload']['payment']['entity'] ?? null;
+        if (!$paymentEntity) {
+            return response()->json(['status' => 'error', 'message' => 'Missing payment entity.'], 400);
+        }
+
+        $orderId = $paymentEntity['order_id'] ?? null;
+        $paymentId = $paymentEntity['id'] ?? null;
+
+        if (!$orderId || !$paymentId) {
+            Log::warning('⚠️ [Razorpay Webhook] Missing order_id or payment_id in webhook', [
+                'order_id'   => $orderId,
+                'payment_id' => $paymentId,
+            ]);
+            return response()->json(['status' => 'error', 'message' => 'Missing order_id or payment_id.'], 400);
+        }
+
+        $transaction = WalletTransaction::where('provider_order_id', $orderId)->first();
+        if (!$transaction) {
+            Log::warning("⚠️ [Razorpay Webhook] No matching transaction found for order: {$orderId}");
+            return response()->json(['status' => 'not_found', 'message' => 'Transaction not found.'], 200);
+        }
+
+        if ($transaction->status === 'completed') {
+            Log::info("ℹ️ [Razorpay Webhook] Order {$orderId} was already completed.");
+            return response()->json(['status' => 'already_processed'], 200);
+        }
+
+        $result = $this->creditPendingTransaction($transaction, $paymentId, null, 'webhook');
+        Log::info("✅ [Razorpay Webhook] Successfully credited order {$orderId} via webhook.");
+
+        return response()->json(['status' => 'success', 'data' => $result], 200);
     }
 
     /**
