@@ -34,6 +34,10 @@ class WalletController extends Controller
             ['balance' => 0]
         );
 
+        // Auto-reconcile any pending Razorpay top-ups inline so wallet is immediately updated
+        $this->autoReconcilePending($wallet);
+        $wallet->refresh();
+
         return response()->json([
             'status' => 'success',
             'data' => [
@@ -502,6 +506,10 @@ class WalletController extends Controller
             ['balance' => 0]
         );
 
+        // Auto-reconcile any pending Razorpay top-ups inline so transactions history is up to date
+        $this->autoReconcilePending($wallet);
+        $wallet->refresh();
+
         $transactions = WalletTransaction::where('wallet_id', $wallet->id)
             ->where('status', '!=', 'pending')
             ->orderBy('created_at', 'desc')
@@ -554,5 +562,62 @@ class WalletController extends Controller
                 'transaction' => $transaction,
             ],
         ], 200);
+    }
+
+    /**
+     * Auto-check and reconcile any recent pending Razorpay recharges for this wallet directly from Razorpay API.
+     */
+    protected function autoReconcilePending(Wallet $wallet): void
+    {
+        try {
+            $pendingTx = WalletTransaction::where('wallet_id', $wallet->id)
+                ->where('status', 'pending')
+                ->where('payment_provider', 'razorpay')
+                ->whereNotNull('provider_order_id')
+                ->where('created_at', '>=', now()->subDays(2))
+                ->get();
+
+            if ($pendingTx->isEmpty()) {
+                return;
+            }
+
+            foreach ($pendingTx as $tx) {
+                $orderId = $tx->provider_order_id;
+                $orderResult = $this->razorpayService->getOrder($orderId);
+
+                if (($orderResult['status'] ?? '') === 'success') {
+                    $orderData = $orderResult['data'];
+                    $orderStatus = $orderData['status'] ?? '';
+                    $amountPaid = (int) ($orderData['amount_paid'] ?? 0);
+
+                    if ($orderStatus === 'paid' || $amountPaid > 0) {
+                        $paymentId = null;
+                        try {
+                            $payments = $this->razorpayService->getApi()->order->fetch($orderId)->payments();
+                            if (isset($payments->items) && is_array($payments->items)) {
+                                foreach ($payments->items as $p) {
+                                    if (($p->status ?? '') === 'captured') {
+                                        $paymentId = $p->id;
+                                        break;
+                                    }
+                                }
+                                if (!$paymentId && !empty($payments->items)) {
+                                    $paymentId = $payments->items[0]->id ?? null;
+                                }
+                            }
+                        } catch (\Throwable $pe) {
+                            Log::warning("Could not fetch payments for {$orderId}: " . $pe->getMessage());
+                        }
+
+                        $paymentId = $paymentId ?? ('pay_auto_' . time());
+
+                        $this->creditPendingTransaction($tx, $paymentId, null, 'auto_reconcile');
+                        Log::info("⚡ [Auto-Reconcile] Successfully credited pending order {$orderId} for User #{$wallet->user_id}");
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('⚠️ [Auto-Reconcile] Check encountered an error: ' . $e->getMessage());
+        }
     }
 }
