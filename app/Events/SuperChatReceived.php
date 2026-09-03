@@ -36,8 +36,11 @@ class SuperChatReceived implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
+            'id'           => $this->superChat['id'] ?? null,
             'user_id'      => $this->superChat['user_id'],
             'user_name'    => $this->superChat['user_name'],
+            'name'         => $this->superChat['name'] ?? $this->superChat['user_name'],
+            'sender_name'  => $this->superChat['sender_name'] ?? $this->superChat['user_name'],
             'user_avatar'  => $this->superChat['user_avatar'] ?? null,
             'amount'       => (float) $this->superChat['amount'],
             'message'      => $this->superChat['message'] ?? '',

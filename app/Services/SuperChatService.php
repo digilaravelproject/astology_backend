@@ -28,9 +28,8 @@ class SuperChatService
         $amount = (float) $gift->price;
         $astrologerUserId = $session->astrologer->user_id;
         $sanitizedUserMessage = $message ? ContentSanitizerService::sanitize($message) : '';
-        $giftMessage = "[Gift: {$gift->title}]" . ($sanitizedUserMessage ? ' ' . $sanitizedUserMessage : '');
 
-        $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $giftMessage) {
+        $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $sanitizedUserMessage) {
             $firstUserId = min($user->id, $astrologerUserId);
             $secondUserId = max($user->id, $astrologerUserId);
 
@@ -50,7 +49,7 @@ class SuperChatService
                 'user_id'            => $user->id,
                 'astrologer_id'      => $session->astrologer_id,
                 'amount'             => $amount,
-                'message'            => $giftMessage,
+                'message'            => $sanitizedUserMessage ?: null,
                 'transaction_status' => 'pending',
             ]);
 
@@ -64,58 +63,26 @@ class SuperChatService
             return $superChat->fresh();
         }, 3);
 
-        // Create LiveComment record so gifts appear in the live room chat stream and history
-        $liveComment = null;
-        try {
-            $liveComment = \App\Models\LiveComment::create([
-                'live_session_id' => $session->id,
-                'user_id'         => $user->id,
-                'message'         => $giftMessage,
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Failed to create LiveComment for super chat', ['error' => $e->getMessage()]);
-        }
-
-        // Broadcast to astrologer (SuperChatReceived)
+        // Broadcast to live room (SuperChatReceived with gift details and photo)
         try {
             broadcast(new SuperChatReceived($session->id, [
-                'user_id'    => $user->id,
-                'user_name'  => $user->name,
-                'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-                'amount'     => $amount,
-                'message'    => $superChat->message ?? '',
-                'gift'       => [
-                    'id'       => $gift->id,
-                    'title'    => $gift->title,
-                    'icon_url' => $gift->icon_url,
-                ],
-                'created_at' => $superChat->created_at->toISOString(),
-            ]));
-        } catch (\Exception $e) {
-            Log::error('Failed to broadcast SuperChatReceived', ['error' => $e->getMessage()]);
-        }
-
-        // Broadcast to all viewers in the live room (NewLiveComment)
-        try {
-            broadcast(new \App\Events\NewLiveComment($session->id, [
-                'id'          => $liveComment?->id ?? $superChat->id,
+                'id'          => $superChat->id,
                 'user_id'     => $user->id,
                 'user_name'   => $user->name,
                 'name'        => $user->name,
                 'sender_name' => $user->name,
                 'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-                'message'     => $giftMessage,
-                'is_gift'     => true,
+                'amount'      => $amount,
+                'message'     => $superChat->message ?? '',
                 'gift'        => [
                     'id'       => $gift->id,
                     'title'    => $gift->title,
                     'icon_url' => $gift->icon_url,
-                    'amount'   => $amount,
                 ],
                 'created_at'  => $superChat->created_at->toISOString(),
             ]));
         } catch (\Exception $e) {
-            Log::error('Failed to broadcast NewLiveComment for SuperChat', ['error' => $e->getMessage()]);
+            Log::error('Failed to broadcast SuperChatReceived', ['error' => $e->getMessage()]);
         }
 
         return [
