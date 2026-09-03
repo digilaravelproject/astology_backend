@@ -339,20 +339,7 @@ class LiveSessionService
 
         $liveSession = LiveSession::create($liveSessionData);
 
-        if ($isInstant) {
-            $freshSession = $liveSession->fresh(['astrologer.user']);
-            try {
-                broadcast(new LiveSessionStarted($freshSession));
-                $this->broadcastActiveSessionsUpdate('started', $freshSession);
-            } catch (\Exception $e) {
-                Log::error('Failed to broadcast LiveSessionStarted on create', ['error' => $e->getMessage()]);
-            }
-            try {
-                \App\Jobs\SendLiveSessionNotificationJob::dispatch($freshSession->id, 'live');
-            } catch (\Exception $e) {
-                Log::error('Failed to dispatch live notification job', ['error' => $e->getMessage()]);
-            }
-        } else {
+        if (!$isInstant) {
             try {
                 \App\Jobs\SendLiveSessionNotificationJob::dispatch($liveSession->id, 'scheduled');
             } catch (\Exception $e) {
@@ -531,10 +518,9 @@ class LiveSessionService
 
         $freshSession = $liveSession->fresh(['astrologer.user']);
         try {
-            broadcast(new LiveSessionStarted($freshSession));
             $this->broadcastActiveSessionsUpdate('started', $freshSession);
         } catch (\Exception $e) {
-            Log::error('Failed to broadcast LiveSessionStarted on start', ['error' => $e->getMessage()]);
+            Log::error('Failed to broadcast ActiveLiveSessionsUpdated on start', ['error' => $e->getMessage()]);
         }
 
         if (!$freshSession->is_live_notified) {
@@ -698,10 +684,9 @@ class LiveSessionService
 
         try {
             $freshBroadcastSession = $liveSession->fresh();
-            broadcast(new LiveSessionStarted($freshBroadcastSession));
             $this->broadcastActiveSessionsUpdate('started', $freshBroadcastSession);
         } catch (\Exception $e) {
-            Log::error('Failed to broadcast LiveSessionStarted', ['error' => $e->getMessage()]);
+            Log::error('Failed to broadcast ActiveLiveSessionsUpdated on startBroadcast', ['error' => $e->getMessage()]);
         }
 
         if (!$liveSession->is_live_notified) {

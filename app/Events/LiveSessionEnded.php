@@ -22,7 +22,6 @@ class LiveSessionEnded implements ShouldBroadcastNow
     public function broadcastOn(): array
     {
         return [
-            new Channel('live-sessions'),
             new \Illuminate\Broadcasting\PresenceChannel('live-session.' . $this->liveSession->id),
         ];
     }
