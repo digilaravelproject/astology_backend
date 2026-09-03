@@ -64,6 +64,19 @@ class SuperChatService
             return $superChat->fresh();
         }, 3);
 
+        // Create LiveComment record so gifts appear in the live room chat stream and history
+        $liveComment = null;
+        try {
+            $liveComment = \App\Models\LiveComment::create([
+                'live_session_id' => $session->id,
+                'user_id'         => $user->id,
+                'message'         => $giftMessage,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Failed to create LiveComment for super chat', ['error' => $e->getMessage()]);
+        }
+
+        // Broadcast to astrologer (SuperChatReceived)
         try {
             broadcast(new SuperChatReceived($session->id, [
                 'user_id'    => $user->id,
@@ -80,6 +93,29 @@ class SuperChatService
             ]));
         } catch (\Exception $e) {
             Log::error('Failed to broadcast SuperChatReceived', ['error' => $e->getMessage()]);
+        }
+
+        // Broadcast to all viewers in the live room (NewLiveComment)
+        try {
+            broadcast(new \App\Events\NewLiveComment($session->id, [
+                'id'          => $liveComment?->id ?? $superChat->id,
+                'user_id'     => $user->id,
+                'user_name'   => $user->name,
+                'name'        => $user->name,
+                'sender_name' => $user->name,
+                'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
+                'message'     => $giftMessage,
+                'is_gift'     => true,
+                'gift'        => [
+                    'id'       => $gift->id,
+                    'title'    => $gift->title,
+                    'icon_url' => $gift->icon_url,
+                    'amount'   => $amount,
+                ],
+                'created_at'  => $superChat->created_at->toISOString(),
+            ]));
+        } catch (\Exception $e) {
+            Log::error('Failed to broadcast NewLiveComment for SuperChat', ['error' => $e->getMessage()]);
         }
 
         return [

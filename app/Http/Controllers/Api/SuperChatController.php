@@ -119,10 +119,15 @@ class SuperChatController extends Controller
             );
 
             return ApiResponse::success([
-                'id' => $result['superChat']->id,
-                'amount' => $result['superChat']->amount,
-                'message' => $result['superChat']->message,
-                'created_at' => $result['superChat']->created_at->toISOString(),
+                'id'          => $result['superChat']->id,
+                'user_id'     => $request->user()->id,
+                'user_name'   => 'You',
+                'name'        => 'You',
+                'sender_name' => $request->user()->name,
+                'is_self'     => true,
+                'amount'      => $result['superChat']->amount,
+                'message'     => $result['superChat']->message,
+                'created_at'  => $result['superChat']->created_at->toISOString(),
             ], 'Super Chat sent successfully', 200);
         } catch (Exception $e) {
             $code = $e->getCode() ?: 500;
@@ -135,8 +140,9 @@ class SuperChatController extends Controller
         try {
             $perPage = min((int) $request->query('per_page', 50), 100);
             $order = $request->query('order', 'asc');
+            $currentUserId = auth('sanctum')->id() ?? $request->user()?->id;
             return ApiResponse::success(
-                $this->liveSessionService->getComments($id, $perPage, $order),
+                $this->liveSessionService->getComments($id, $perPage, $order, $currentUserId),
                 'Comments retrieved successfully'
             );
         } catch (Exception $e) {

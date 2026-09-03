@@ -197,24 +197,33 @@ class LiveSessionService
 
         try {
             broadcast(new NewLiveComment($session->id, [
-                'user_id' => $user->id,
-                'user_name' => $user->name,
+                'id'          => $comment->id,
+                'user_id'     => $user->id,
+                'user_name'   => $user->name,
+                'name'        => $user->name,
+                'sender_name' => $user->name,
                 'user_avatar' => \App\Helpers\MediaHelper::getUrl($user->profile_photo),
-                'message' => $comment->message,
-                'created_at' => $comment->created_at->toISOString(),
-            ]))->toOthers();
+                'message'     => $comment->message,
+                'created_at'  => $comment->created_at->toISOString(),
+            ]));
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Failed to broadcast comment', ['error' => $e->getMessage()]);
         }
 
         return [
-            'id' => $comment->id,
-            'message' => $comment->message,
-            'created_at' => $comment->created_at->toISOString(),
+            'id'          => $comment->id,
+            'user_id'     => $user->id,
+            'user_name'   => 'You',
+            'name'        => 'You',
+            'sender_name' => $user->name,
+            'is_self'     => true,
+            'user_avatar' => $user->profile_photo ? \App\Helpers\MediaHelper::getUrl($user->profile_photo) : null,
+            'message'     => $comment->message,
+            'created_at'  => $comment->created_at->toISOString(),
         ];
     }
 
-    public function getComments(int $sessionId, int $perPage = 50, string $order = 'asc'): array
+    public function getComments(int $sessionId, int $perPage = 50, string $order = 'asc', ?int $currentUserId = null): array
     {
         $session = LiveSession::findOrFail($sessionId);
 
@@ -225,14 +234,23 @@ class LiveSessionService
             ->orderBy('id', $sortDirection)
             ->paginate($perPage);
 
-        $data = $comments->map(fn($comment) => [
-            'id' => $comment->id,
-            'user_id' => $comment->user_id,
-            'user_name' => $comment->user->name ?? 'Unknown',
-            'user_avatar' => $comment->user->profile_photo ? \App\Helpers\MediaHelper::getUrl($comment->user->profile_photo) : null,
-            'message' => $comment->message,
-            'created_at' => $comment->created_at->toISOString(),
-        ]);
+        $data = $comments->map(function ($comment) use ($currentUserId) {
+            $isSelf = $currentUserId && ((int) $comment->user_id === (int) $currentUserId);
+            $rawName = $comment->user->name ?? 'Unknown';
+            $displayName = $isSelf ? 'You' : $rawName;
+
+            return [
+                'id'          => $comment->id,
+                'user_id'     => $comment->user_id,
+                'user_name'   => $displayName,
+                'name'        => $displayName,
+                'sender_name' => $rawName,
+                'is_self'     => (bool) $isSelf,
+                'user_avatar' => $comment->user->profile_photo ? \App\Helpers\MediaHelper::getUrl($comment->user->profile_photo) : null,
+                'message'     => $comment->message,
+                'created_at'  => $comment->created_at->toISOString(),
+            ];
+        });
 
         return [
             'data' => $data->values(),
