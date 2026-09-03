@@ -264,8 +264,13 @@ class LiveSessionService
 
             // Strip legacy [Gift: ...] prefix if stored in database
             $cleanedMessage = preg_replace('/^\[Gift:\s*[^\]]+\]\s*/i', '', $rawMessage);
-            if (empty(trim($cleanedMessage))) {
-                $cleanedMessage = $matchedGift ? "Sent a {$matchedGift['title']} " : 'Sent a gift ';
+            // Strip celebration popper / party emojis (🎉, 🎊, 🎁, etc.)
+            $cleanedMessage = trim(preg_replace('/[\x{1F389}\x{1F38A}\x{1F388}\x{1F381}]/u', '', $cleanedMessage));
+
+            if ($matchedGift && stripos($cleanedMessage, 'Sent a') === 0) {
+                $cleanedMessage = "Sent a {$matchedGift['title']}";
+            } elseif (empty($cleanedMessage)) {
+                $cleanedMessage = $matchedGift ? "Sent a {$matchedGift['title']}" : 'Sent a gift';
             }
 
             return [

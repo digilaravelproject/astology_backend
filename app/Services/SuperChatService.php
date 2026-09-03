@@ -28,7 +28,13 @@ class SuperChatService
         $amount = (float) $gift->price;
         $astrologerUserId = $session->astrologer->user_id;
         $sanitizedUserMessage = $message ? ContentSanitizerService::sanitize($message) : '';
-        $cleanGiftMessage = !empty(trim($sanitizedUserMessage)) ? $sanitizedUserMessage : "Sent a {$gift->title} ";
+        $sanitizedUserMessage = trim(preg_replace('/[\x{1F389}\x{1F38A}\x{1F388}\x{1F381}]/u', '', $sanitizedUserMessage));
+
+        if (empty($sanitizedUserMessage) || stripos($sanitizedUserMessage, 'Sent a') === 0) {
+            $cleanGiftMessage = "Sent a {$gift->title}";
+        } else {
+            $cleanGiftMessage = "Sent a {$gift->title} - {$sanitizedUserMessage}";
+        }
 
         $superChat = DB::transaction(function () use ($session, $user, $amount, $astrologerUserId, $cleanGiftMessage) {
             $firstUserId = min($user->id, $astrologerUserId);
