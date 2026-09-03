@@ -134,8 +134,9 @@ class SuperChatController extends Controller
     {
         try {
             $perPage = min((int) $request->query('per_page', 50), 100);
+            $order = $request->query('order', 'asc');
             return ApiResponse::success(
-                $this->liveSessionService->getComments($id, $perPage),
+                $this->liveSessionService->getComments($id, $perPage, $order),
                 'Comments retrieved successfully'
             );
         } catch (Exception $e) {

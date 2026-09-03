@@ -214,13 +214,15 @@ class LiveSessionService
         ];
     }
 
-    public function getComments(int $sessionId, int $perPage = 50): array
+    public function getComments(int $sessionId, int $perPage = 50, string $order = 'asc'): array
     {
         $session = LiveSession::findOrFail($sessionId);
 
+        $sortDirection = strtolower($order) === 'desc' ? 'desc' : 'asc';
+
         $comments = LiveComment::with('user:id,name,profile_photo')
             ->where('live_session_id', $session->id)
-            ->latest()
+            ->orderBy('id', $sortDirection)
             ->paginate($perPage);
 
         $data = $comments->map(fn($comment) => [
