@@ -136,8 +136,8 @@ class ChatService
                 }
                 
                 if ($status === 'initiated') {
-                    // Dispatch timeout cleanup (120 seconds ringing timeout)
-                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'chat')->delay(now()->addSeconds(120));
+                    // Dispatch timeout cleanup (60 seconds ringing timeout)
+                    \App\Jobs\CleanupMissedSessionJob::dispatch($session->id, 'chat')->delay(now()->addSeconds(60));
                 }
 
                 return $session;
