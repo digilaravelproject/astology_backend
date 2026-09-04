@@ -213,7 +213,7 @@ class UserAuthController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
             }
 
-            $isTestUser = in_array($phone, ['7458086472', '9651017054','7303838972'8]);
+            $isTestUser = in_array($phone, ['7458086472', '9651017054','7303838972']);
 
             if (!($isTestUser && $otp === '1234')) {
                 if (!$user->otp || !$user->otp_expires_at || Carbon::now()->gt($user->otp_expires_at)) {
