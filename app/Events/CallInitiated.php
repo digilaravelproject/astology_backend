@@ -103,6 +103,7 @@ class CallInitiated implements ShouldBroadcastNow
                 'id'              => (int) $this->session->id,
                 'consumer_id'     => (int) $this->session->consumer_id,
                 'provider_id'     => (int) $this->session->provider_id,
+                'session_type'    => $this->session->session_type ?? 'normal',
                 'status'          => $this->session->status, // 'initiated' or 'waiting'
                 'rate_per_minute' => (float) $this->session->rate_per_minute,
                 'call_type'       => $this->session->call_type ?? 'audio',

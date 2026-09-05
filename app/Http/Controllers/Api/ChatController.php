@@ -113,21 +113,30 @@ class ChatController extends Controller
             $durationSeconds = (int) ($session->duration_seconds ?? 0);
             $totalCost = (float) ($session->total_cost ?? 0.00);
 
+            $isPrepaid = $session->isPrepaid();
+            $packageRemainingSeconds = null;
+            if ($isPrepaid) {
+                $sub = \App\Models\PackageSubSession::where('chat_session_id', $session->id)->with('purchase')->first();
+                $packageRemainingSeconds = $sub?->purchase?->remaining_duration;
+            }
+
             // Calculate astrologer share based on active offer or global fallback
             $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
-            $pricing = $pricingCalculator->calculate($session->provider->astrologer, 'chat');
-            $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
+            $pricing = $session->provider?->astrologer ? $pricingCalculator->calculate($session->provider->astrologer, 'chat') : [];
+            $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? 80.00);
             $astrologerEarning = round(($totalCost * $astrologerSharePct) / 100, 2);
 
             $billingDetails = [
-                'duration_seconds' => $durationSeconds,
+                'session_type'              => $session->session_type ?? ($isPrepaid ? 'prepaid' : 'normal'),
+                'duration_seconds'          => $durationSeconds,
+                'package_remaining_seconds' => $packageRemainingSeconds,
                 'user_details' => [
                     'duration_seconds' => $durationSeconds,
-                    'amount_deducted' => (float) $totalCost,
+                    'amount_deducted'  => (float) $totalCost,
                 ],
                 'astrologer_details' => [
                     'duration_seconds' => $durationSeconds,
-                    'amount_added' => (float) $astrologerEarning,
+                    'amount_added'     => (float) $astrologerEarning,
                 ],
             ];
 

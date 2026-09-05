@@ -116,6 +116,7 @@ class CallService
                 $session = $this->callRepo->create([
                     'consumer_id'     => $consumerId,
                     'provider_id'     => $providerId,
+                    'session_type'    => $hasActivePackage ? 'prepaid' : 'normal',
                     'call_type'       => 'audio',
                     'status'          => $status,
                     'rate_per_minute' => $effectiveRate,
@@ -171,7 +172,8 @@ class CallService
                     ->exists();
                 
                 // If this is a package session, we allow the in-session channel transition
-                $isPrepaid = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
+                $isPrepaid = $session->isPrepaid()
+                    || \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
                     || (float) $session->rate_per_minute <= 0;
 
                 if (!$isPrepaid && ($isChatBusy || $isCallBusy)) {
@@ -285,7 +287,8 @@ class CallService
                 $durationSeconds = $session->started_at ? $session->started_at->diffInSeconds($endTime) : 0;
                 
                 // Skip charging if this is a prepaid package session or rate is 0.00
-                $isPackageSession = \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
+                $isPackageSession = $session->isPrepaid()
+                    || \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
                     || (float) $session->rate_per_minute <= 0;
 
                 if (!$isPackageSession) {

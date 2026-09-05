@@ -44,6 +44,7 @@ class SendSessionAcceptedPushListener implements ShouldQueue
                 astrologerName: $astrologerName,
                 astrologerAvatar: $astrologerAvatar,
                 extra: [
+                    'session_type'    => (string) ($session->session_type ?? 'normal'),
                     'rate_per_minute' => (string) ($session->rate_per_minute ?? 0),
                     'status'          => (string) ($session->status ?? 'ongoing'),
                 ]

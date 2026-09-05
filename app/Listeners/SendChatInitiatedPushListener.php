@@ -44,6 +44,7 @@ class SendChatInitiatedPushListener implements ShouldQueue
                 userName: $senderName,
                 userAvatar: $senderAvatar,
                 extra: [
+                    'session_type'    => (string) ($session->session_type ?? 'normal'),
                     'question'        => (string) ($session->question ?? ''),
                     'rate_per_minute' => (string) ($session->rate_per_minute ?? 0),
                 ]

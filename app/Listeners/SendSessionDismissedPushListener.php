@@ -46,6 +46,7 @@ class SendSessionDismissedPushListener implements ShouldQueue
             $commonData = [
                 'type'              => strtoupper($channelType) . '_DISMISSED',
                 'session_id'        => (string) $session->id,
+                'session_type'      => (string) ($session->session_type ?? 'normal'),
                 'channel_type'      => $channelType,
                 'reason'            => $reason,
                 'dismissed_by_id'   => (string) ($dismissedById ?? ''),

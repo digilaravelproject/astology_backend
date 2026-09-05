@@ -12,6 +12,7 @@ class ChatSession extends Model
     protected $fillable = [
         'consumer_id',
         'provider_id',
+        'session_type',
         'status',
         'started_at',
         'accepted_at',
@@ -33,6 +34,16 @@ class ChatSession extends Model
         'rate_per_minute' => 'float',
     ];
 
+    public function isPrepaid(): bool
+    {
+        return $this->session_type === 'prepaid';
+    }
+
+    public function isNormal(): bool
+    {
+        return $this->session_type === 'normal' || empty($this->session_type);
+    }
+
     public function consumer()
     {
         return $this->belongsTo(User::class, 'consumer_id');
@@ -41,6 +52,11 @@ class ChatSession extends Model
     public function provider()
     {
         return $this->belongsTo(User::class, 'provider_id');
+    }
+
+    public function packageSubSession()
+    {
+        return $this->hasOne(PackageSubSession::class, 'chat_session_id');
     }
 
     public function messages()

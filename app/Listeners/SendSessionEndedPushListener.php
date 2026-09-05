@@ -81,9 +81,13 @@ class SendSessionEndedPushListener implements ShouldQueue
                 $endedByName = $astrologerName;
             }
 
+            $isPrepaid = $session->isPrepaid() || (float) $amountDeducted <= 0;
+            $sessionType = $session->session_type ?? ($isPrepaid ? 'prepaid' : 'normal');
+
             // Standardized extra data map matching frontend JSON spec
             $commonData = [
                 'session_id'                => (string) $session->id,
+                'session_type'              => (string) $sessionType,
                 'channel_type'              => $channelType,
                 'user_id'                   => (string) $consumerId,
                 'user_name'                 => $userName,
@@ -103,7 +107,9 @@ class SendSessionEndedPushListener implements ShouldQueue
 
             // 1. Send Push & In-App Notification to CONSUMER USER
             $userTitle = "{$channelLabel} Ended ✨";
-            if ($endedByRole === 'user') {
+            if ($isPrepaid) {
+                $userBody = "Your {$channelType} with {$astrologerName} ended. Duration: {$durationFormatted}. Package minutes updated.";
+            } elseif ($endedByRole === 'user') {
                 $userBody = "You ended the {$channelType} with {$astrologerName}. Duration: {$durationFormatted}. Deducted: ₹" . number_format($amountDeducted, 2) . ". Balance: ₹" . number_format($userRemainingBalance, 2) . ".";
             } elseif ($endedByRole === 'astrologer') {
                 $userBody = "{$astrologerName} ended the {$channelType}. Duration: {$durationFormatted}. Deducted: ₹" . number_format($amountDeducted, 2) . ". Balance: ₹" . number_format($userRemainingBalance, 2) . ".";
@@ -124,7 +130,9 @@ class SendSessionEndedPushListener implements ShouldQueue
 
             // 2. Send Push & In-App Notification to ASTROLOGER
             $astroTitle = "{$channelLabel} Ended 💰";
-            if ($endedByRole === 'astrologer') {
+            if ($isPrepaid) {
+                $astroBody = "Your {$channelType} with {$userName} ended. Duration: {$durationFormatted}. Package session completed.";
+            } elseif ($endedByRole === 'astrologer') {
                 $astroBody = "You ended the {$channelType} with {$userName}. Duration: {$durationFormatted}. Credited: ₹" . number_format($amountCredited, 2) . ". Balance: ₹" . number_format($astrologerWalletBalance, 2) . ".";
             } elseif ($endedByRole === 'user') {
                 $astroBody = "{$userName} ended the {$channelType}. Duration: {$durationFormatted}. Credited: ₹" . number_format($amountCredited, 2) . ". Balance: ₹" . number_format($astrologerWalletBalance, 2) . ".";

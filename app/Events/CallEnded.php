@@ -28,16 +28,18 @@ class CallEnded implements ShouldBroadcastNow
         } else {
             $durationSeconds = (int) ($session->duration_seconds ?? 0);
             $totalCost = (float) ($session->total_cost ?? 0.00);
+            $sessionType = $session->session_type ?? ($totalCost <= 0 ? 'prepaid' : 'normal');
 
             $this->billing = [
+                'session_type'     => $sessionType,
                 'duration_seconds' => $durationSeconds,
                 'user_details' => [
                     'duration_seconds' => $durationSeconds,
-                    'amount_deducted' => $totalCost,
+                    'amount_deducted'  => $totalCost,
                 ],
                 'astrologer_details' => [
                     'duration_seconds' => $durationSeconds,
-                    'amount_added' => $totalCost,
+                    'amount_added'     => $totalCost,
                 ],
             ];
         }

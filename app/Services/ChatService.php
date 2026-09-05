@@ -121,6 +121,7 @@ class ChatService
                 $session = $this->chatRepo->create([
                     'consumer_id'     => $consumerId,
                     'provider_id'     => $providerId,
+                    'session_type'    => $hasActivePackage ? 'prepaid' : 'normal',
                     'status'          => $status,
                     'rate_per_minute' => $effectiveRate,
                     'question'        => $question,
@@ -186,7 +187,8 @@ class ChatService
                     ->exists();
 
                 // If this is a package session, allow in-session channel transition
-                $isPrepaid = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists()
+                $isPrepaid = $session->isPrepaid()
+                    || \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists()
                     || (float) $session->rate_per_minute <= 0;
 
                 if (!$isPrepaid && ($isChatBusy || $isCallBusy)) {
@@ -424,7 +426,8 @@ class ChatService
                 $durationSeconds = $session->started_at ? (int) $session->started_at->diffInSeconds($endTime) : 0;
                 
                 // Skip charging if this is a prepaid package session or rate is 0.00
-                $isPackageSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists()
+                $isPackageSession = $session->isPrepaid()
+                    || \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->exists()
                     || (float) $session->rate_per_minute <= 0;
 
                 if (!$isPackageSession) {

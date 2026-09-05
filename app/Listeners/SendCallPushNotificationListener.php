@@ -46,6 +46,7 @@ class SendCallPushNotificationListener implements ShouldQueue
                 sessionId: (int) $session->id,
                 callType: $callType,
                 extra: [
+                    'session_type'    => (string) ($session->session_type ?? 'normal'),
                     'rate_per_minute' => (string) ($session->rate_per_minute ?? 0),
                 ]
             );
