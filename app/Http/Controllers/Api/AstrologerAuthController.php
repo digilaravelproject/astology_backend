@@ -260,7 +260,7 @@ class AstrologerAuthController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if (in_array($phone, ['7458086472', '9651017054','7303838972'])) {
+            if (in_array($phone, ['7458086472', '9651017054','7303838972','8009210084'])) {
                 $otp = '1234';
             } else {
                 $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
@@ -374,7 +374,7 @@ class AstrologerAuthController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            $isTestUser = in_array($phone, ['7458086472', '9651017054','7303838972']);
+            $isTestUser = in_array($phone, ['7458086472', '9651017054','7303838972','8009210084']);
 
             if (!($isTestUser && $otp === '1234')) {
                 if (!$astrologer->otp || !$astrologer->otp_expires_at || Carbon::now()->gt($astrologer->otp_expires_at)) {
