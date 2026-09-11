@@ -131,7 +131,11 @@ class SuperChatController extends Controller
             ], 'Super Chat sent successfully', 200);
         } catch (Exception $e) {
             $code = $e->getCode() ?: 500;
-            return ApiResponse::error($e->getMessage(), $code);
+            // Insufficient balance (402) or wallet error -> return 200 with success: false
+            if ($code === 402 || str_contains(strtolower($e->getMessage()), 'insufficient balance')) {
+                return ApiResponse::error($e->getMessage(), 200);
+            }
+            return ApiResponse::error($e->getMessage(), ($code >= 400 && $code < 500) ? $code : 500);
         }
     }
 

@@ -846,15 +846,19 @@ class LiveSessionService
         $astrologer = $session->astrologer;
         $astrologerUser = $astrologer?->user;
 
+        $photoUrl = $astrologer?->profile_photo_url ?? $astrologerUser?->profile_photo_url;
+        $rawPhoto = $astrologer?->profile_photo ?? $astrologerUser?->profile_photo;
+
         return [
             'id' => $session->id,
             'title' => $session->title,
             'astrologer' => $astrologer ? [
-                'id' => $astrologer->user_id,
-                'name' => $astrologerUser?->name,
-                'profile_photo' => $astrologerUser?->profile_photo
-                    ? \App\Helpers\MediaHelper::getUrl($astrologerUser->profile_photo)
-                    : $astrologer?->profile_photo,
+                'id' => (int) $astrologer->id,
+                'astrologer_id' => (int) $astrologer->id,
+                'user_id' => (int) $astrologer->user_id,
+                'name' => (string) ($astrologerUser?->name ?? 'Astrologer'),
+                'profile_photo' => $rawPhoto ? \App\Helpers\MediaHelper::getUrl($rawPhoto) : null,
+                'profile_photo_url' => $photoUrl,
             ] : null,
             'is_broadcasting' => $session->is_broadcasting,
             'is_camera_on' => $session->is_camera_on ?? false,
@@ -868,6 +872,9 @@ class LiveSessionService
         $astrologer = $session->astrologer;
         $astrologerUser = $astrologer?->user;
 
+        $photoUrl = $astrologer?->profile_photo_url ?? $astrologerUser?->profile_photo_url;
+        $rawPhoto = $astrologer?->profile_photo ?? $astrologerUser?->profile_photo;
+
         return [
             'id' => $session->id,
             'title' => $session->title,
@@ -879,12 +886,20 @@ class LiveSessionService
             'is_audio_on' => $session->is_audio_on ?? false,
             'viewer_count' => $session->viewer_count,
             'astrologer' => $astrologer ? [
-                'id' => $astrologer->user_id,
-                'name' => $astrologerUser?->name,
-                'profile_photo' => $astrologerUser?->profile_photo
-                    ? \App\Helpers\MediaHelper::getUrl($astrologerUser->profile_photo)
-                    : $astrologer?->profile_photo,
+                'id' => (int) $astrologer->id,
+                'astrologer_id' => (int) $astrologer->id,
+                'user_id' => (int) $astrologer->user_id,
+                'name' => (string) ($astrologerUser?->name ?? 'Astrologer'),
+                'profile_photo' => $rawPhoto ? \App\Helpers\MediaHelper::getUrl($rawPhoto) : null,
+                'profile_photo_url' => $photoUrl,
                 'gender' => $astrologerUser?->gender,
+                'years_of_experience' => (string) ($astrologer->years_of_experience ?? '0'),
+                'experience' => (int) ($astrologer->years_of_experience ?? 0),
+                'areas_of_expertise' => $astrologer->areas_of_expertise ?? [],
+                'skills' => $astrologer->relationLoaded('skill') && $astrologer->skill ? $astrologer->skill->pluck('name')->toArray() : [],
+                'languages' => $astrologer->languages ?? [],
+                'avg_rating' => (float) ($astrologer->avg_rating ?? 0.0),
+                'bio' => $astrologer->bio,
                 'date_of_birth' => $astrologer->date_of_birth?->format('Y-m-d'),
             ] : null,
         ];
