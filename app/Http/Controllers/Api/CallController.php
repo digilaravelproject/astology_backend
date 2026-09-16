@@ -35,12 +35,13 @@ class CallController extends Controller
         $request->validate([
             'provider_id' => 'required|exists:users,id',
             'offer'       => 'required|string',
+            'live_session_id' => 'nullable|integer|exists:live_sessions,id',
         ]);
 
         try {
             $consumer = $request->user();
             $consumerId = $consumer->id;
-            $session = $this->callService->initiateCall($consumerId, $request->provider_id);
+            $session = $this->callService->initiateCall($consumerId, $request->provider_id, false, $request->live_session_id);
             $session->load(['consumer', 'provider']);
 
             broadcast(new CallInitiated($session, [
@@ -405,7 +406,7 @@ class CallController extends Controller
                     'is_normal'                  => !$isPrepaid,
                     'is_prepaid'                 => $isPrepaid,
                     'is_package_session'         => $isPrepaid,
-                    'session_type'               => 'call',
+                    'session_type'               => $session->session_type ?? 'call',
                     'package_info'               => $packageInfo,
                     'remaining_duration_seconds' => $remainingDurationSeconds,
                 ],

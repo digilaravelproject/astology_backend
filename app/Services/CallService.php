@@ -36,9 +36,9 @@ class CallService
     /**
      * Initiate a call session with rate validation and balance check.
      */
-    public function initiateCall($consumerId, $providerId, bool $isPackageCall = false)
+    public function initiateCall($consumerId, $providerId, bool $isPackageCall = false, ?int $liveSessionId = null)
     {
-        return DB::transaction(function () use ($consumerId, $providerId, $isPackageCall) {
+        return DB::transaction(function () use ($consumerId, $providerId, $isPackageCall, $liveSessionId) {
             try {
                 if ($this->blockService->isBlockedBidirectional((int) $consumerId, (int) $providerId)) {
                     throw new Exception("You cannot initiate a call with this user because of block status.");
@@ -48,6 +48,16 @@ class CallService
                 $astrologer = $provider->astrologer;
                 if (!$astrologer || !$astrologer->is_call_enabled) {
                     throw new Exception("Astrologer is not available for calls.");
+                }
+
+                if ($liveSessionId) {
+                    $liveSession = \App\Models\LiveSession::where('id', $liveSessionId)
+                        ->where('provider_id', $providerId)
+                        ->where('status', 'ongoing')
+                        ->first();
+                    if (!$liveSession) {
+                        throw new Exception("Invalid or ended live session.");
+                    }
                 }
 
                 $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
@@ -112,11 +122,13 @@ class CallService
 
                 $status = ($isBusy && !$hasActivePackage) ? 'waiting' : 'initiated';
                 $effectiveRate = $hasActivePackage ? 0.00 : $rate;
+                $sessionType = $liveSessionId ? 'live' : ($hasActivePackage ? 'prepaid' : 'normal');
 
                 $session = $this->callRepo->create([
                     'consumer_id'     => $consumerId,
                     'provider_id'     => $providerId,
-                    'session_type'    => $hasActivePackage ? 'prepaid' : 'normal',
+                    'session_type'    => $sessionType,
+                    'live_session_id' => $liveSessionId,
                     'call_type'       => 'audio',
                     'status'          => $status,
                     'rate_per_minute' => $effectiveRate,
