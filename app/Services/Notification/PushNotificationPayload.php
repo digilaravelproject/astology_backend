@@ -168,6 +168,80 @@ class PushNotificationPayload
     }
 
     /**
+     * Build an Assistant Chat notification payload with distinct enterprise contract, branding, and deep-linking.
+     *
+     * @param int $sessionId ChatAssistanceSession ID
+     * @param int $senderId Sender user ID
+     * @param string $senderName Sender user name
+     * @param string $messagePreview Message text preview
+     * @param string $direction 'user_to_astrologer' or 'assistant_to_user'
+     * @param string|null $senderAvatar Avatar URL
+     * @param string|null $astrologerName Astrologer display name for assistant branding
+     * @param array $extra Additional metadata
+     */
+    public static function forChatAssistance(
+        int $sessionId,
+        int $senderId,
+        string $senderName,
+        string $messagePreview,
+        string $direction = 'assistant_to_user',
+        ?string $senderAvatar = null,
+        ?string $astrologerName = null,
+        array $extra = []
+    ): self {
+        $cleanPreview = mb_strimwidth($messagePreview, 0, 120, '...');
+
+        if ($direction === 'assistant_to_user') {
+            // User receives reply from Astrologer's Assistant
+            $displayTitle = ($astrologerName ? $astrologerName : $senderName) . ' (Assistant)';
+            $screenRoute = '/assistant-chat-room';
+        } else {
+            // Astrologer receives query from User
+            $displayTitle = "New query from {$senderName} (Assistant Chat)";
+            $screenRoute = '/astrologer/assistant-chat-thread';
+        }
+
+        $data = array_merge([
+            // Canonical Enterprise Contract
+            'entity_type'     => 'chat_assistance',
+            'entity_id'       => (string) $sessionId,
+            'action'          => 'OPEN_ASSISTANT_CHAT',
+            'sender_id'       => (string) $senderId,
+            'sender_name'     => $displayTitle,
+            'sender_avatar'   => $senderAvatar ?? '',
+            'direction'       => $direction,
+
+            // Navigation & Compatibility Aliases
+            'type'            => 'chat_assistance',
+            'session_id'      => (string) $sessionId,
+            'screen_route'    => $screenRoute,
+            'screen'          => 'CHAT_ASSISTANCE_SCREEN',
+            'click_action'    => 'FLUTTER_NOTIFICATION_CLICK',
+            'created_at'      => now()->toIso8601String(),
+        ], $extra);
+
+        return new self(
+            title: $displayTitle,
+            body: $cleanPreview,
+            type: 'chat_assistance',
+            referenceId: (string) $sessionId,
+            imageUrl: $senderAvatar,
+            clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+            sound: 'default',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: false,
+            entityType: 'chat_assistance',
+            entityId: (string) $sessionId,
+            action: 'OPEN_ASSISTANT_CHAT',
+            senderId: (string) $senderId,
+            senderName: $displayTitle,
+            senderAvatar: $senderAvatar,
+            channelId: 'assistant_chat_channel'
+        );
+    }
+
+    /**
      * Build a high-priority session request notification (Chat / Call).
      */
     public static function forSessionRequest(

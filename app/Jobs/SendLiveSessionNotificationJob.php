@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -18,7 +19,8 @@ class SendLiveSessionNotificationJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries = 3;
+    public int $tries = 2;
+    public array $backoff = [15, 60];
     public int $timeout = 120;
 
     /**
@@ -49,58 +51,48 @@ class SendLiveSessionNotificationJob implements ShouldQueue
             }
 
             $astrologer = $session->astrologer;
+            $astrologerId = $astrologer->id;
+            $astrologerUserId = $astrologer->user_id;
+
+            // RULE 2: Anti-Spam & Cooldown Check (10 minutes) for live alerts
+            if ($this->notificationType === 'live') {
+                $cooldownKey = "astro_live_notif_cooldown_{$astrologerId}";
+                if (Cache::has($cooldownKey)) {
+                    Log::info("SendLiveSessionNotificationJob: Live notification suppressed by 10-minute cooldown for Astrologer #{$astrologerId} (Session #{$session->id}).");
+                    $session->update(['is_live_notified' => true]);
+                    return;
+                }
+            }
+
             $astrologerUser = $astrologer->user;
             $astrologerName = $astrologerUser?->name ?? 'Astrologer';
             $astrologerAvatar = $astrologerUser?->profile_photo
                 ? \App\Helpers\MediaHelper::getUrl($astrologerUser->profile_photo)
                 : $astrologer->profile_photo;
 
-            $astrologerId = $astrologer->id;
-            $astrologerUserId = $astrologer->user_id;
+            // RULE 1: Strict Audience Isolation
+            // Strictly target active followers only: is_liked = true, is_blocked = false, and exclude the astrologer themselves.
+            $targetUserIds = DB::table('astrologer_communities')
+                ->where('astrologer_id', $astrologerId)
+                ->where('is_liked', true)
+                ->where('is_blocked', false)
+                ->where('user_id', '!=', $astrologerUserId)
+                ->pluck('user_id')
+                ->unique()
+                ->values()
+                ->toArray();
 
-            // 1. High-Performance SQL UNION Audience Deduplication
-            $targetUserIds = DB::table(function ($query) use ($astrologerId, $astrologerUserId) {
-                $query->select('user_id')
-                    ->from('astrologer_communities')
-                    ->where('astrologer_id', $astrologerId)
-                    ->where('is_liked', true)
-                    ->where('is_blocked', false)
-                    ->union(
-                        DB::table('chat_sessions')
-                            ->select('consumer_id as user_id')
-                            ->where('provider_id', $astrologerUserId)
-                    )
-                    ->union(
-                        DB::table('call_sessions')
-                            ->select('consumer_id as user_id')
-                            ->where('provider_id', $astrologerUserId)
-                    );
-            }, 'audience')
-            ->whereNotNull('user_id')
-            ->where('user_id', '!=', $astrologerUserId)
-            ->whereNotIn('user_id', function ($query) use ($astrologerId) {
-                $query->select('user_id')
-                    ->from('astrologer_communities')
-                    ->where('astrologer_id', $astrologerId)
-                    ->where('is_blocked', true);
-            })
-            ->pluck('user_id')
-            ->toArray();
-
-            // Fallback for public sessions: If astrologer has no followers/chat history yet, notify all active users with registered devices
-            if (empty($targetUserIds) && ($session->session_type === 'public' || empty($session->session_type))) {
-                $targetUserIds = \App\Models\User::where('id', '!=', $astrologerUserId)
-                    ->where('user_type', '!=', 'astrologer')
-                    ->pluck('id')
-                    ->toArray();
-            }
-
+            // Zero followers: Gracefully complete with 0 dispatches. Strictly NEVER fallback to all users.
             if (empty($targetUserIds)) {
-                Log::info("SendLiveSessionNotificationJob: No eligible audience found for Astrologer #{$astrologerId} LiveSession #{$session->id}.");
+                Log::info("SendLiveSessionNotificationJob: No active followers found for Astrologer #{$astrologerId}. Push delivery skipped.");
+                if ($this->notificationType === 'live') {
+                    $session->update(['is_live_notified' => true]);
+                    Cache::put("astro_live_notif_cooldown_{$astrologerId}", now()->toIso8601String(), now()->addMinutes(10));
+                }
                 return;
             }
 
-            // 2. Build Deep-Linking Push Notification Payload
+            // RULE 4: Build Standardized Deep-Linking Push Notification Payload
             $payload = PushNotificationPayload::forLiveSession(
                 sessionId: $session->id,
                 astrologerId: $astrologerId,
@@ -112,22 +104,23 @@ class SendLiveSessionNotificationJob implements ShouldQueue
                 channelName: $session->room_uuid ?: "live_session_{$session->id}"
             );
 
-            // 3. Chunked Dispatching to prevent memory overload
+            // RULE 3: Micro-Batch Queue Dispatching (250 per chunk)
             $chunks = array_chunk($targetUserIds, 250);
             foreach ($chunks as $chunk) {
                 NotificationService::sendToUsers($chunk, $payload, saveInApp: true);
             }
 
-            // 4. Mark notification flag on LiveSession model
+            // Mark notification flags & activate anti-spam cooldown
             if ($this->notificationType === 'live') {
                 $session->update(['is_live_notified' => true]);
+                Cache::put("astro_live_notif_cooldown_{$astrologerId}", now()->toIso8601String(), now()->addMinutes(10));
             } elseif ($this->notificationType === 'scheduled') {
                 $session->update(['is_scheduled_notified' => true]);
             } elseif ($this->notificationType === 'reminder') {
                 $session->update(['is_reminder_notified' => true]);
             }
 
-            Log::info("SendLiveSessionNotificationJob: Dispatched {$this->notificationType} notifications for LiveSession #{$session->id} to " . count($targetUserIds) . " users.");
+            Log::info("SendLiveSessionNotificationJob: Dispatched {$this->notificationType} notifications for LiveSession #{$session->id} to " . count($targetUserIds) . " followers.");
 
         } catch (Exception $e) {
             Log::error("SendLiveSessionNotificationJob Failed: " . $e->getMessage(), [

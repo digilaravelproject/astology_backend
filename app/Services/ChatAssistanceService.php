@@ -9,9 +9,14 @@ use App\Models\ChatAssistanceEvent;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\CallSession;
+use App\Models\ChatSession;
+use App\Models\UserBlock;
 use App\Events\ChatAssistanceInitiated;
 use App\Events\MessageSent;
 use App\Events\MessageStatusUpdated;
+use App\Services\Notification\PushNotificationPayload;
+use App\Services\NotificationService;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
@@ -21,6 +26,41 @@ use App\Services\ContentSanitizerService;
 
 class ChatAssistanceService
 {
+    /**
+     * Verify if a user is an existing client of the astrologer (has past consultation history).
+     * Rule: Only users with prior ChatSession or CallSession can access Assistant Chat.
+     * Also checks block status.
+     */
+    public function isExistingUser(int $consumerId, int $providerId): bool
+    {
+        // 1. Check if either party has blocked the other
+        $isBlocked = UserBlock::where(function ($query) use ($consumerId, $providerId) {
+            $query->where('blocker_id', $consumerId)->where('blocked_id', $providerId);
+        })->orWhere(function ($query) use ($consumerId, $providerId) {
+            $query->where('blocker_id', $providerId)->where('blocked_id', $consumerId);
+        })->exists();
+
+        if ($isBlocked) {
+            return false;
+        }
+
+        // 2. Check past chat session history
+        $hasChatHistory = ChatSession::where('consumer_id', $consumerId)
+            ->where('provider_id', $providerId)
+            ->exists();
+
+        if ($hasChatHistory) {
+            return true;
+        }
+
+        // 3. Check past call session history
+        $hasCallHistory = CallSession::where('consumer_id', $consumerId)
+            ->where('provider_id', $providerId)
+            ->exists();
+
+        return $hasCallHistory;
+    }
+
     /**
      * Initiate or retrieve a Chat Assistance session.
      */
@@ -42,6 +82,11 @@ class ChatAssistanceService
                 $finalConsumerId = $providerId;
                 $finalProviderId = $consumerId;
             }
+        }
+
+        // Strict Rule: Consumer must be an existing user with prior consultation history
+        if (!$this->isExistingUser($finalConsumerId, $finalProviderId)) {
+            throw new Exception("You can only connect with this astrologer's assistant after having at least one consultation with the astrologer.", 403);
         }
 
         return DB::transaction(function () use ($finalConsumerId, $finalProviderId, $consumerId, $callSessionId) {
@@ -121,6 +166,11 @@ class ChatAssistanceService
         $sender = User::findOrFail($senderId);
         $isAstrologer = ($sender->user_type === 'astrologer');
 
+        // Strict Rule: If consumer is sending, verify existing user qualification
+        if (!$isAstrologer && !$this->isExistingUser($session->consumer_id, $session->provider_id)) {
+            throw new Exception("You can only connect with this astrologer's assistant after having at least one consultation with the astrologer.", 403);
+        }
+
         $message = DB::transaction(function () use ($session, $senderId, $receiverId, $isAstrologer, $data, $callSessionId) {
             if ($isAstrologer) {
                 // Astrologer outgoing reply check
@@ -196,7 +246,74 @@ class ChatAssistanceService
         // Broadcast real-time message OUTSIDE transaction using unified MessageSent event
         event(new MessageSent($message, $receiverId));
 
+        // ROLE-BASED NOTIFICATION DISPATCHING & ANTI-SPAM THROTTLING
+        try {
+            $this->dispatchChatAssistanceNotification($session, $message, $sender, $receiverId);
+        } catch (\Exception $e) {
+            Log::error("ChatAssistanceService: Failed to dispatch push notification: " . $e->getMessage());
+        }
+
         return $message;
+    }
+
+    /**
+     * Dispatch role-based push notifications for Assistant Chat with anti-spam throttling.
+     * Rule:
+     * 1. User sends message -> Notify Astrologer only (deep link to thread).
+     * 2. Assistant/Astrologer sends message -> Notify User only with "{Astrologer Name} (Assistant)" branding.
+     * 3. Zero alerts to Astrologer on outbound assistant replies.
+     * 4. 15-second throttle to avoid spam bursts.
+     */
+    protected function dispatchChatAssistanceNotification(ChatAssistanceSession $session, ChatAssistanceMessage $message, User $sender, int $receiverId): void
+    {
+        // Check 15-second throttle window to prevent sound pop-up spam
+        $throttleKey = "assistant_chat_throttle_{$receiverId}_{$session->id}";
+        if (Cache::has($throttleKey)) {
+            Log::info("ChatAssistanceService: Push notification throttled (within 15s window) for receiver #{$receiverId} on Session #{$session->id}.");
+            return;
+        }
+
+        $isAstrologer = ($sender->user_type === 'astrologer');
+        $previewText = $message->message ?: ($message->type === 'image' ? 'Sent an image attachment' : 'Sent an attachment');
+        $senderAvatar = $sender->profile_photo ? MediaHelper::getUrl($sender->profile_photo) : null;
+
+        if ($isAstrologer) {
+            // Direction: Assistant -> User
+            // Target recipient is User only. Astrologer receives ZERO notifications.
+            $payload = PushNotificationPayload::forChatAssistance(
+                sessionId: $session->id,
+                senderId: $sender->id,
+                senderName: $sender->name,
+                messagePreview: $previewText,
+                direction: 'assistant_to_user',
+                senderAvatar: $senderAvatar,
+                astrologerName: $sender->name
+            );
+
+            NotificationService::sendToUser($receiverId, $payload, saveInApp: true);
+            Cache::put($throttleKey, true, now()->addSeconds(15));
+            Log::info("ChatAssistanceService: Dispatched assistant reply push notification to User #{$receiverId}.");
+        } else {
+            // Direction: User -> Astrologer
+            // Target recipient is Astrologer
+            // Retrieve astrologer details
+            $provider = User::find($receiverId);
+            $astrologerName = $provider?->name ?? 'Astrologer';
+
+            $payload = PushNotificationPayload::forChatAssistance(
+                sessionId: $session->id,
+                senderId: $sender->id,
+                senderName: $sender->name,
+                messagePreview: $previewText,
+                direction: 'user_to_astrologer',
+                senderAvatar: $senderAvatar,
+                astrologerName: $astrologerName
+            );
+
+            NotificationService::sendToUser($receiverId, $payload, saveInApp: true);
+            Cache::put($throttleKey, true, now()->addSeconds(15));
+            Log::info("ChatAssistanceService: Dispatched user query push notification to Astrologer #{$receiverId}.");
+        }
     }
 
     /**

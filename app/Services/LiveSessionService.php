@@ -14,6 +14,7 @@ use App\Events\ActiveLiveSessionsUpdated;
 use App\Events\AstrologerMediaStatusChanged;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use App\Services\ContentSanitizerService;
 
@@ -524,10 +525,16 @@ class LiveSessionService
         }
 
         if (!$freshSession->is_live_notified) {
-            try {
-                \App\Jobs\SendLiveSessionNotificationJob::dispatch($freshSession->id, 'live');
-            } catch (\Exception $e) {
-                Log::error('Failed to dispatch live notification job on startSession', ['error' => $e->getMessage()]);
+            $cooldownKey = "astro_live_notif_cooldown_{$astrologerId}";
+            if (Cache::has($cooldownKey)) {
+                Log::info("LiveSessionService: Live notification suppressed by 10-minute cooldown for Astrologer #{$astrologerId} in startSession.");
+                $freshSession->update(['is_live_notified' => true]);
+            } else {
+                try {
+                    \App\Jobs\SendLiveSessionNotificationJob::dispatch($freshSession->id, 'live');
+                } catch (\Exception $e) {
+                    Log::error('Failed to dispatch live notification job on startSession', ['error' => $e->getMessage()]);
+                }
             }
         }
 
@@ -690,10 +697,16 @@ class LiveSessionService
         }
 
         if (!$liveSession->is_live_notified) {
-            try {
-                \App\Jobs\SendLiveSessionNotificationJob::dispatch($liveSession->id, 'live');
-            } catch (\Exception $e) {
-                Log::error('Failed to dispatch live notification job on startBroadcast', ['error' => $e->getMessage()]);
+            $cooldownKey = "astro_live_notif_cooldown_{$astrologerId}";
+            if (Cache::has($cooldownKey)) {
+                Log::info("LiveSessionService: Live notification suppressed by 10-minute cooldown for Astrologer #{$astrologerId} in startBroadcast.");
+                $liveSession->update(['is_live_notified' => true]);
+            } else {
+                try {
+                    \App\Jobs\SendLiveSessionNotificationJob::dispatch($liveSession->id, 'live');
+                } catch (\Exception $e) {
+                    Log::error('Failed to dispatch live notification job on startBroadcast', ['error' => $e->getMessage()]);
+                }
             }
         }
 
@@ -805,10 +818,22 @@ class LiveSessionService
     }
 
     /**
-     * Send notification to eligible audience when astrologer goes live.
+     * Send notification to eligible followers when astrologer goes live or schedules a session.
      */
     private function notifyAllUsersAboutLive(LiveSession $liveSession, string $type = 'live'): void
     {
+        if ($type === 'live') {
+            if ($liveSession->is_live_notified) {
+                return;
+            }
+            $cooldownKey = "astro_live_notif_cooldown_{$liveSession->astrologer_id}";
+            if (Cache::has($cooldownKey)) {
+                Log::info("LiveSessionService: Live notification suppressed by 10-minute cooldown for Astrologer #{$liveSession->astrologer_id} in notifyAllUsersAboutLive.");
+                $liveSession->update(['is_live_notified' => true]);
+                return;
+            }
+        }
+
         try {
             \App\Jobs\SendLiveSessionNotificationJob::dispatch($liveSession->id, $type);
         } catch (\Exception $e) {

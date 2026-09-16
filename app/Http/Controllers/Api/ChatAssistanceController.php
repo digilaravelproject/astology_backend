@@ -49,7 +49,9 @@ class ChatAssistanceController extends Controller
 
             return ApiResponse::success(['session' => $session], 'Chat assistance initiated successfully');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 400);
+            $code = $e->getCode();
+            $statusCode = ($code >= 400 && $code < 600) ? $code : 400;
+            return ApiResponse::error($e->getMessage(), $statusCode);
         }
     }
 
@@ -114,7 +116,9 @@ class ChatAssistanceController extends Controller
 
             return ApiResponse::success(['message' => $message], 'Message sent successfully');
         } catch (Exception $e) {
-            return ApiResponse::error($e->getMessage(), 400);
+            $code = $e->getCode();
+            $statusCode = ($code >= 400 && $code < 600) ? $code : 400;
+            return ApiResponse::error($e->getMessage(), $statusCode);
         }
     }
 
