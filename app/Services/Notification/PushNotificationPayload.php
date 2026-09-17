@@ -197,7 +197,7 @@ class PushNotificationPayload
             $screenRoute = '/assistant-chat-room';
         } else {
             // Astrologer receives query from User
-            $displayTitle = "New query from {$senderName} (Assistant Chat)";
+            $displayTitle = "{$senderName} - Assistant Chat";
             $screenRoute = '/astrologer/assistant-chat-thread';
         }
 
