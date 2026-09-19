@@ -157,6 +157,7 @@ Route::prefix('v1')->group(function () {
                 Route::post('/{id}/stop-broadcast', [LiveSessionController::class, 'stopBroadcast']);
                 Route::post('/{id}/media-status',   [LiveSessionController::class, 'updateMediaStatus']);
                 Route::get('/{id}/comments',        [SuperChatController::class, 'comments']);
+                Route::get('/{id}/call-status',     [SuperChatController::class, 'callStatus']);
             });
 
             // Price Increase Requests
@@ -325,6 +326,7 @@ Route::prefix('v1')->group(function () {
             Route::post('/live/{id}/comment',   [SuperChatController::class, 'comment'])->middleware('throttle:tiered');
             Route::post('/live/{id}/super-chat',[SuperChatController::class, 'sendSuperChat']);
             Route::get('/live/{id}/comments',   [SuperChatController::class, 'comments']);
+            Route::get('/live/{id}/call-status', [SuperChatController::class, 'callStatus']);
 
             // Device Token Management (FCM)
             Route::post('/device-token',        [DeviceTokenController::class, 'store']);

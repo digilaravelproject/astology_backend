@@ -153,4 +153,16 @@ class SuperChatController extends Controller
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
+
+    public function callStatus($id)
+    {
+        try {
+            $status = $this->liveSessionService->getCallStatus((int) $id);
+            return ApiResponse::success($status, 'Live session call status retrieved successfully');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return ApiResponse::error('Live session not found', 404);
+        } catch (Exception $e) {
+            return ApiResponse::error($e->getMessage(), 500);
+        }
+    }
 }

@@ -80,6 +80,11 @@ class CallService
                 $isCallBusy = \App\Models\CallSession::where('provider_id', $providerId)
                     ->whereIn('status', ['ringing', 'accepted', 'ongoing'])
                     ->exists();
+
+                // If this is a live session call and astrologer is already on a call, reject with clear message
+                if ($liveSessionId && $isCallBusy) {
+                    throw new Exception("Astrologer is currently on a call with another viewer. Please wait until the call finishes.");
+                }
                 // Cross-channel waiting queue check: considers BOTH chat and call waiting rows
                 $hasWaitingQueue = \App\Models\CallSession::where('provider_id', $providerId)
                     ->where('status', 'waiting')
@@ -435,6 +440,25 @@ class CallService
                 \App\Services\AstrologerService::flushCatalogCache();
 
                 $session->refresh();
+
+                // If this is a live session call, notify all viewers in the room that the astrologer is free
+                if ($session->live_session_id || $session->isLive()) {
+                    try {
+                        broadcast(new \App\Events\LiveSessionCallStatusUpdated((int) $session->live_session_id, [
+                            'live_session_id' => (int) $session->live_session_id,
+                            'is_on_call'      => false,
+                            'call_session_id' => null,
+                            'user'            => null,
+                            'started_at'      => null,
+                        ]));
+                    } catch (\Throwable $e) {
+                        Log::error('Failed to broadcast LiveSessionCallStatusUpdated on endCall', [
+                            'live_session_id' => $session->live_session_id,
+                            'error'           => $e->getMessage(),
+                        ]);
+                    }
+                }
+
                 return $session;
 
             } catch (Exception $e) {

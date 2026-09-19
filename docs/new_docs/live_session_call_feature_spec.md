@@ -150,24 +150,129 @@ sequenceDiagram
 
 ## 3. Real-Time WebSockets & Broadcasting Events
 
-Because the backend reuses the exact same WebRTC infrastructure as Normal Calls, **the socket events remain exactly the same.** No custom events (like `LiveSessionCallStarted`) are broadcasted to the global live room.
+Live Session audio calling utilizes two distinct signaling layers:
+1. **Private 1-on-1 WebRTC Signaling (`private-user.{userId}`):** Handles SDP offer/answer exchange, ICE candidates, and billing updates between the caller and astrologer.
+2. **Room Presence Channel (`live-session.{liveSessionId}`):** Notifies **all viewers in the live room** in real-time about whether the astrologer is currently engaged on a call, enabling client apps to dynamically hide or disable the "Audio Call" button for other viewers.
 
-### `CallInitiated`
+### 3.1 Room-Wide Broadcast: `LiveSessionCallStatusUpdated`
+- **Channel:** `PresenceChannel('live-session.' . $liveSessionId)`
+- **Broadcast Name:** `LiveSessionCallStatusUpdated`
+- **Triggered When:**
+  - Astrologer accepts a call -> Broadcasts `is_on_call: true`.
+  - Call ends (by either party, balance exhausted, or live session stop) -> Broadcasts `is_on_call: false`.
+  - Astrologer rejects or caller cancels ringing request -> Broadcasts `is_on_call: false`.
+- **Payload When Call Connected (`is_on_call: true`):**
+  ```json
+  {
+    "live_session_id": 10,
+    "is_on_call": true,
+    "call_session_id": 89,
+    "user": {
+      "id": 12,
+      "name": "Rahul Sharma",
+      "profile_photo_url": "https://example.com/storage/profile/12.jpg"
+    },
+    "started_at": "2026-09-19T16:15:00.000000Z"
+  }
+  ```
+- **Payload When Call Disconnected (`is_on_call: false`):**
+  ```json
+  {
+    "live_session_id": 10,
+    "is_on_call": false,
+    "call_session_id": null,
+    "user": null,
+    "started_at": null
+  }
+  ```
+- **Client Action:**
+  - When `is_on_call == true`: Hide or disable the "Call Astrologer" button for all other viewers. Optionally display an overlay banner: *"Astrologer is talking to [User]"*.
+  - When `is_on_call == false`: Re-enable / show the "Call Astrologer" button for all viewers.
+
+### 3.2 Participant WebRTC Events (`private-user.{id}`)
+
+#### `CallInitiated`
 - **Channels:** `private-user.{providerId}`
 - **Differences from Normal Call:** The payload will clearly indicate `session_type: "live"` and include `live_session_id: 10`.
-- **Frontend Action:** The Astrologer App should intercept this. Seeing `session_type: "live"`, it should display a non-intrusive "Incoming Live Call" popup layered over the Live Broadcast, rather than jumping to a standalone Incoming Call screen.
+- **Frontend Action:** The Astrologer App intercepts this. Seeing `session_type: "live"`, it displays a non-intrusive "Incoming Live Call" popup layered over the Live Broadcast, rather than jumping to a standalone Incoming Call screen.
 
-### `CallEnded` / `CallDismissed`
+#### `CallAccepted`
+- **Channels:** `private-user.{consumerId}`
+- **Payload:** Includes answer SDP and `session_type: "live"`.
+
+#### `CallEnded` / `CallDismissed`
 - **Channels:** `private-user.{consumerId}`, `private-user.{providerId}`
-- **Frontend Action:** When received, tear down the WebRTC `RTCPeerConnection` and remove the audio mix from LiveKit. Do **not** disconnect from the LiveKit room.
+- **Frontend Action:** When received, tear down the WebRTC `RTCPeerConnection` and remove the audio mix from LiveKit. Do **not** disconnect from the LiveKit broadcast room.
 
 ---
 
-## 4. Frontend Implementation Guidelines (Client-Side Audio Mixing)
+## 4. Live Session Call Status REST APIs
 
-1. **Offer/Answer Flow:** Identical to standard 1-on-1 calls.
-2. **UI Layering:** Since `session_type: "live"` is provided, the call UI should be an overlay (e.g., a small "Active Call" widget) inside the Live Session screen.
-3. **Audio Mixing (Crucial):**
+### 4.1 Live Session Detail & Join Response
+Whenever a viewer joins or opens the live session via `GET /api/user/live/{id}` or `POST /api/user/live/{id}/join`, the response includes the astrologer's current call status:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 10,
+    "title": "Evening Astro Live",
+    "status": "ongoing",
+    "is_broadcasting": true,
+    "is_on_call": true,
+    "active_call": {
+      "call_session_id": 89,
+      "status": "ongoing",
+      "user": {
+        "id": 12,
+        "name": "Rahul Sharma",
+        "profile_photo_url": "https://..."
+      },
+      "started_at": "2026-09-19T16:15:00.000000Z"
+    }
+  }
+}
+```
+
+### 4.2 Dedicated Call Status Endpoint
+For lightweight status checking, polling fallback, or re-verifying right before dialling:
+- **Consumer Route:** `GET /api/user/live/{id}/call-status`
+- **Astrologer Route:** `GET /api/astrologer/live/{id}/call-status`
+- **Success Response (HTTP 200):**
+  ```json
+  {
+    "success": true,
+    "message": "Live session call status retrieved successfully",
+    "data": {
+      "live_session_id": 10,
+      "is_on_call": false,
+      "active_call": null
+    }
+  }
+  ```
+
+---
+
+## 5. Frontend Implementation Guidelines (Client-Side Audio Mixing & UI)
+
+1. **Echo Room Subscription:**
+   ```javascript
+   // Listen to the room presence channel
+   Echo.join(`live-session.${liveSessionId}`)
+       .listen('.LiveSessionCallStatusUpdated', (data) => {
+           if (data.is_on_call) {
+               // Disable or hide Call Button for all viewers
+               setCanCall(false);
+               setOnCallUser(data.user?.name);
+           } else {
+               // Re-enable Call Button
+               setCanCall(true);
+               setOnCallUser(null);
+           }
+       });
+   ```
+2. **Offer/Answer Flow:** Identical to standard 1-on-1 calls.
+3. **UI Layering:** Since `session_type: "live"` is provided, the call UI should be an overlay (e.g., a small "Active Call" widget with elapsed timer) inside the Live Session screen.
+4. **Audio Mixing (Crucial):**
    - The Consumer (Viewer) will have an active WebRTC connection to the Astrologer.
    - The Astrologer's device will receive the Viewer's audio via WebRTC.
-   - To ensure other viewers hear the caller, the Astrologer App must mix the incoming WebRTC audio track with the Astrologer's microphone input before publishing to LiveKit. (Alternatively, if played on the device speaker, the microphone will naturally pick it up, though software mixing is cleaner).
+   - To ensure other viewers hear the caller, the Astrologer App mixes the incoming WebRTC audio track with the Astrologer's microphone input before publishing to LiveKit.

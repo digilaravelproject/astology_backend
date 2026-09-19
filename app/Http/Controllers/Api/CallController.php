@@ -12,6 +12,7 @@ use App\Events\CallEnded;
 use App\Events\CallDismissed;
 use App\Events\IceCandidateSent;
 use App\Events\WebRtcSdpUpdated;
+use App\Events\LiveSessionCallStatusUpdated;
 use App\Models\CallSession;
 use App\Models\IceCandidate;
 use App\Jobs\CallBillingTickJob;
@@ -89,6 +90,30 @@ class CallController extends Controller
 
             broadcast(new CallAccepted($session));
 
+            // If this is a live session call, notify all viewers in the room that the astrologer is on call
+            if ($session->live_session_id || $session->isLive()) {
+                $session->loadMissing('consumer');
+                $consumerUser = $session->consumer;
+                try {
+                    broadcast(new LiveSessionCallStatusUpdated((int) $session->live_session_id, [
+                        'live_session_id' => (int) $session->live_session_id,
+                        'is_on_call'      => true,
+                        'call_session_id' => (int) $session->id,
+                        'user'            => $consumerUser ? [
+                            'id'                => (int) $consumerUser->id,
+                            'name'              => (string) $consumerUser->name,
+                            'profile_photo_url' => \App\Helpers\MediaHelper::getUrl($consumerUser->profile_photo),
+                        ] : null,
+                        'started_at'      => $session->started_at ? $session->started_at->toISOString() : now()->toISOString(),
+                    ]));
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('Failed to broadcast LiveSessionCallStatusUpdated on acceptCall', [
+                        'live_session_id' => $session->live_session_id,
+                        'error'           => $e->getMessage(),
+                    ]);
+                }
+            }
+
             return ApiResponse::success(['session' => $session], 'Call accepted successfully');
 
         } catch (Exception $e) {
@@ -110,6 +135,23 @@ class CallController extends Controller
             // CallDismissed broadcasts to BOTH channels so the user's ring screen closes
             broadcast(new CallDismissed($session, $providerId, 'rejected'));
 
+            if ($session->live_session_id || $session->isLive()) {
+                try {
+                    broadcast(new LiveSessionCallStatusUpdated((int) $session->live_session_id, [
+                        'live_session_id' => (int) $session->live_session_id,
+                        'is_on_call'      => false,
+                        'call_session_id' => null,
+                        'user'            => null,
+                        'started_at'      => null,
+                    ]));
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('Failed to broadcast LiveSessionCallStatusUpdated on rejectCall', [
+                        'live_session_id' => $session->live_session_id,
+                        'error'           => $e->getMessage(),
+                    ]);
+                }
+            }
+
             return ApiResponse::success(null, 'Call rejected');
 
         } catch (Exception $e) {
@@ -129,6 +171,23 @@ class CallController extends Controller
 
             // CallDismissed broadcasts to user.{id} and call.{id} so astrologer's ring screen closes
             broadcast(new CallDismissed($session, $consumerId, 'cancelled'));
+
+            if ($session->live_session_id || $session->isLive()) {
+                try {
+                    broadcast(new LiveSessionCallStatusUpdated((int) $session->live_session_id, [
+                        'live_session_id' => (int) $session->live_session_id,
+                        'is_on_call'      => false,
+                        'call_session_id' => null,
+                        'user'            => null,
+                        'started_at'      => null,
+                    ]));
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::error('Failed to broadcast LiveSessionCallStatusUpdated on cancelCall', [
+                        'live_session_id' => $session->live_session_id,
+                        'error'           => $e->getMessage(),
+                    ]);
+                }
+            }
 
             return ApiResponse::success(null, 'Call cancelled successfully');
 

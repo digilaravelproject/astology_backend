@@ -570,6 +570,21 @@ class LiveSessionService
             }
         }
 
+        // Gracefully terminate any ongoing/ringing call session linked to this live session
+        $activeCall = \App\Models\CallSession::where('live_session_id', $liveSession->id)
+            ->whereIn('status', ['initiated', 'ringing', 'accepted', 'ongoing'])
+            ->first();
+        if ($activeCall) {
+            try {
+                app(\App\Services\CallService::class)->endCall($activeCall->id, $liveSession->astrologer?->user_id);
+            } catch (\Throwable $e) {
+                Log::error('Failed to end active live call on stopSession', [
+                    'call_session_id' => $activeCall->id,
+                    'error'           => $e->getMessage(),
+                ]);
+            }
+        }
+
         try {
             broadcast(new AstrologerMediaStatusChanged(
                 $liveSession->id,
@@ -900,6 +915,13 @@ class LiveSessionService
         $photoUrl = $astrologer?->profile_photo_url ?? $astrologerUser?->profile_photo_url;
         $rawPhoto = $astrologer?->profile_photo ?? $astrologerUser?->profile_photo;
 
+        // Check if astrologer is currently engaged in an active call for this live session
+        $activeCall = \App\Models\CallSession::with('consumer:id,name,profile_photo')
+            ->where('live_session_id', $session->id)
+            ->whereIn('status', ['accepted', 'ongoing'])
+            ->latest('id')
+            ->first();
+
         return [
             'id' => $session->id,
             'title' => $session->title,
@@ -909,6 +931,17 @@ class LiveSessionService
             'is_broadcasting' => $session->is_broadcasting,
             'is_camera_on' => $session->is_camera_on ?? false,
             'is_audio_on' => $session->is_audio_on ?? false,
+            'is_on_call' => (bool) $activeCall,
+            'active_call' => $activeCall ? [
+                'call_session_id' => (int) $activeCall->id,
+                'status'          => $activeCall->status,
+                'user'            => $activeCall->consumer ? [
+                    'id'                => (int) $activeCall->consumer->id,
+                    'name'              => (string) $activeCall->consumer->name,
+                    'profile_photo_url' => \App\Helpers\MediaHelper::getUrl($activeCall->consumer->profile_photo),
+                ] : null,
+                'started_at'      => $activeCall->started_at ? $activeCall->started_at->toISOString() : null,
+            ] : null,
             'viewer_count' => $session->viewer_count,
             'astrologer' => $astrologer ? [
                 'id' => (int) $astrologer->id,
@@ -926,6 +959,35 @@ class LiveSessionService
                 'avg_rating' => (float) ($astrologer->avg_rating ?? 0.0),
                 'bio' => $astrologer->bio,
                 'date_of_birth' => $astrologer->date_of_birth?->format('Y-m-d'),
+            ] : null,
+        ];
+    }
+
+    /**
+     * Retrieve current call status for a live session.
+     */
+    public function getCallStatus(int $sessionId): array
+    {
+        $session = LiveSession::findOrFail($sessionId);
+
+        $activeCall = \App\Models\CallSession::with('consumer:id,name,profile_photo')
+            ->where('live_session_id', $session->id)
+            ->whereIn('status', ['accepted', 'ongoing'])
+            ->latest('id')
+            ->first();
+
+        return [
+            'live_session_id' => (int) $session->id,
+            'is_on_call'      => (bool) $activeCall,
+            'active_call'     => $activeCall ? [
+                'call_session_id' => (int) $activeCall->id,
+                'status'          => $activeCall->status,
+                'user'            => $activeCall->consumer ? [
+                    'id'                => (int) $activeCall->consumer->id,
+                    'name'              => (string) $activeCall->consumer->name,
+                    'profile_photo_url' => \App\Helpers\MediaHelper::getUrl($activeCall->consumer->profile_photo),
+                ] : null,
+                'started_at'      => $activeCall->started_at ? $activeCall->started_at->toISOString() : null,
             ] : null,
         ];
     }
