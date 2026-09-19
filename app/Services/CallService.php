@@ -52,7 +52,7 @@ class CallService
 
                 if ($liveSessionId) {
                     $liveSession = \App\Models\LiveSession::where('id', $liveSessionId)
-                        ->where('provider_id', $providerId)
+                        ->where('astrologer_id', $astrologer->id)
                         ->where('status', 'ongoing')
                         ->first();
                     if (!$liveSession) {
