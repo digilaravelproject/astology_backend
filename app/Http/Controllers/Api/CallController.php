@@ -115,9 +115,10 @@ class CallController extends Controller
             }
 
             // Attach ICE candidates missed during background/killed state
-            $session->ice_candidates = \App\Models\IceCandidate::where('call_session_id', $session->id)
+            $iceCandidates = \App\Models\IceCandidate::where('call_session_id', $session->id)
                                                                ->where('receiver_id', $providerId)
                                                                ->get();
+            $session->setAttribute('ice_candidates', $iceCandidates);
 
             return ApiResponse::success(['session' => $session], 'Call accepted successfully');
 
@@ -464,9 +465,10 @@ class CallController extends Controller
             $session->package_info       = $packageInfo;
 
             // Fetch ICE candidates for the current user
-            $session->ice_candidates = \App\Models\IceCandidate::where('call_session_id', $session->id)
+            $iceCandidates = \App\Models\IceCandidate::where('call_session_id', $session->id)
                                                                ->where('receiver_id', $userId)
                                                                ->get();
+            $session->setAttribute('ice_candidates', $iceCandidates);
 
             return ApiResponse::success(
                 [
