@@ -322,6 +322,8 @@ class LiveSessionService
             'status' => $isInstant ? 'ongoing' : 'upcoming',
             'duration_minutes' => $data['duration_minutes'] ?? 60,
             'max_participants' => $data['max_participants'] ?? 100,
+            'is_camera_on' => $isInstant ? true : false,
+            'is_audio_on' => $isInstant ? true : false,
         ];
 
         if ($isInstant) {
@@ -680,6 +682,8 @@ class LiveSessionService
         $liveSession->update([
             'room_uuid' => $roomName,
             'is_broadcasting' => true,
+            'is_camera_on' => true,
+            'is_audio_on' => true,
         ]);
 
         // Use the astrologer's user_id from the session relation
@@ -871,7 +875,9 @@ class LiveSessionService
             'scheduled_time' => $session->scheduled_at->format('H:i:s'),
             'session_type' => $session->session_type,
             'status' => $session->status,
-            'is_broadcasting' => $session->is_broadcasting,
+            'is_broadcasting' => (bool) $session->is_broadcasting,
+            'is_camera_on' => (bool) ($session->is_camera_on ?? true),
+            'is_audio_on' => (bool) ($session->is_audio_on ?? true),
             'duration_minutes' => $session->duration_minutes,
             'max_participants' => $session->max_participants,
             'current_participants' => $session->current_participants,

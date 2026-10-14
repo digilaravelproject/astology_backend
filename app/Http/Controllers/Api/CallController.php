@@ -43,6 +43,7 @@ class CallController extends Controller
             $consumer = $request->user();
             $consumerId = $consumer->id;
             $session = $this->callService->initiateCall($consumerId, $request->provider_id, false, $request->live_session_id);
+            $session->update(['consumer_sdp' => $request->offer]);
             $session->load(['consumer', 'provider']);
 
             broadcast(new CallInitiated($session, [
@@ -85,7 +86,8 @@ class CallController extends Controller
             $providerId = $request->user()->id;
             $session    = $this->callService->acceptCall($sessionId, $providerId);
 
-            // Attach answer SDP to the in-memory object so the event payload carries it
+            // Persist answer SDP in database and in-memory object
+            $session->update(['provider_sdp' => $request->answer]);
             $session->answer = $request->answer;
 
             broadcast(new CallAccepted($session));
