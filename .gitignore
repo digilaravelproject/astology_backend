@@ -22,3 +22,23 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+# Added by code-review-graph
+.code-review-graph/
+.claude/
+.gemini/
+.qoder/
+.codebuddy/
+.github/
+.kiro/
+.cursorrules
+.cursor/
+.mcp.json
+.windsurfrules
+.codescene/
+.semgrep/ 
+Agents.md
+claude.md
+CODEBUDDY.md
+gemini.md
+opencode.jsonc
+qoder.md
