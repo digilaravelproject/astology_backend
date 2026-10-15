@@ -21,6 +21,8 @@ class CallSession extends Model
         'duration_seconds',
         'rate_per_minute',
         'total_cost',
+        'astrologer_earning',
+        'admin_commission',
         'last_billed_at',
         'consumer_sdp',
         'provider_sdp',
@@ -32,9 +34,30 @@ class CallSession extends Model
         'last_billed_at' => 'datetime',
         'rate_per_minute' => 'float',
         'total_cost' => 'float',
+        'astrologer_earning' => 'float',
+        'admin_commission' => 'float',
         'duration_seconds' => 'integer',
         'live_session_id' => 'integer',
     ];
+
+    /**
+     * Get astrologer net earning. Falls back to calculating based on Admin commission if not explicitly stored.
+     */
+    public function getAstrologerEarningAttribute($value): float
+    {
+        if ($value !== null && (float) $value > 0) {
+            return (float) $value;
+        }
+
+        $totalCost = (float) ($this->attributes['total_cost'] ?? 0.00);
+        if ($totalCost <= 0) {
+            return 0.00;
+        }
+
+        $adminCommission = (float) (\App\Models\Setting::get('global_commission_percentage') ?? 40.00);
+        $astroSharePct = max(0, min(100, 100 - $adminCommission));
+        return round(($totalCost * $astroSharePct) / 100, 2);
+    }
 
     public function isPrepaid(): bool
     {

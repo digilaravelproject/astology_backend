@@ -368,6 +368,7 @@ class ChatController extends Controller
                 if ($session->consumer) {
                     $session->consumer->chat_assistance_session_id = $assistanceSessionId;
                 }
+                $session->astrologer_earning = (float) $session->astrologer_earning;
                 return $session;
             });
 

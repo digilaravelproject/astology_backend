@@ -471,6 +471,9 @@ class ChatService
 
                 $totalCost = $alreadyBilled + $chargeAmount;
 
+                $totalCreditAmount = 0.00;
+                $adminCommissionAmount = 0.00;
+
                 // Create consolidated transaction records for the entire session at once!
                 if ($totalCost > 0) {
                     $this->walletService->logDebitOnly($session->consumer_id, $totalCost, 'chat_deduction', 'App\Models\ChatSession', $session->id);
@@ -480,6 +483,7 @@ class ChatService
                     $pricing = $pricingCalculator->calculate($provider->astrologer, 'chat');
                     $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
                     $totalCreditAmount = round(($totalCost * $astrologerSharePct) / 100, 2);
+                    $adminCommissionAmount = round($totalCost - $totalCreditAmount, 2);
 
                     $this->walletService->logCreditOnly($session->provider_id, $totalCreditAmount, 'chat_credit', 'App\Models\ChatSession', $session->id);
                 }
@@ -526,12 +530,20 @@ class ChatService
                     }
                 }
 
-                $this->chatRepo->update($sessionId, [
+                $sessionUpdateData = [
                     'status' => 'completed',
                     'ended_at' => $endTime,
                     'duration_seconds' => $durationSeconds,
                     'total_cost' => $totalCost,
-                ]);
+                ];
+                if (\Illuminate\Support\Facades\Schema::hasColumn('chat_sessions', 'astrologer_earning')) {
+                    $sessionUpdateData['astrologer_earning'] = $totalCreditAmount;
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('chat_sessions', 'admin_commission')) {
+                    $sessionUpdateData['admin_commission'] = $adminCommissionAmount;
+                }
+
+                $this->chatRepo->update($sessionId, $sessionUpdateData);
 
                 // Clean up any stale or hanging chat sessions between these two users so they never auto-reopen
                 \App\Models\ChatSession::where('consumer_id', $session->consumer_id)

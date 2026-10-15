@@ -567,6 +567,17 @@ class AstrologerService
             $statusValues = $dbStatusMap[strtolower($statusFilter)] ?? [$statusFilter];
         }
 
+        $globalCommission = (float) (\App\Models\Setting::get('global_commission_percentage') ?? 40.00);
+        $astroSharePct = max(0, min(100, 100 - $globalCommission));
+
+        $chatEarningCol = Schema::hasColumn('chat_sessions', 'astrologer_earning')
+            ? 'astrologer_earning'
+            : DB::raw("ROUND(total_cost * {$astroSharePct} / 100, 2) as astrologer_earning");
+
+        $callEarningCol = Schema::hasColumn('call_sessions', 'astrologer_earning')
+            ? 'astrologer_earning'
+            : DB::raw("ROUND(total_cost * {$astroSharePct} / 100, 2) as astrologer_earning");
+
         $chats = DB::table('chat_sessions')
             ->select([
                 'id',
@@ -579,6 +590,7 @@ class AstrologerService
                 'duration_seconds',
                 'rate_per_minute',
                 'total_cost',
+                $chatEarningCol,
                 'created_at',
                 'updated_at',
             ])
@@ -596,6 +608,7 @@ class AstrologerService
                 'duration_seconds',
                 'rate_per_minute',
                 'total_cost',
+                $callEarningCol,
                 'created_at',
                 'updated_at',
             ])
@@ -686,7 +699,13 @@ class AstrologerService
                 'started_at' => $item->started_at,
                 'ended_at' => $item->ended_at,
                 'duration_seconds' => (int) $item->duration_seconds,
-                'amount' => (float) $item->total_cost,
+                'amount' => isset($item->astrologer_earning) && (float) $item->astrologer_earning > 0
+                    ? (float) $item->astrologer_earning
+                    : (float) round(((float) $item->total_cost * $astroSharePct) / 100, 2),
+                'astrologer_earning' => isset($item->astrologer_earning) && (float) $item->astrologer_earning > 0
+                    ? (float) $item->astrologer_earning
+                    : (float) round(((float) $item->total_cost * $astroSharePct) / 100, 2),
+                'total_cost' => (float) $item->total_cost,
                 'rate_per_minute' => (float) $item->rate_per_minute,
                 'payment_status' => $item->status === 'completed' ? 'paid' : ($item->total_cost > 0 ? 'paid' : 'pending'),
                 'last_message' => ($item->type === 'chat' && isset($latestMessages[$item->id])) ? $latestMessages[$item->id]->message : null,

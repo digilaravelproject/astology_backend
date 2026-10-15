@@ -271,18 +271,27 @@ class NormalChatService
 
                 $provider = User::with('astrologer')->findOrFail($providerId);
                 $pricing = $this->pricingCalculator->calculate($provider->astrologer, 'chat');
-                $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? 70.0);
+                $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? 60.0);
                 $totalCreditAmount = round(($totalCost * $astrologerSharePct) / 100, 2);
+                $adminCommissionAmount = round($totalCost - $totalCreditAmount, 2);
 
                 $this->walletService->logCreditOnly($providerId, $totalCreditAmount, 'chat_credit', 'App\Models\ChatSession', $session->id);
             }
 
-            $this->chatRepo->update($sessionId, [
+            $sessionUpdateData = [
                 'status' => 'completed',
                 'ended_at' => $endTime,
                 'duration_seconds' => $durationSeconds,
                 'total_cost' => $totalCost,
-            ]);
+            ];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('chat_sessions', 'astrologer_earning')) {
+                $sessionUpdateData['astrologer_earning'] = $totalCreditAmount ?? 0.00;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('chat_sessions', 'admin_commission')) {
+                $sessionUpdateData['admin_commission'] = $adminCommissionAmount ?? 0.00;
+            }
+
+            $this->chatRepo->update($sessionId, $sessionUpdateData);
 
             // Clean up any stale or hanging sessions between these two users so they never auto-reopen
             ChatSession::where('consumer_id', $consumerId)

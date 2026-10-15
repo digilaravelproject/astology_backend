@@ -30,6 +30,14 @@ class CallEnded implements ShouldBroadcastNow
             $totalCost = (float) ($session->total_cost ?? 0.00);
             $sessionType = $session->session_type ?? ($totalCost <= 0 ? 'prepaid' : 'normal');
 
+            // Astrologer net earning
+            $astrologerEarning = (float) ($session->astrologer_earning ?? 0.00);
+            if ($astrologerEarning <= 0 && $totalCost > 0) {
+                $adminCommission = (float) (\App\Models\Setting::get('global_commission_percentage') ?? 40.00);
+                $astroSharePct = max(0, min(100, 100 - $adminCommission));
+                $astrologerEarning = round(($totalCost * $astroSharePct) / 100, 2);
+            }
+
             $this->billing = [
                 'session_type'     => $sessionType,
                 'duration_seconds' => $durationSeconds,
@@ -39,7 +47,7 @@ class CallEnded implements ShouldBroadcastNow
                 ],
                 'astrologer_details' => [
                     'duration_seconds' => $durationSeconds,
-                    'amount_added'     => $totalCost,
+                    'amount_added'     => $astrologerEarning,
                 ],
             ];
         }

@@ -349,6 +349,9 @@ class CallService
 
                 $totalCost = $alreadyBilled + $chargeAmount;
 
+                $totalCreditAmount = 0.00;
+                $adminCommissionAmount = 0.00;
+
                 // Create consolidated transaction records for the entire session at once!
                 if ($totalCost > 0) {
                     $this->walletService->logDebitOnly($session->consumer_id, $totalCost, 'call_deduction', 'App\Models\CallSession', $session->id);
@@ -358,6 +361,7 @@ class CallService
                     $pricing = $pricingCalculator->calculate($provider->astrologer, 'call');
                     $astrologerSharePct = (float) $pricing['astrologer_share_percentage'];
                     $totalCreditAmount = round(($totalCost * $astrologerSharePct) / 100, 2);
+                    $adminCommissionAmount = round($totalCost - $totalCreditAmount, 2);
 
                     $this->walletService->logCreditOnly($session->provider_id, $totalCreditAmount, 'call_credit', 'App\Models\CallSession', $session->id);
                 }
@@ -404,12 +408,20 @@ class CallService
                     }
                 }
 
-                $this->callRepo->update($sessionId, [
+                $sessionUpdateData = [
                     'status' => 'completed',
                     'ended_at' => $endTime,
                     'duration_seconds' => $durationSeconds,
                     'total_cost' => $totalCost,
-                ]);
+                ];
+                if (\Illuminate\Support\Facades\Schema::hasColumn('call_sessions', 'astrologer_earning')) {
+                    $sessionUpdateData['astrologer_earning'] = $totalCreditAmount;
+                }
+                if (\Illuminate\Support\Facades\Schema::hasColumn('call_sessions', 'admin_commission')) {
+                    $sessionUpdateData['admin_commission'] = $adminCommissionAmount;
+                }
+
+                $this->callRepo->update($sessionId, $sessionUpdateData);
 
                 // Clean up any stale or hanging call sessions between these two users so they never auto-reopen/ring
                 \App\Models\CallSession::where('consumer_id', $session->consumer_id)

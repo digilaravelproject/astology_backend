@@ -216,18 +216,27 @@ class NormalCallService
 
                 $provider = User::with('astrologer')->findOrFail($providerId);
                 $pricing = $this->pricingCalculator->calculate($provider->astrologer, 'call');
-                $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? 70.0);
+                $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? 60.0);
                 $totalCreditAmount = round(($totalCost * $astrologerSharePct) / 100, 2);
+                $adminCommissionAmount = round($totalCost - $totalCreditAmount, 2);
 
                 $this->walletService->logCreditOnly($providerId, $totalCreditAmount, 'call_credit', 'App\Models\CallSession', $session->id);
             }
 
-            $this->callRepo->update($sessionId, [
+            $sessionUpdateData = [
                 'status' => 'completed',
                 'ended_at' => $endTime,
                 'duration_seconds' => $durationSeconds,
                 'total_cost' => $totalCost,
-            ]);
+            ];
+            if (\Illuminate\Support\Facades\Schema::hasColumn('call_sessions', 'astrologer_earning')) {
+                $sessionUpdateData['astrologer_earning'] = $totalCreditAmount ?? 0.00;
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('call_sessions', 'admin_commission')) {
+                $sessionUpdateData['admin_commission'] = $adminCommissionAmount ?? 0.00;
+            }
+
+            $this->callRepo->update($sessionId, $sessionUpdateData);
 
             $this->presenceService->setFree($consumerId);
             $this->presenceService->setFree($providerId);
