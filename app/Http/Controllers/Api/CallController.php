@@ -34,19 +34,46 @@ class CallController extends Controller
     public function initiateCall(Request $request)
     {
         $request->validate([
-            'provider_id'        => 'required|exists:users,id',
-            'offer'              => 'required|string',
-            'live_session_id'    => 'nullable|integer|exists:live_sessions,id',
-            'is_package_session' => 'nullable|boolean',
+            'provider_id'         => 'required|exists:users,id',
+            'offer'               => 'required|string',
+            'live_session_id'     => 'nullable|integer|exists:live_sessions,id',
+            'is_package_session'  => 'nullable|boolean',
+            'is_package'          => 'nullable|boolean',
+            'sub_session_id'      => 'nullable|integer',
+            'package_id'          => 'nullable|integer',
+            'package_purchase_id' => 'nullable|integer',
         ]);
 
         try {
             $consumer = $request->user();
             $consumerId = $consumer->id;
-            $isPackageCall = $request->boolean('is_package_session');
-            $session = $this->callService->initiateCall($consumerId, $request->provider_id, $isPackageCall, $request->live_session_id);
+            $isPackageCall = $request->boolean('is_package_session')
+                || $request->boolean('is_package')
+                || $request->filled('sub_session_id')
+                || $request->filled('package_id')
+                || $request->filled('package_purchase_id');
+
+            $session = $this->callService->initiateCall(
+                $consumerId, 
+                $request->provider_id, 
+                $isPackageCall, 
+                $request->live_session_id,
+                $request->input('sub_session_id'),
+                $request->input('package_purchase_id')
+            );
             $session->update(['consumer_sdp' => $request->offer]);
             $session->load(['consumer', 'provider']);
+
+            if ($request->filled('sub_session_id')) {
+                $sub = \App\Models\PackageSubSession::find($request->sub_session_id);
+                if ($sub) {
+                    $sub->update([
+                        'call_session_id' => $session->id,
+                        'call_status'     => 'ringing',
+                        'mode'            => 'call',
+                    ]);
+                }
+            }
 
             $subSession = \App\Models\PackageSubSession::where('call_session_id', $session->id)->first();
             $isPackage = $session->session_type === 'prepaid' || !is_null($subSession);

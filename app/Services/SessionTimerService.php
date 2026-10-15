@@ -97,6 +97,9 @@ class SessionTimerService
                 }
             } else {
                 $linkedSession = $this->callService->initiateCall($userId, $astrologerId, true);
+                if ($offer) {
+                    $linkedSession->update(['consumer_sdp' => $offer]);
+                }
                 $linkedSession->load(['consumer', 'provider']);
 
                 $user = User::find($userId);

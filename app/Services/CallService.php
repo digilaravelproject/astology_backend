@@ -36,9 +36,9 @@ class CallService
     /**
      * Initiate a call session with rate validation and balance check.
      */
-    public function initiateCall($consumerId, $providerId, bool $isPackageCall = false, ?int $liveSessionId = null)
+    public function initiateCall($consumerId, $providerId, bool $isPackageCall = false, ?int $liveSessionId = null, ?int $subSessionId = null, ?int $packagePurchaseId = null)
     {
-        return DB::transaction(function () use ($consumerId, $providerId, $isPackageCall, $liveSessionId) {
+        return DB::transaction(function () use ($consumerId, $providerId, $isPackageCall, $liveSessionId, $subSessionId, $packagePurchaseId) {
             try {
                 if ($this->blockService->isBlockedBidirectional((int) $consumerId, (int) $providerId)) {
                     throw new Exception("You cannot initiate a call with this user because of block status.");
@@ -65,15 +65,31 @@ class CallService
                 $rate = (float) $pricing['customer_rate'];
 
                 // Check if consumer is currently in an active prepaid package session with this astrologer
-                $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
-                    $q->where('user_id', $consumerId)
-                      ->where('astrologer_id', $providerId)
-                      ->where('status', 'active');
-                })->whereNull('ended_at')->first();
+                $activePackageSubSession = null;
+                if ($subSessionId) {
+                    $activePackageSubSession = \App\Models\PackageSubSession::where('id', $subSessionId)
+                        ->whereNull('ended_at')
+                        ->first();
+                }
+                if (!$activePackageSubSession) {
+                    $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
+                        $q->where('user_id', $consumerId)
+                          ->where('astrologer_id', $providerId)
+                          ->where('status', 'active');
+                    })->whereNull('ended_at')->first();
+                }
 
                 // Only fetch active package purchase if explicitly requested as a package call
                 $activePurchase = null;
-                if ($isPackageCall) {
+                if ($packagePurchaseId) {
+                    $activePurchase = \App\Models\PackagePurchase::where('id', $packagePurchaseId)
+                        ->where('user_id', $consumerId)
+                        ->where('astrologer_id', $providerId)
+                        ->where('status', 'active')
+                        ->where('remaining_duration', '>', 0)
+                        ->first();
+                }
+                if (!$activePurchase && $isPackageCall) {
                     $activePurchase = \App\Models\PackagePurchase::where('user_id', $consumerId)
                         ->where('astrologer_id', $providerId)
                         ->where('status', 'active')
@@ -212,19 +228,30 @@ class CallService
                 
                 // If this is a package session, we allow the in-session channel transition
                 $isPrepaid = $session->isPrepaid()
+                    || $session->session_type === 'prepaid'
                     || \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
-                    || (float) $session->rate_per_minute <= 0;
+                    || (float) $session->rate_per_minute <= 0
+                    || \App\Models\PackageSubSession::whereHas('purchase', function ($q) use ($session) {
+                        $q->where('user_id', $session->consumer_id)
+                          ->where('astrologer_id', $session->provider_id)
+                          ->where('status', 'active');
+                    })->whereNull('ended_at')->exists();
 
                 if (!$isPrepaid && ($isChatBusy || $isCallBusy)) {
                     throw new Exception("You are already in an active session.");
                 }
                 
                 // Atomically update participants
-                $this->callRepo->update($sessionId, [
+                $updateData = [
                     'status' => 'ongoing',
                     'started_at' => now(),
                     'last_billed_at' => now()
-                ]);
+                ];
+                if ($isPrepaid) {
+                    $updateData['rate_per_minute'] = 0.00;
+                    $updateData['session_type'] = 'prepaid';
+                }
+                $this->callRepo->update($sessionId, $updateData);
                 
                 $this->presenceService->setBusy($session->consumer_id, $sessionId);
                 $this->presenceService->setBusy($providerId, $sessionId);
@@ -327,8 +354,14 @@ class CallService
                 
                 // Skip charging if this is a prepaid package session or rate is 0.00
                 $isPackageSession = $session->isPrepaid()
+                    || $session->session_type === 'prepaid'
                     || \App\Models\PackageSubSession::where('call_session_id', $sessionId)->exists()
-                    || (float) $session->rate_per_minute <= 0;
+                    || (float) $session->rate_per_minute <= 0
+                    || \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($session) {
+                        $q->where('user_id', $session->consumer_id)
+                          ->where('astrologer_id', $session->provider_id)
+                          ->where('status', 'active');
+                    })->whereNull('ended_at')->exists();
 
                 if (!$isPackageSession) {
                     $linkedSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($session) {
@@ -344,6 +377,13 @@ class CallService
                             'call_status'     => 'disconnected',
                         ]);
                     }
+                }
+
+                if ($isPackageSession) {
+                    $session->update([
+                        'rate_per_minute' => 0.00,
+                        'session_type'    => 'prepaid',
+                    ]);
                 }
 
                 $finalCost = $isPackageSession ? 0.00 : $this->calculateCost($durationSeconds, $session->rate_per_minute);

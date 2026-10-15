@@ -37,15 +37,23 @@ class ChatController extends Controller
     public function initiateChat(Request $request)
     {
         $request->validate([
-            'provider_id'        => 'required|exists:users,id',
-            'question'           => 'nullable|string',
-            'is_package_session' => 'nullable|boolean',
-            'is_package'         => 'nullable|boolean',
+            'provider_id'         => 'required|exists:users,id',
+            'question'            => 'nullable|string',
+            'is_package_session'  => 'nullable|boolean',
+            'is_package'          => 'nullable|boolean',
+            'sub_session_id'      => 'nullable|integer',
+            'package_id'          => 'nullable|integer',
+            'package_purchase_id' => 'nullable|integer',
         ]);
 
         try {
             $consumerId = $request->user()->id;
-            $isPackageChat = $request->boolean('is_package_session') || $request->boolean('is_package');
+            $isPackageChat = $request->boolean('is_package_session') 
+                || $request->boolean('is_package')
+                || $request->filled('sub_session_id')
+                || $request->filled('package_id')
+                || $request->filled('package_purchase_id');
+
             $session = $this->chatService->initiateChat(
                 $consumerId,
                 $request->provider_id,
@@ -53,6 +61,17 @@ class ChatController extends Controller
                 $isPackageChat
             );
             $session->load(['consumer', 'provider']);
+
+            if ($request->filled('sub_session_id')) {
+                $sub = \App\Models\PackageSubSession::find($request->sub_session_id);
+                if ($sub) {
+                    $sub->update([
+                        'chat_session_id' => $session->id,
+                        'chat_status'     => 'active',
+                        'mode'            => 'chat',
+                    ]);
+                }
+            }
             
             // Broadcast ChatInitiated with full consumer details
             broadcast(new ChatInitiated($session, $request->user()));
