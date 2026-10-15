@@ -34,7 +34,12 @@ class MediaHelper
         }
 
         if (filter_var($path, FILTER_VALIDATE_URL)) {
-            return $path;
+            if (str_contains($path, 'localhost') || str_contains($path, '127.0.0.1')) {
+                $parsed = parse_url($path, PHP_URL_PATH);
+                $path = $parsed ? ltrim($parsed, '/') : $path;
+            } else {
+                return $path;
+            }
         }
 
         $path = ltrim($path, '/');
@@ -47,7 +52,21 @@ class MediaHelper
 
         if ($url && !str_starts_with($url, 'http://') && !str_starts_with($url, 'https://') && !str_starts_with($url, '//')) {
             $appUrl = rtrim(config('app.url', 'http://localhost'), '/');
+            if (!app()->runningInConsole() && request()) {
+                $reqHost = request()->getHttpHost();
+                if ($reqHost && !str_contains($reqHost, 'localhost') && !str_contains($reqHost, '127.0.0.1')) {
+                    $appUrl = request()->schemeAndHttpHost();
+                }
+            }
             $url = $appUrl . '/' . ltrim($url, '/');
+        } elseif ($url && (str_contains($url, 'localhost') || str_contains($url, '127.0.0.1'))) {
+            if (!app()->runningInConsole() && request()) {
+                $reqHost = request()->getHttpHost();
+                if ($reqHost && !str_contains($reqHost, 'localhost') && !str_contains($reqHost, '127.0.0.1')) {
+                    $parsed = parse_url($url, PHP_URL_PATH);
+                    $url = request()->schemeAndHttpHost() . ($parsed ? '/' . ltrim($parsed, '/') : '');
+                }
+            }
         }
 
         return $url;
