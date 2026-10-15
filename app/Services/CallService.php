@@ -64,13 +64,6 @@ class CallService
                 $pricing = $pricingCalculator->calculate($astrologer, 'call');
                 $rate = (float) $pricing['customer_rate'];
 
-                // Check if consumer has an active prepaid package with this astrologer
-                $activePurchase = \App\Models\PackagePurchase::where('user_id', $consumerId)
-                    ->where('astrologer_id', $providerId)
-                    ->where('status', 'active')
-                    ->where('remaining_duration', '>', 0)
-                    ->first();
-
                 // Check if consumer is currently in an active prepaid package session with this astrologer
                 $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
                     $q->where('user_id', $consumerId)
@@ -78,7 +71,17 @@ class CallService
                       ->where('status', 'active');
                 })->whereNull('ended_at')->first();
 
-                $hasActivePackage = !$liveSessionId && ($isPackageCall || !is_null($activePackageSubSession) || !is_null($activePurchase));
+                // Only fetch active package purchase if explicitly requested as a package call
+                $activePurchase = null;
+                if ($isPackageCall) {
+                    $activePurchase = \App\Models\PackagePurchase::where('user_id', $consumerId)
+                        ->where('astrologer_id', $providerId)
+                        ->where('status', 'active')
+                        ->where('remaining_duration', '>', 0)
+                        ->first();
+                }
+
+                $hasActivePackage = !$liveSessionId && ($isPackageCall || !is_null($activePackageSubSession));
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -154,7 +157,7 @@ class CallService
                             'call_status'     => 'ringing',
                             'mode'            => 'call',
                         ]);
-                    } elseif ($activePurchase && !$isPackageCall) {
+                    } elseif ($activePurchase) {
                         \App\Models\PackageSubSession::create([
                             'package_purchase_id' => $activePurchase->id,
                             'mode'                => 'call',

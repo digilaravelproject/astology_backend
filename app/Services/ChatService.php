@@ -60,14 +60,6 @@ class ChatService
                 $pricing = $this->pricingCalculator->calculate($astrologer, 'chat');
                 $rate = (float) $pricing['customer_rate'];
 
-                // Check if this is an explicitly initiated prepaid package chat OR if consumer is currently in an active prepaid package session with this astrologer
-                // Check if consumer has an active prepaid package with this astrologer
-                $activePurchase = \App\Models\PackagePurchase::where('user_id', $consumerId)
-                    ->where('astrologer_id', $providerId)
-                    ->where('status', 'active')
-                    ->where('remaining_duration', '>', 0)
-                    ->first();
-
                 // Check if consumer is currently in an active prepaid package session with this astrologer
                 $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
                     $q->where('user_id', $consumerId)
@@ -75,7 +67,17 @@ class ChatService
                       ->where('status', 'active');
                 })->whereNull('ended_at')->first();
 
-                $hasActivePackage = ($isPackageChat || !is_null($activePackageSubSession) || !is_null($activePurchase));
+                // Only fetch active package purchase if explicitly requested as a package chat
+                $activePurchase = null;
+                if ($isPackageChat) {
+                    $activePurchase = \App\Models\PackagePurchase::where('user_id', $consumerId)
+                        ->where('astrologer_id', $providerId)
+                        ->where('status', 'active')
+                        ->where('remaining_duration', '>', 0)
+                        ->first();
+                }
+
+                $hasActivePackage = ($isPackageChat || !is_null($activePackageSubSession));
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -143,7 +145,7 @@ class ChatService
                             'chat_status'     => ($status === 'ongoing' ? 'active' : 'idle'),
                             'mode'            => 'chat',
                         ]);
-                    } elseif ($activePurchase && !$isPackageChat) {
+                    } elseif ($activePurchase) {
                         \App\Models\PackageSubSession::create([
                             'package_purchase_id' => $activePurchase->id,
                             'mode'                => 'chat',
