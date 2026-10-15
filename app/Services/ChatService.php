@@ -61,13 +61,21 @@ class ChatService
                 $rate = (float) $pricing['customer_rate'];
 
                 // Check if this is an explicitly initiated prepaid package chat OR if consumer is currently in an active prepaid package session with this astrologer
+                // Check if consumer has an active prepaid package with this astrologer
+                $activePurchase = \App\Models\PackagePurchase::where('user_id', $consumerId)
+                    ->where('astrologer_id', $providerId)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->first();
+
+                // Check if consumer is currently in an active prepaid package session with this astrologer
                 $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
                     $q->where('user_id', $consumerId)
                       ->where('astrologer_id', $providerId)
                       ->where('status', 'active');
                 })->whereNull('ended_at')->first();
 
-                $hasActivePackage = $isPackageChat || !is_null($activePackageSubSession);
+                $hasActivePackage = ($isPackageChat || !is_null($activePackageSubSession) || !is_null($activePurchase));
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -127,13 +135,25 @@ class ChatService
                     'question'        => $question,
                 ]);
 
-                // If consumer is in an active package sub-session, auto-link this chat channel
-                if ($activePackageSubSession) {
-                    $activePackageSubSession->update([
-                        'chat_session_id' => $session->id,
-                        'chat_status'     => ($status === 'ongoing' ? 'active' : 'idle'),
-                        'mode'            => 'chat',
-                    ]);
+                // Auto-link or create PackageSubSession for prepaid package chat
+                if ($hasActivePackage) {
+                    if ($activePackageSubSession) {
+                        $activePackageSubSession->update([
+                            'chat_session_id' => $session->id,
+                            'chat_status'     => ($status === 'ongoing' ? 'active' : 'idle'),
+                            'mode'            => 'chat',
+                        ]);
+                    } elseif ($activePurchase && !$isPackageChat) {
+                        \App\Models\PackageSubSession::create([
+                            'package_purchase_id' => $activePurchase->id,
+                            'mode'                => 'chat',
+                            'chat_session_id'     => $session->id,
+                            'chat_status'         => ($status === 'ongoing' ? 'active' : 'idle'),
+                            'started_at'          => null,
+                            'ended_at'            => null,
+                            'duration_used'       => 0,
+                        ]);
+                    }
                 }
                 
                 if ($status === 'initiated') {
@@ -502,7 +522,8 @@ class ChatService
                             ->lockForUpdate()
                             ->first();
                         if ($purchase) {
-                            $totalElapsed = $subSession->started_at ? (int) $subSession->started_at->diffInSeconds($endTime) : $durationSeconds;
+                            $startRef = $subSession->started_at ?? $session->started_at;
+                            $totalElapsed = $startRef ? (int) $startRef->diffInSeconds($endTime) : $durationSeconds;
                             $durationUsed = (int) min($totalElapsed, $purchase->remaining_duration);
                             
                             $subSession->update([

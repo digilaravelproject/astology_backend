@@ -154,7 +154,7 @@ class CallService
                             'call_status'     => 'ringing',
                             'mode'            => 'call',
                         ]);
-                    } elseif ($activePurchase) {
+                    } elseif ($activePurchase && !$isPackageCall) {
                         \App\Models\PackageSubSession::create([
                             'package_purchase_id' => $activePurchase->id,
                             'mode'                => 'call',
@@ -399,9 +399,8 @@ class CallService
                             ->lockForUpdate()
                             ->first();
                         if ($purchase) {
-                            $totalElapsed = ($subSession->started_at && $session->started_at) 
-                                ? (int) $subSession->started_at->diffInSeconds($endTime) 
-                                : 0;
+                            $startRef = $subSession->started_at ?? $session->started_at;
+                            $totalElapsed = $startRef ? (int) $startRef->diffInSeconds($endTime) : $durationSeconds;
                             $durationUsed = (int) min($totalElapsed, $purchase->remaining_duration);
                             
                             $subSession->update([

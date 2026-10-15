@@ -216,7 +216,7 @@ class NormalCallService
 
                 $provider = User::with('astrologer')->findOrFail($providerId);
                 $pricing = $this->pricingCalculator->calculate($provider->astrologer, 'call');
-                $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? 60.0);
+                $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? 80.0);
                 $totalCreditAmount = round(($totalCost * $astrologerSharePct) / 100, 2);
                 $adminCommissionAmount = round($totalCost - $totalCreditAmount, 2);
 

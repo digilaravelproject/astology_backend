@@ -567,7 +567,7 @@ class AstrologerService
             $statusValues = $dbStatusMap[strtolower($statusFilter)] ?? [$statusFilter];
         }
 
-        $globalCommission = (float) (\App\Models\Setting::get('global_commission_percentage') ?? 40.00);
+        $globalCommission = (float) (\App\Models\Setting::get('global_commission_percentage') ?? \App\Models\Setting::get('global_admin_commission_rate') ?? 20.00);
         $astroSharePct = max(0, min(100, 100 - $globalCommission));
 
         $chatEarningCol = Schema::hasColumn('chat_sessions', 'astrologer_earning')

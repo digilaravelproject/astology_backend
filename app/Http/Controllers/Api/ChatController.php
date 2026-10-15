@@ -124,7 +124,7 @@ class ChatController extends Controller
             $pricingCalculator = app(\App\Services\PricingCalculatorService::class);
             $pricing = $session->provider?->astrologer ? $pricingCalculator->calculate($session->provider->astrologer, 'chat') : [];
             $astrologerSharePct = (float) ($pricing['astrologer_share_percentage'] ?? 80.00);
-            $astrologerEarning = round(($totalCost * $astrologerSharePct) / 100, 2);
+            $astrologerEarning = isset($session->astrologer_earning) ? (float) $session->astrologer_earning : round(($totalCost * $astrologerSharePct) / 100, 2);
 
             $billingDetails = [
                 'session_type'              => $session->session_type ?? ($isPrepaid ? 'prepaid' : 'normal'),

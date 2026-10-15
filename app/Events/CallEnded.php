@@ -33,7 +33,7 @@ class CallEnded implements ShouldBroadcastNow
             // Astrologer net earning
             $astrologerEarning = (float) ($session->astrologer_earning ?? 0.00);
             if ($astrologerEarning <= 0 && $totalCost > 0) {
-                $adminCommission = (float) (\App\Models\Setting::get('global_commission_percentage') ?? 40.00);
+                $adminCommission = (float) (\App\Models\Setting::get('global_commission_percentage') ?? \App\Models\Setting::get('global_admin_commission_rate') ?? 20.00);
                 $astroSharePct = max(0, min(100, 100 - $adminCommission));
                 $astrologerEarning = round(($totalCost * $astroSharePct) / 100, 2);
             }

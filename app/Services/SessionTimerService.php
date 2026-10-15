@@ -125,19 +125,22 @@ class SessionTimerService
             $subSession = DB::transaction(function () use ($purchase, $mode, $linkedSession) {
                 $purchase->lockForUpdate()->first();
 
+                $col = $mode === 'chat' ? 'chat_session_id' : 'call_session_id';
+                $existing = PackageSubSession::where($col, $linkedSession->id)
+                    ->whereNull('ended_at')
+                    ->first();
+                if ($existing) {
+                    return $existing;
+                }
+
                 $data = [
                     'package_purchase_id' => $purchase->id,
                     'mode'                => $mode,
                     'started_at'          => null,
                     'ended_at'            => null,
                     'duration_used'       => 0,
+                    $col                  => $linkedSession->id,
                 ];
-
-                if ($mode === 'chat') {
-                    $data['chat_session_id'] = $linkedSession->id;
-                } else {
-                    $data['call_session_id'] = $linkedSession->id;
-                }
 
                 return PackageSubSession::create($data);
             });
@@ -253,8 +256,16 @@ class SessionTimerService
 
                 $actorId         = $userId ?? $purchase->user_id;
                 $endTime         = now();
-                $durationSeconds = $subSession->started_at
-                    ? (int) $subSession->started_at->diffInSeconds($endTime)
+                $startRef = $subSession->started_at;
+                if (!$startRef) {
+                    if ($subSession->call_session_id) {
+                        $startRef = CallSession::where('id', $subSession->call_session_id)->value('started_at');
+                    } elseif ($subSession->chat_session_id) {
+                        $startRef = ChatSession::where('id', $subSession->chat_session_id)->value('started_at');
+                    }
+                }
+                $durationSeconds = $startRef
+                    ? (int) \Carbon\Carbon::parse($startRef)->diffInSeconds($endTime)
                     : 0;
                 $durationUsed    = (int) min(max($durationSeconds, 0), $purchase->remaining_duration);
 
