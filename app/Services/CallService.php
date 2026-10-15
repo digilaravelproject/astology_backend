@@ -64,14 +64,21 @@ class CallService
                 $pricing = $pricingCalculator->calculate($astrologer, 'call');
                 $rate = (float) $pricing['customer_rate'];
 
-                // Check if this is an explicitly initiated prepaid package call OR if consumer is currently in an active prepaid package session with this astrologer
+                // Check if consumer has an active prepaid package with this astrologer
+                $activePurchase = \App\Models\PackagePurchase::where('user_id', $consumerId)
+                    ->where('astrologer_id', $providerId)
+                    ->where('status', 'active')
+                    ->where('remaining_duration', '>', 0)
+                    ->first();
+
+                // Check if consumer is currently in an active prepaid package session with this astrologer
                 $activePackageSubSession = \App\Models\PackageSubSession::whereHas('purchase', function($q) use ($consumerId, $providerId) {
                     $q->where('user_id', $consumerId)
                       ->where('astrologer_id', $providerId)
                       ->where('status', 'active');
                 })->whereNull('ended_at')->first();
 
-                $hasActivePackage = $isPackageCall || !is_null($activePackageSubSession);
+                $hasActivePackage = !$liveSessionId && ($isPackageCall || !is_null($activePackageSubSession) || !is_null($activePurchase));
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
@@ -139,13 +146,25 @@ class CallService
                     'rate_per_minute' => $effectiveRate,
                 ]);
 
-                // If consumer is in an active package sub-session, auto-link this call channel
-                if ($activePackageSubSession) {
-                    $activePackageSubSession->update([
-                        'call_session_id' => $session->id,
-                        'call_status'     => 'ringing',
-                        'mode'            => 'call',
-                    ]);
+                // Auto-link or create PackageSubSession for prepaid package call
+                if ($hasActivePackage) {
+                    if ($activePackageSubSession) {
+                        $activePackageSubSession->update([
+                            'call_session_id' => $session->id,
+                            'call_status'     => 'ringing',
+                            'mode'            => 'call',
+                        ]);
+                    } elseif ($activePurchase) {
+                        \App\Models\PackageSubSession::create([
+                            'package_purchase_id' => $activePurchase->id,
+                            'mode'                => 'call',
+                            'call_session_id'     => $session->id,
+                            'call_status'         => 'ringing',
+                            'started_at'          => null,
+                            'ended_at'            => null,
+                            'duration_used'       => 0,
+                        ]);
+                    }
                 }
 
                 if ($status === 'initiated') {
@@ -380,7 +399,9 @@ class CallService
                             ->lockForUpdate()
                             ->first();
                         if ($purchase) {
-                            $totalElapsed = $subSession->started_at ? (int) $subSession->started_at->diffInSeconds($endTime) : $durationSeconds;
+                            $totalElapsed = ($subSession->started_at && $session->started_at) 
+                                ? (int) $subSession->started_at->diffInSeconds($endTime) 
+                                : 0;
                             $durationUsed = (int) min($totalElapsed, $purchase->remaining_duration);
                             
                             $subSession->update([

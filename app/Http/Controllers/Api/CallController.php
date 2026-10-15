@@ -34,17 +34,22 @@ class CallController extends Controller
     public function initiateCall(Request $request)
     {
         $request->validate([
-            'provider_id' => 'required|exists:users,id',
-            'offer'       => 'required|string',
-            'live_session_id' => 'nullable|integer|exists:live_sessions,id',
+            'provider_id'        => 'required|exists:users,id',
+            'offer'              => 'required|string',
+            'live_session_id'    => 'nullable|integer|exists:live_sessions,id',
+            'is_package_session' => 'nullable|boolean',
         ]);
 
         try {
             $consumer = $request->user();
             $consumerId = $consumer->id;
-            $session = $this->callService->initiateCall($consumerId, $request->provider_id, false, $request->live_session_id);
+            $isPackageCall = $request->boolean('is_package_session');
+            $session = $this->callService->initiateCall($consumerId, $request->provider_id, $isPackageCall, $request->live_session_id);
             $session->update(['consumer_sdp' => $request->offer]);
             $session->load(['consumer', 'provider']);
+
+            $subSession = \App\Models\PackageSubSession::where('call_session_id', $session->id)->first();
+            $isPackage = $session->session_type === 'prepaid' || !is_null($subSession);
 
             broadcast(new CallInitiated($session, [
                 'id'                  => (int) $consumer->id,
@@ -63,9 +68,16 @@ class CallController extends Controller
                 'profile_photo_url'   => \App\Helpers\MediaHelper::getUrl($consumer->profile_photo),
                 'profile_completed'   => (bool) $consumer->profile_completed,
                 'offer'               => $request->offer,
+                'is_package'          => $isPackage,
+                'sub_session_id'      => $subSession?->id,
             ]));
 
-            return ApiResponse::success(['session' => $session], 'Call initiated successfully');
+            return ApiResponse::success([
+                'session'        => $session,
+                'sub_session'    => $subSession,
+                'is_package'     => $isPackage,
+                'sub_session_id' => $subSession?->id,
+            ], 'Call initiated successfully');
 
         } catch (Exception $e) {
             return ApiResponse::error($e->getMessage(), 400);
