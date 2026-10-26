@@ -70,4 +70,8 @@ return [
         'dlt_template_id' => env('EXOTEL_DLT_TEMPLATE_ID'),
     ],
 
+    'google_maps' => [
+        'api_key' => env('GOOGLE_MAPS_API_KEY', 'AIzaSyD5yjQ3qESYKjD86CkCL4rPR0wQpJ0yyc8'),
+    ],
+
 ];

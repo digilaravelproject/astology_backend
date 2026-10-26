@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\{
     GiftController,
     KundliController,
     LiveSessionController,
+    LocationController,
     MatrimonyController,
     NoticeController,
     NotificationController,
@@ -483,6 +484,13 @@ Route::prefix('v1')->group(function () {
     Route::get('/payment-policy',           [StaticPageController::class, 'getPaymentPolicy'])->middleware('throttle:general');
     Route::get('/about-us',                 [StaticPageController::class, 'getAboutUs'])->middleware('throttle:general');
     Route::get('/customer-support',         [StaticPageController::class, 'getCustomerSupport'])->middleware('throttle:general');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Location & Geocoding Search
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/location/search',          [LocationController::class, 'search'])->middleware('throttle:general');
 
     /*
     |--------------------------------------------------------------------------
