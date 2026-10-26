@@ -97,7 +97,7 @@ class CallService
                         ->first();
                 }
 
-                $hasActivePackage = !$liveSessionId && ($isPackageCall || !is_null($activePackageSubSession));
+                $hasActivePackage = !$liveSessionId && (!is_null($activePackageSubSession) || ($isPackageCall && !is_null($activePurchase)));
 
                 // Dynamic busy status check
                 $isChatBusy = \App\Models\ChatSession::where('provider_id', $providerId)
