@@ -54,14 +54,34 @@
             background: #94a3b8;
         }
 
+        /* Desktop Layout (768px and up) */
+        @media (min-width: 768px) {
+            .admin-sidebar {
+                position: fixed !important;
+                left: 0 !important;
+                top: 70px !important;
+                width: 250px !important;
+                height: calc(100vh - 70px) !important;
+                transform: translateX(0) !important;
+                z-index: 40 !important;
+            }
+
+            .admin-main {
+                margin-left: 250px !important;
+                width: calc(100% - 250px) !important;
+                min-width: 0 !important;
+                flex: 1 1 0% !important;
+            }
+        }
+
         @media (max-width: 767px) {
-            .admin-header { height: 60px; padding-inline: 12px; }
+            .admin-header { height: 60px !important; padding-inline: 12px; }
             .admin-brand { min-width: 0; gap: 8px; font-size: 15px; }
             .admin-brand img { width: 32px; height: 32px; flex: none; }
-            .admin-main-shell { padding-top: 60px; }
-            .admin-sidebar { top: 60px; height: calc(100vh - 60px); width: min(280px, 86vw); }
-            .admin-main { width: 100%; min-width: 0; overflow-x: hidden; margin-left: 0 !important; }
-            .admin-main-inner { width: 100%; min-width: 0; padding: 14px 12px; }
+            .admin-main-shell { padding-top: 60px !important; }
+            .admin-sidebar { top: 60px !important; height: calc(100vh - 60px) !important; width: min(280px, 86vw) !important; }
+            .admin-main { width: 100% !important; min-width: 0 !important; overflow-x: hidden; margin-left: 0 !important; }
+            .admin-main-inner { width: 100% !important; min-width: 0 !important; padding: 14px 12px !important; }
 
             .admin-content { font-size: 13px; }
             .admin-content h1 { font-size: 1.35rem; line-height: 1.25; overflow-wrap: anywhere; }
