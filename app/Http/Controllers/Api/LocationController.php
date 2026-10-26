@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Log;
 class LocationController extends Controller
 {
     /**
-     * Search locations/places via Google Geocoding API.
+     * Search locations/places via Google Places API (New) & Geocoding API.
      *
      * @param Request $request
      * @return JsonResponse
@@ -31,55 +31,90 @@ class LocationController extends Controller
 
             $results = CacheHelper::remember($cacheKey, 86400, function () use ($query) {
                 $apiKey = config('services.google_maps.api_key', env('GOOGLE_MAPS_API_KEY', 'AIzaSyD5yjQ3qESYKjD86CkCL4rPR0wQpJ0yyc8'));
-
-                $response = Http::timeout(10)->get('https://maps.googleapis.com/maps/api/geocode/json', [
-                    'address' => $query,
-                    'key'     => $apiKey,
-                ]);
-
-                if (!$response->successful()) {
-                    Log::warning('Google Geocoding HTTP failed: ' . $response->status(), [
-                        'query' => $query,
-                        'body'  => $response->body(),
-                    ]);
-                    return [];
-                }
-
-                $data = $response->json();
-                $status = $data['status'] ?? '';
-
-                if ($status !== 'OK' || empty($data['results']) || !is_array($data['results'])) {
-                    if ($status !== 'ZERO_RESULTS') {
-                        Log::warning('Google Geocoding non-OK status: ' . $status, [
-                            'query'         => $query,
-                            'error_message' => $data['error_message'] ?? null,
-                        ]);
-                    }
-                    return [];
-                }
-
                 $formattedList = [];
 
-                foreach ($data['results'] as $item) {
-                    $formattedAddress = $item['formatted_address'] ?? '';
-                    $lat = $item['geometry']['location']['lat'] ?? null;
-                    $lng = $item['geometry']['location']['lng'] ?? null;
+                // 1. Primary: Google Places API (New) Text Search
+                try {
+                    $placesResponse = Http::timeout(8)
+                        ->withHeaders([
+                            'Content-Type'     => 'application/json',
+                            'X-Goog-Api-Key'   => $apiKey,
+                            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.location',
+                        ])
+                        ->post('https://places.googleapis.com/v1/places:searchText', [
+                            'textQuery' => $query,
+                        ]);
 
-                    if ($formattedAddress && $lat !== null && $lng !== null) {
-                        $lower = strtolower(trim($formattedAddress));
-                        // Refine South Mumbai default center to standard Mumbai city center
-                        if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
-                            $lat = 19.0760;
-                            $lng = 72.8774;
+                    if ($placesResponse->successful()) {
+                        $placesData = $placesResponse->json();
+                        if (!empty($placesData['places']) && is_array($placesData['places'])) {
+                            foreach ($placesData['places'] as $place) {
+                                $name = $place['displayName']['text'] ?? '';
+                                $formattedAddress = $place['formattedAddress'] ?? '';
+                                $lat = $place['location']['latitude'] ?? null;
+                                $lng = $place['location']['longitude'] ?? null;
+
+                                if ($lat !== null && $lng !== null) {
+                                    $displayName = $formattedAddress ?: $name;
+                                    $lower = strtolower(trim($displayName));
+                                    if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
+                                        $lat = 19.0760;
+                                        $lng = 72.8774;
+                                    }
+
+                                    $formattedList[] = [
+                                        'display_name' => $displayName,
+                                        'address'      => $formattedAddress ?: $name,
+                                        'latitude'     => (float) $lat,
+                                        'longitude'    => (float) $lng,
+                                        'place_id'     => $place['id'] ?? null,
+                                    ];
+                                }
+                            }
                         }
+                    }
+                } catch (\Throwable $pe) {
+                    Log::warning('Places New search exception: ' . $pe->getMessage());
+                }
 
-                        $formattedList[] = [
-                            'display_name' => $formattedAddress,
-                            'address'      => $formattedAddress,
-                            'latitude'     => (float) $lat,
-                            'longitude'    => (float) $lng,
-                            'place_id'     => $item['place_id'] ?? null,
-                        ];
+                // 2. Fallback: Google Geocoding API if Places API (New) returned no results
+                if (empty($formattedList)) {
+                    try {
+                        $geoResponse = Http::timeout(8)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                            'address' => $query,
+                            'key'     => $apiKey,
+                        ]);
+
+                        if ($geoResponse->successful()) {
+                            $geoData = $geoResponse->json();
+                            $status = $geoData['status'] ?? '';
+
+                            if ($status === 'OK' && !empty($geoData['results']) && is_array($geoData['results'])) {
+                                foreach ($geoData['results'] as $item) {
+                                    $formattedAddress = $item['formatted_address'] ?? '';
+                                    $lat = $item['geometry']['location']['lat'] ?? null;
+                                    $lng = $item['geometry']['location']['lng'] ?? null;
+
+                                    if ($formattedAddress && $lat !== null && $lng !== null) {
+                                        $lower = strtolower(trim($formattedAddress));
+                                        if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
+                                            $lat = 19.0760;
+                                            $lng = 72.8774;
+                                        }
+
+                                        $formattedList[] = [
+                                            'display_name' => $formattedAddress,
+                                            'address'      => $formattedAddress,
+                                            'latitude'     => (float) $lat,
+                                            'longitude'    => (float) $lng,
+                                            'place_id'     => $item['place_id'] ?? null,
+                                        ];
+                                    }
+                                }
+                            }
+                        }
+                    } catch (\Throwable $ge) {
+                        Log::warning('Geocoding search exception: ' . $ge->getMessage());
                     }
                 }
 
