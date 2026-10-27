@@ -15,6 +15,7 @@ use App\Events\ChatQueueUpdated;
 use App\Events\MessageStatusUpdated;
 use App\Services\ContentSanitizerService;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class ChatController extends Controller
@@ -204,6 +205,20 @@ class ChatController extends Controller
 
         $hasAttachment = !empty($inputAttachmentUrl) || !is_null($file);
 
+        Log::info('[CHAT_DIAGNOSTIC] sendMessage: INCOMING', [
+            'session_id' => $sessionId,
+            'user_id' => $request->user()?->id,
+            'all_inputs' => $request->except(['file', 'attachment', 'image', 'photo']),
+            'all_files' => array_keys($request->allFiles()),
+            'has_file' => !is_null($file),
+            'client_orig_name' => $file?->getClientOriginalName(),
+            'client_mime' => $file?->getClientMimeType(),
+            'file_mime' => $file?->getMimeType(),
+            'file_size' => $file?->getSize(),
+            'input_type' => $request->input('type'),
+            'input_attachment_url' => $inputAttachmentUrl,
+        ]);
+
         $request->validate([
             'message'        => $hasAttachment ? 'nullable|string' : 'required|string',
             'attachment_url' => 'nullable',
@@ -297,10 +312,22 @@ class ChatController extends Controller
                 $message->load('replyTo');
             }
 
+            Log::info('[CHAT_DIAGNOSTIC] sendMessage: CREATED & BROADCAST', [
+                'message_id' => $message->id,
+                'sender_id' => $message->sender_id,
+                'receiver_id' => $message->receiver_id,
+                'type' => $message->type,
+                'attachment_url' => $message->attachment_url,
+                'raw_db_attachment_url' => $message->getRawOriginal('attachment_url'),
+            ]);
+
             broadcast(new MessageSent($message, $receiverId));
 
             return ApiResponse::success(['message' => $message], 'Message sent');
         } catch (Exception $e) {
+            Log::error('[CHAT_DIAGNOSTIC] sendMessage: ERROR: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
@@ -316,6 +343,20 @@ class ChatController extends Controller
             $userId = $request->user()->id;
             $perPage = min((int) $request->query('per_page', 30), 100);
             $messages = $this->chatService->getMessagesForSession($sessionId, $userId, $perPage);
+
+            Log::info('[CHAT_DIAGNOSTIC] getMessages: RETRIEVED', [
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'total_returned' => count($messages->items()),
+                'items_sample' => collect($messages->items())->take(-5)->map(fn($m) => [
+                    'id' => $m->id,
+                    'type' => $m->type,
+                    'message' => $m->message,
+                    'attachment_url' => $m->attachment_url,
+                    'raw_db_attachment_url' => $m->getRawOriginal('attachment_url'),
+                ])->values()->toArray(),
+            ]);
+
             return ApiResponse::success($messages, 'Messages retrieved');
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ApiResponse::error('Chat session not found', 404);
@@ -520,6 +561,17 @@ class ChatController extends Controller
             // Generate full public URL via MediaHelper for robust scheme & host resolution
             $url = \App\Helpers\MediaHelper::getFullUrl($path);
 
+            Log::info('[CHAT_DIAGNOSTIC] uploadAttachment: STORED SUCCESS', [
+                'user_id' => $userId,
+                'orig_name' => $origName,
+                'client_mime' => $file->getClientMimeType(),
+                'detected_mime' => $mime,
+                'resolved_ext' => $ext,
+                'is_image' => $isImage,
+                'stored_path' => $path,
+                'full_url' => $url,
+            ]);
+
             return ApiResponse::success([
                 'file_path'      => $path,
                 'attachment_url' => $url,
@@ -527,8 +579,14 @@ class ChatController extends Controller
                 'type'           => $isImage ? 'image' : 'file',
             ], 'File uploaded successfully', 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('[CHAT_DIAGNOSTIC] uploadAttachment: VALIDATION FAILED', [
+                'errors' => $e->errors()
+            ]);
             return ApiResponse::error('Validation failed', 422, $e->errors());
         } catch (Exception $e) {
+            Log::error('[CHAT_DIAGNOSTIC] uploadAttachment: ERROR: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
