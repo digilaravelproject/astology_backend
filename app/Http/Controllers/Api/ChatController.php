@@ -254,25 +254,8 @@ class ChatController extends Controller
 
             $attachmentUrl = $inputAttachmentUrl;
             if ($file) {
-                $origName = strtolower($file->getClientOriginalName() ?? '');
-                $mime = $file->getMimeType() ?? '';
-                $origExt = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
-
-                $isImg = str_starts_with($mime, 'image/') 
-                    || in_array($origExt, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'])
-                    || str_contains($origName, '.jpg')
-                    || str_contains($origName, '.jpeg')
-                    || str_contains($origName, '.png')
-                    || str_contains($origName, '.webp');
-
-                $ext = $origExt ?: ($isImg ? 'jpg' : 'bin');
-                if ($isImg && !in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'])) {
-                    $ext = 'jpg';
-                }
-
-                $filename = \Illuminate\Support\Str::random(40) . '.' . $ext;
-                $path = $file->storeAs("chat-attachments/{$userId}", $filename, 'public');
-                $attachmentUrl = \App\Helpers\MediaHelper::getFullUrl($path);
+                $processed = \App\Helpers\MediaHelper::processAndStoreChatAttachment($file, $userId);
+                $attachmentUrl = $processed['url'];
             } elseif ($attachmentUrl) {
                 $attachmentUrl = \App\Helpers\MediaHelper::getFullUrl($attachmentUrl);
             }
@@ -539,33 +522,17 @@ class ChatController extends Controller
 
         try {
             $userId = $request->user()->id;
-            $mime = $file->getMimeType() ?? '';
-            $origName = strtolower($file->getClientOriginalName() ?? '');
-            $origExt = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
-
-            $isImage = str_starts_with($mime, 'image/') 
-                || in_array($origExt, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'])
-                || str_contains($origName, '.jpg')
-                || str_contains($origName, '.jpeg')
-                || str_contains($origName, '.png')
-                || str_contains($origName, '.webp');
-
-            $ext = $origExt ?: ($isImage ? 'jpg' : 'bin');
-            if ($isImage && !in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'])) {
-                $ext = 'jpg';
-            }
-
-            $filename = \Illuminate\Support\Str::random(40) . '.' . $ext;
-            $path = $file->storeAs("chat-attachments/{$userId}", $filename, 'public');
-            
-            // Generate full public URL via MediaHelper for robust scheme & host resolution
-            $url = \App\Helpers\MediaHelper::getFullUrl($path);
+            $res = \App\Helpers\MediaHelper::processAndStoreChatAttachment($file, $userId);
+            $path = $res['path'];
+            $url = $res['url'];
+            $isImage = $res['is_image'];
+            $ext = $res['ext'];
 
             Log::info('[CHAT_DIAGNOSTIC] uploadAttachment: STORED SUCCESS', [
                 'user_id' => $userId,
-                'orig_name' => $origName,
+                'orig_name' => $file->getClientOriginalName(),
                 'client_mime' => $file->getClientMimeType(),
-                'detected_mime' => $mime,
+                'detected_mime' => $file->getMimeType(),
                 'resolved_ext' => $ext,
                 'is_image' => $isImage,
                 'stored_path' => $path,
@@ -575,6 +542,11 @@ class ChatController extends Controller
             return ApiResponse::success([
                 'file_path'      => $path,
                 'attachment_url' => $url,
+                'attachment'     => $url,
+                'image'          => $url,
+                'image_url'      => $url,
+                'media_url'      => $url,
+                'url'            => $url,
                 'is_image'       => $isImage,
                 'type'           => $isImage ? 'image' : 'file',
             ], 'File uploaded successfully', 201);

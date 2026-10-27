@@ -59,4 +59,7 @@
     Header set Connection keep-alive
     Header set X-Content-Type-Options "nosniff"
     Header set X-XSS-Protection "1; mode=block"
+    Header set Access-Control-Allow-Origin "*"
+    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
+    Header set Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
 </IfModule>
