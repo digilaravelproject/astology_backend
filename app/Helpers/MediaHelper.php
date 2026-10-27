@@ -38,6 +38,10 @@ class MediaHelper
                 $parsed = parse_url($path, PHP_URL_PATH);
                 $path = $parsed ? ltrim($parsed, '/') : $path;
             } else {
+                // Ensure HTTPS for mobile clients (Android blocks cleartext HTTP)
+                if (str_starts_with($path, 'http://')) {
+                    $path = 'https://' . substr($path, 7);
+                }
                 return $path;
             }
         }
@@ -67,6 +71,11 @@ class MediaHelper
                     $url = request()->schemeAndHttpHost() . ($parsed ? '/' . ltrim($parsed, '/') : '');
                 }
             }
+        }
+
+        // Always enforce HTTPS for non-local URLs so mobile apps don't drop image rendering
+        if ($url && str_starts_with($url, 'http://') && !str_contains($url, 'localhost') && !str_contains($url, '127.0.0.1')) {
+            $url = 'https://' . substr($url, 7);
         }
 
         return $url;

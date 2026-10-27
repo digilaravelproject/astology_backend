@@ -186,15 +186,32 @@ class ChatController extends Controller
 
     public function sendMessage(Request $request, $sessionId)
     {
-        $file = $request->file('file') ?? $request->file('attachment') ?? $request->file('image');
-        $hasAttachment = $request->filled('attachment_url') || !is_null($file);
+        $file = $request->file('file') 
+            ?? $request->file('attachment') 
+            ?? $request->file('image')
+            ?? $request->file('photo');
+
+        $inputAttachmentUrl = $request->input('attachment_url')
+            ?? $request->input('attachment')
+            ?? $request->input('file_path')
+            ?? $request->input('image')
+            ?? $request->input('file')
+            ?? $request->input('photo');
+
+        if (!is_string($inputAttachmentUrl)) {
+            $inputAttachmentUrl = null;
+        }
+
+        $hasAttachment = !empty($inputAttachmentUrl) || !is_null($file);
 
         $request->validate([
             'message'        => $hasAttachment ? 'nullable|string' : 'required|string',
-            'attachment_url' => 'nullable|string',
-            'file'           => 'nullable|file|max:20480',
-            'attachment'     => 'nullable|file|max:20480',
-            'image'          => 'nullable|file|max:20480',
+            'attachment_url' => 'nullable',
+            'attachment'     => 'nullable',
+            'file'           => 'nullable',
+            'image'          => 'nullable',
+            'photo'          => 'nullable',
+            'file_path'      => 'nullable',
             'type'           => 'nullable|in:text,image,system,document,file,audio,video',
             'reply_to_id'    => 'nullable|integer|exists:messages,id',
         ]);
@@ -220,20 +237,50 @@ class ChatController extends Controller
             $cleanMessage = $request->message ? $this->sanitize($request->message) : null;
             $sanitizedMessage = ContentSanitizerService::sanitize($cleanMessage);
 
-            $attachmentUrl = $request->attachment_url;
+            $attachmentUrl = $inputAttachmentUrl;
             if ($file) {
-                $path = $file->store("chat-attachments/{$userId}", 'public');
+                $origName = strtolower($file->getClientOriginalName() ?? '');
+                $mime = $file->getMimeType() ?? '';
+                $origExt = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+
+                $isImg = str_starts_with($mime, 'image/') 
+                    || in_array($origExt, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'])
+                    || str_contains($origName, '.jpg')
+                    || str_contains($origName, '.jpeg')
+                    || str_contains($origName, '.png')
+                    || str_contains($origName, '.webp');
+
+                $ext = $origExt ?: ($isImg ? 'jpg' : 'bin');
+                if ($isImg && !in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'])) {
+                    $ext = 'jpg';
+                }
+
+                $filename = \Illuminate\Support\Str::random(40) . '.' . $ext;
+                $path = $file->storeAs("chat-attachments/{$userId}", $filename, 'public');
                 $attachmentUrl = \App\Helpers\MediaHelper::getFullUrl($path);
+            } elseif ($attachmentUrl) {
+                $attachmentUrl = \App\Helpers\MediaHelper::getFullUrl($attachmentUrl);
             }
 
-            $type = $request->type;
-            if (!$type || $type === 'text') {
-                if ($attachmentUrl) {
-                    $ext = strtolower(pathinfo(parse_url($attachmentUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-                    $type = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp']) ? 'image' : 'file';
-                } else {
-                    $type = 'text';
+            $type = $request->input('type');
+            if ($attachmentUrl) {
+                $pathLower = strtolower(parse_url($attachmentUrl, PHP_URL_PATH) ?? '');
+                $isImg = str_contains($pathLower, '.jpg')
+                    || str_contains($pathLower, '.jpeg')
+                    || str_contains($pathLower, '.png')
+                    || str_contains($pathLower, '.webp')
+                    || str_contains($pathLower, '.gif')
+                    || str_contains($pathLower, '.heic')
+                    || str_contains($pathLower, '.heif')
+                    || str_contains($pathLower, '.bmp');
+
+                if ($isImg) {
+                    $type = 'image';
+                } elseif (!$type || $type === 'text') {
+                    $type = 'file';
                 }
+            } else {
+                $type = $type ?: 'text';
             }
 
             $message = Message::create([
@@ -451,15 +498,27 @@ class ChatController extends Controller
 
         try {
             $userId = $request->user()->id;
-            
-            // Store file inside public disk under chat-attachments/{userId}
-            $path = $file->store("chat-attachments/{$userId}", 'public');
+            $mime = $file->getMimeType() ?? '';
+            $origName = strtolower($file->getClientOriginalName() ?? '');
+            $origExt = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+
+            $isImage = str_starts_with($mime, 'image/') 
+                || in_array($origExt, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'])
+                || str_contains($origName, '.jpg')
+                || str_contains($origName, '.jpeg')
+                || str_contains($origName, '.png')
+                || str_contains($origName, '.webp');
+
+            $ext = $origExt ?: ($isImage ? 'jpg' : 'bin');
+            if ($isImage && !in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp'])) {
+                $ext = 'jpg';
+            }
+
+            $filename = \Illuminate\Support\Str::random(40) . '.' . $ext;
+            $path = $file->storeAs("chat-attachments/{$userId}", $filename, 'public');
             
             // Generate full public URL via MediaHelper for robust scheme & host resolution
             $url = \App\Helpers\MediaHelper::getFullUrl($path);
-
-            $mime = $file->getMimeType() ?? '';
-            $isImage = str_starts_with($mime, 'image/') || in_array(strtolower($file->getClientOriginalExtension()), ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp']);
 
             return ApiResponse::success([
                 'file_path'      => $path,
