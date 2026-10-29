@@ -24,6 +24,11 @@ class RouteServiceProvider extends ServiceProvider
             $deviceKey = $this->resolveDeviceFingerprint($request);
             $phone = preg_replace('/[^0-9]/', '', (string) ($request->input('phone') ?? $request->input('mobile') ?? $request->input('phone_number') ?? ''));
 
+            $otpService = app(\App\Services\OtpService::class);
+            if (! empty($phone) && $otpService->isTestPhone($phone)) {
+                return Limit::none();
+            }
+
             $limits = [
                 Limit::perMinute((int) Setting::get('rate_limit_otp_device', 20))
                     ->by("otp_device:{$deviceKey}")

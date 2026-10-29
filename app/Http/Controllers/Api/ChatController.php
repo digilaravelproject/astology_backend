@@ -15,6 +15,7 @@ use App\Events\ChatQueueUpdated;
 use App\Events\MessageStatusUpdated;
 use App\Services\ContentSanitizerService;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Exception;
 
 class ChatController extends Controller
@@ -186,15 +187,46 @@ class ChatController extends Controller
 
     public function sendMessage(Request $request, $sessionId)
     {
-        $file = $request->file('file') ?? $request->file('attachment') ?? $request->file('image');
-        $hasAttachment = $request->filled('attachment_url') || !is_null($file);
+        $file = $request->file('file') 
+            ?? $request->file('attachment') 
+            ?? $request->file('image')
+            ?? $request->file('photo');
+
+        $inputAttachmentUrl = $request->input('attachment_url')
+            ?? $request->input('attachment')
+            ?? $request->input('file_path')
+            ?? $request->input('image')
+            ?? $request->input('file')
+            ?? $request->input('photo');
+
+        if (!is_string($inputAttachmentUrl)) {
+            $inputAttachmentUrl = null;
+        }
+
+        $hasAttachment = !empty($inputAttachmentUrl) || !is_null($file);
+
+        Log::info('[CHAT_DIAGNOSTIC] sendMessage: INCOMING', [
+            'session_id' => $sessionId,
+            'user_id' => $request->user()?->id,
+            'all_inputs' => $request->except(['file', 'attachment', 'image', 'photo']),
+            'all_files' => array_keys($request->allFiles()),
+            'has_file' => !is_null($file),
+            'client_orig_name' => $file?->getClientOriginalName(),
+            'client_mime' => $file?->getClientMimeType(),
+            'file_mime' => $file?->getMimeType(),
+            'file_size' => $file?->getSize(),
+            'input_type' => $request->input('type'),
+            'input_attachment_url' => $inputAttachmentUrl,
+        ]);
 
         $request->validate([
             'message'        => $hasAttachment ? 'nullable|string' : 'required|string',
-            'attachment_url' => 'nullable|string',
-            'file'           => 'nullable|file|max:20480',
-            'attachment'     => 'nullable|file|max:20480',
-            'image'          => 'nullable|file|max:20480',
+            'attachment_url' => 'nullable',
+            'attachment'     => 'nullable',
+            'file'           => 'nullable',
+            'image'          => 'nullable',
+            'photo'          => 'nullable',
+            'file_path'      => 'nullable',
             'type'           => 'nullable|in:text,image,system,document,file,audio,video',
             'reply_to_id'    => 'nullable|integer|exists:messages,id',
         ]);
@@ -220,20 +252,33 @@ class ChatController extends Controller
             $cleanMessage = $request->message ? $this->sanitize($request->message) : null;
             $sanitizedMessage = ContentSanitizerService::sanitize($cleanMessage);
 
-            $attachmentUrl = $request->attachment_url;
+            $attachmentUrl = $inputAttachmentUrl;
             if ($file) {
-                $path = $file->store("chat-attachments/{$userId}", 'public');
-                $attachmentUrl = \App\Helpers\MediaHelper::getFullUrl($path);
+                $processed = \App\Helpers\MediaHelper::processAndStoreChatAttachment($file, $userId);
+                $attachmentUrl = $processed['url'];
+            } elseif ($attachmentUrl) {
+                $attachmentUrl = \App\Helpers\MediaHelper::getFullUrl($attachmentUrl);
             }
 
-            $type = $request->type;
-            if (!$type || $type === 'text') {
-                if ($attachmentUrl) {
-                    $ext = strtolower(pathinfo(parse_url($attachmentUrl, PHP_URL_PATH) ?? '', PATHINFO_EXTENSION));
-                    $type = in_array($ext, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp']) ? 'image' : 'file';
-                } else {
-                    $type = 'text';
+            $type = $request->input('type');
+            if ($attachmentUrl) {
+                $pathLower = strtolower(parse_url($attachmentUrl, PHP_URL_PATH) ?? '');
+                $isImg = str_contains($pathLower, '.jpg')
+                    || str_contains($pathLower, '.jpeg')
+                    || str_contains($pathLower, '.png')
+                    || str_contains($pathLower, '.webp')
+                    || str_contains($pathLower, '.gif')
+                    || str_contains($pathLower, '.heic')
+                    || str_contains($pathLower, '.heif')
+                    || str_contains($pathLower, '.bmp');
+
+                if ($isImg) {
+                    $type = 'image';
+                } elseif (!$type || $type === 'text') {
+                    $type = 'file';
                 }
+            } else {
+                $type = $type ?: 'text';
             }
 
             $message = Message::create([
@@ -250,10 +295,22 @@ class ChatController extends Controller
                 $message->load('replyTo');
             }
 
+            Log::info('[CHAT_DIAGNOSTIC] sendMessage: CREATED & BROADCAST', [
+                'message_id' => $message->id,
+                'sender_id' => $message->sender_id,
+                'receiver_id' => $message->receiver_id,
+                'type' => $message->type,
+                'attachment_url' => $message->attachment_url,
+                'raw_db_attachment_url' => $message->getRawOriginal('attachment_url'),
+            ]);
+
             broadcast(new MessageSent($message, $receiverId));
 
             return ApiResponse::success(['message' => $message], 'Message sent');
         } catch (Exception $e) {
+            Log::error('[CHAT_DIAGNOSTIC] sendMessage: ERROR: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return ApiResponse::error($e->getMessage(), 500);
         }
     }
@@ -269,6 +326,20 @@ class ChatController extends Controller
             $userId = $request->user()->id;
             $perPage = min((int) $request->query('per_page', 30), 100);
             $messages = $this->chatService->getMessagesForSession($sessionId, $userId, $perPage);
+
+            Log::info('[CHAT_DIAGNOSTIC] getMessages: RETRIEVED', [
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'total_returned' => count($messages->items()),
+                'items_sample' => collect($messages->items())->take(-5)->map(fn($m) => [
+                    'id' => $m->id,
+                    'type' => $m->type,
+                    'message' => $m->message,
+                    'attachment_url' => $m->attachment_url,
+                    'raw_db_attachment_url' => $m->getRawOriginal('attachment_url'),
+                ])->values()->toArray(),
+            ]);
+
             return ApiResponse::success($messages, 'Messages retrieved');
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return ApiResponse::error('Chat session not found', 404);
@@ -451,25 +522,43 @@ class ChatController extends Controller
 
         try {
             $userId = $request->user()->id;
-            
-            // Store file inside public disk under chat-attachments/{userId}
-            $path = $file->store("chat-attachments/{$userId}", 'public');
-            
-            // Generate full public URL via MediaHelper for robust scheme & host resolution
-            $url = \App\Helpers\MediaHelper::getFullUrl($path);
+            $res = \App\Helpers\MediaHelper::processAndStoreChatAttachment($file, $userId);
+            $path = $res['path'];
+            $url = $res['url'];
+            $isImage = $res['is_image'];
+            $ext = $res['ext'];
 
-            $mime = $file->getMimeType() ?? '';
-            $isImage = str_starts_with($mime, 'image/') || in_array(strtolower($file->getClientOriginalExtension()), ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', 'bmp']);
+            Log::info('[CHAT_DIAGNOSTIC] uploadAttachment: STORED SUCCESS', [
+                'user_id' => $userId,
+                'orig_name' => $file->getClientOriginalName(),
+                'client_mime' => $file->getClientMimeType(),
+                'detected_mime' => $file->getMimeType(),
+                'resolved_ext' => $ext,
+                'is_image' => $isImage,
+                'stored_path' => $path,
+                'full_url' => $url,
+            ]);
 
             return ApiResponse::success([
                 'file_path'      => $path,
                 'attachment_url' => $url,
+                'attachment'     => $url,
+                'image'          => $url,
+                'image_url'      => $url,
+                'media_url'      => $url,
+                'url'            => $url,
                 'is_image'       => $isImage,
                 'type'           => $isImage ? 'image' : 'file',
             ], 'File uploaded successfully', 201);
         } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::warning('[CHAT_DIAGNOSTIC] uploadAttachment: VALIDATION FAILED', [
+                'errors' => $e->errors()
+            ]);
             return ApiResponse::error('Validation failed', 422, $e->errors());
         } catch (Exception $e) {
+            Log::error('[CHAT_DIAGNOSTIC] uploadAttachment: ERROR: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
             return ApiResponse::error($e->getMessage(), 500);
         }
     }

@@ -71,21 +71,11 @@ class UserAuthController extends Controller
                 ], 403);
             }
 
-            // 2. 30-Second Resend Cooldown Check
-            $cooldownKey = "otp_cooldown:{$phone}";
-            if (Cache::has($cooldownKey)) {
-                $lastSent = (int) Cache::get($cooldownKey);
-                $diff = time() - $lastSent;
-                if ($diff < 30) {
-                    $retryAfter = 30 - $diff;
-                    DB::rollBack();
-                    return response()->json([
-                        'status'              => 'error',
-                        'message'             => "Please wait {$retryAfter} seconds before requesting a new OTP.",
-                        'error_code'          => 'OTP_COOLDOWN_ACTIVE',
-                        'retry_after_seconds' => $retryAfter,
-                    ], 429);
-                }
+            // 2. Cooldown & Rate Limit Check via OtpService
+            $otpService = app(\App\Services\OtpService::class);
+            if ($cooldownResponse = $otpService->checkSendRateLimit($phone)) {
+                DB::rollBack();
+                return response()->json($cooldownResponse, 429);
             }
 
             // 3. Check if consumer user exists (pessimistic lock for atomic safety)
@@ -103,26 +93,21 @@ class UserAuthController extends Controller
                 ]);
             }
 
-            if (in_array($phone, ['7458086472', '9651017054','7303838972','8009210084'])) {
-                $otp = '1234';
-            } else {
-                $otp = str_pad(random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-            }
+            $otp = $otpService->generateOtp($phone);
 
             // Store OTP in users table
             $user->otp = $otp;
-            $user->otp_expires_at = Carbon::now()->addMinutes(10);
+            $user->otp_expires_at = $otpService->getExpiry();
             $user->otp_verified_at = null;
             $user->save();
 
             DB::commit();
 
-            // Set cooldown for 30 seconds & reset failed attempts on new OTP request
-            Cache::put($cooldownKey, time(), 30);
-            Cache::forget("otp_attempts:{$phone}");
+            // Set cooldown & window counters, reset failed verify attempts
+            $otpService->recordOtpSent($phone);
 
-            // Asynchronously dispatch SMS OTP
-            \App\Jobs\SendSmsOtpJob::dispatch($phone, $otp);
+            // Asynchronously dispatch SMS OTP (automatically skips test phones)
+            $otpService->dispatchSms($phone, $otp);
 
             NotificationHelper::send(
                 $user->id,
@@ -189,18 +174,11 @@ class UserAuthController extends Controller
                 ], 403);
             }
 
-            // 2. Max 5 Wrong Attempts Check
-            $attemptKey = "otp_attempts:{$phone}";
-            $attempts = (int) Cache::get($attemptKey, 0);
-
-            if ($attempts >= 5) {
+            // 2. Max 5 Wrong Attempts Check via OtpService
+            $otpService = app(\App\Services\OtpService::class);
+            if ($attemptLockout = $otpService->checkVerifyAttempts($phone)) {
                 DB::rollBack();
-                return response()->json([
-                    'status'              => 'error',
-                    'message'             => 'Too many invalid OTP attempts. Please wait 10 minutes or request a new OTP.',
-                    'error_code'          => 'MAX_OTP_ATTEMPTS_EXCEEDED',
-                    'retry_after_seconds' => 600,
-                ], 429);
+                return response()->json($attemptLockout, 429);
             }
 
             $user = User::where('phone', $phone)
@@ -213,29 +191,16 @@ class UserAuthController extends Controller
                 return response()->json(['status' => 'error', 'message' => 'User not found.'], 404);
             }
 
-            $isTestUser = in_array($phone, ['7458086472', '9651017054','7303838972','8009210084']);
-
-            if (!($isTestUser && $otp === '1234')) {
-                if (!$user->otp || !$user->otp_expires_at || Carbon::now()->gt($user->otp_expires_at)) {
+            if (!$otpService->isOtpValid($user->otp, $user->otp_expires_at, $otp, $phone)) {
+                // If not generated or expired (and not test user)
+                if (!$otpService->isTestPhone($phone) && (!$user->otp || !$user->otp_expires_at || Carbon::now()->gt($user->otp_expires_at))) {
                     DB::rollBack();
                     return response()->json(['status' => 'error', 'message' => 'OTP expired or not generated.'], 422);
                 }
 
-                if ($user->otp !== $otp) {
-                    $attempts = (int) Cache::increment($attemptKey);
-                    if ($attempts === 1) {
-                        Cache::put($attemptKey, 1, now()->addMinutes(10));
-                    }
-                    $remaining = max(0, 5 - $attempts);
-
-                    DB::rollBack();
-                    return response()->json([
-                        'status'             => 'error',
-                        'message'            => "Invalid OTP. You have {$remaining} attempt(s) remaining.",
-                        'error_code'         => 'INVALID_OTP',
-                        'remaining_attempts' => $remaining,
-                    ], 422);
-                }
+                $failedAttempt = $otpService->recordFailedAttempt($phone);
+                DB::rollBack();
+                return response()->json($failedAttempt, 422);
             }
 
             // OTP verified
@@ -245,8 +210,7 @@ class UserAuthController extends Controller
             $user->save();
 
             // Clear cooldown and attempts cache on successful verification
-            Cache::forget($attemptKey);
-            Cache::forget("otp_cooldown:{$phone}");
+            $otpService->clearState($phone);
 
             // Revoke all existing tokens and old devices for single active session constraint
             $user->tokens()->delete();

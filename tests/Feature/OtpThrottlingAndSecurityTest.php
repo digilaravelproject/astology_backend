@@ -93,4 +93,29 @@ class OtpThrottlingAndSecurityTest extends TestCase
         $res2->assertStatus(429);
         $res2->assertJsonPath('error_code', 'OTP_COOLDOWN_ACTIVE');
     }
+
+    /** @test */
+    public function test_phone_skips_sms_queue_and_verifies_with_fixed_otp()
+    {
+        \Illuminate\Support\Facades\Queue::fake();
+
+        $testPhone = '7458086472';
+
+        // 1. Send OTP for test number
+        $res1 = $this->postJson('/api/v1/user/send-otp', ['phone' => $testPhone]);
+        $res1->assertStatus(200);
+        $res1->assertJsonPath('status', 'success');
+
+        // External SMS job must NOT be dispatched for test phone
+        \Illuminate\Support\Facades\Queue::assertNotPushed(\App\Jobs\SendSmsOtpJob::class);
+
+        // 2. Verify OTP with fixed '1234'
+        $res2 = $this->postJson('/api/v1/user/verify-otp', [
+            'phone' => $testPhone,
+            'otp'   => '1234',
+        ]);
+        $res2->assertStatus(200);
+        $res2->assertJsonPath('status', 'success');
+        $this->assertNotEmpty($res2->json('token'));
+    }
 }

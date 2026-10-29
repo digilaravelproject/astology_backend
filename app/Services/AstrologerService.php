@@ -679,7 +679,7 @@ class AstrologerService
 
         $baseOffset = 120 + (($page - 1) * $perPage);
 
-        $formattedOrders = $results->values()->map(function ($item, $index) use ($consumers, $latestMessages, $waitingPositions, $baseOffset) {
+        $formattedOrders = $results->values()->map(function ($item, $index) use ($consumers, $latestMessages, $waitingPositions, $baseOffset, $astroSharePct) {
             $consumer = $consumers->get($item->consumer_id);
             $queuePosition = null;
             if ($item->status === 'waiting') {

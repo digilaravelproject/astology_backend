@@ -414,6 +414,20 @@ Route::prefix('v1')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::post('/broadcasting/auth', function (Request $request) {
+        $socketId = $request->input('socket_id')
+            ?? $request->input('socketId')
+            ?? $request->header('X-Socket-ID');
+
+        if (!empty($socketId)) {
+            $request->merge(['socket_id' => (string) $socketId]);
+        }
+
+        if (empty($request->channel_name) || empty($request->socket_id) || !is_string($request->socket_id)) {
+            return response()->json([
+                'message' => 'The socket_id and channel_name fields are required and must be valid strings.',
+            ], 422);
+        }
+
         return Broadcast::auth($request);
     })->middleware(['auth:sanctum', 'throttle:general']);
 
