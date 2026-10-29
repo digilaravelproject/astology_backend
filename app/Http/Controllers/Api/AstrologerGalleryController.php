@@ -60,17 +60,25 @@ class AstrologerGalleryController extends Controller
             $astrologer = Astrologer::where('user_id', $user->id)->firstOrFail();
 
             $totalImages = AstrologerGallery::where('astrologer_id', $astrologer->id)->count();
-            $activeImages = AstrologerGallery::where('astrologer_id', $astrologer->id)
-                ->where('status', 'active')
+            $approvedImages = AstrologerGallery::where('astrologer_id', $astrologer->id)
+                ->whereIn('status', ['active', 'approved'])
                 ->count();
             $pendingImages = AstrologerGallery::where('astrologer_id', $astrologer->id)
                 ->where('status', 'pending')
                 ->count();
+            $rejectedImages = AstrologerGallery::where('astrologer_id', $astrologer->id)
+                ->where('status', 'rejected')
+                ->count();
 
             $data = [
-                'total_images' => $totalImages,
-                'active_images' => $activeImages,
-                'pending_images' => $pendingImages,
+                'total_images'    => $totalImages,
+                'active_images'   => $approvedImages,
+                'approved_images' => $approvedImages,
+                'approved_count'  => $approvedImages,
+                'pending_images'  => $pendingImages,
+                'pending_count'   => $pendingImages,
+                'rejected_images' => $rejectedImages,
+                'rejected_count'  => $rejectedImages,
             ];
 
             return ApiResponse::success($data, 'Gallery count retrieved successfully');
@@ -94,7 +102,11 @@ class AstrologerGalleryController extends Controller
             $query = AstrologerGallery::where('astrologer_id', $astrologer->id);
 
             if ($status) {
-                $query->where('status', $status);
+                if (in_array(strtolower($status), ['active', 'approved'])) {
+                    $query->whereIn('status', ['active', 'approved']);
+                } else {
+                    $query->where('status', $status);
+                }
             }
 
             $galleries = $query->orderByDesc('created_at')->paginate($per_page);

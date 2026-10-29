@@ -21,11 +21,37 @@ class AstrologerGallery extends Model
         'is_visible' => 'boolean',
     ];
 
-    protected $appends = ['image_url'];
+    protected $appends = [
+        'image_url',
+        'image',
+        'is_approved',
+        'approval_status',
+    ];
+
+    public function getStatusAttribute($value): string
+    {
+        return $value === 'active' ? 'approved' : ($value ?? 'pending');
+    }
 
     public function getImageUrlAttribute(): ?string
     {
-        return \App\Helpers\MediaHelper::getUrl($this->image_path);
+        return \App\Helpers\MediaHelper::getFullUrl($this->image_path);
+    }
+
+    public function getImageAttribute(): ?string
+    {
+        return \App\Helpers\MediaHelper::getFullUrl($this->image_path);
+    }
+
+    public function getIsApprovedAttribute(): bool
+    {
+        return in_array($this->attributes['status'] ?? null, ['active', 'approved']);
+    }
+
+    public function getApprovalStatusAttribute(): string
+    {
+        $status = $this->attributes['status'] ?? 'pending';
+        return in_array($status, ['active', 'approved']) ? 'approved' : ($status === 'rejected' ? 'rejected' : 'pending');
     }
 
     public function astrologer(): BelongsTo

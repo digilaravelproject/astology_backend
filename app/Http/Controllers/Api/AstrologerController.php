@@ -170,16 +170,21 @@ class AstrologerController extends Controller
     {
         try {
             $gallery = \App\Models\AstrologerGallery::where('astrologer_id', $id)
-                ->where('status', 'active')
+                ->whereIn('status', ['active', 'approved'])
                 ->where('is_visible', true)
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function ($item) {
+                    $url = \App\Helpers\MediaHelper::getFullUrl($item->image_path);
                     return [
                         'id' => $item->id,
                         'astrologer_id' => $item->astrologer_id,
-                        'image' => \App\Helpers\MediaHelper::getFullUrl($item->image_path),
+                        'image' => $url,
+                        'image_url' => $url,
                         'image_path' => $item->image_path,
+                        'status' => $item->status,
+                        'is_approved' => true,
+                        'is_visible' => (bool) $item->is_visible,
                         'created_at' => $item->created_at,
                         'updated_at' => $item->updated_at,
                     ];

@@ -23,7 +23,12 @@ class AstrologerGalleryController extends Controller
         }
 
         if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
+            $status = $request->input('status');
+            if (in_array(strtolower($status), ['active', 'approved'])) {
+                $query->whereIn('status', ['active', 'approved']);
+            } else {
+                $query->where('status', $status);
+            }
         }
 
         if ($request->filled('search')) {
@@ -65,7 +70,7 @@ class AstrologerGalleryController extends Controller
         try {
             $gallery = AstrologerGallery::findOrFail($id);
             $gallery->update([
-                'status' => 'active',
+                'status' => 'approved',
                 'remarks' => null,
             ]);
 
@@ -87,11 +92,11 @@ class AstrologerGalleryController extends Controller
 
             $gallery = AstrologerGallery::findOrFail($id);
             $gallery->update([
-                'status' => 'pending',
+                'status' => 'rejected',
                 'remarks' => $validated['remarks'],
             ]);
 
-            return redirect()->back()->with('success', 'Gallery image marked as pending with remarks');
+            return redirect()->back()->with('success', 'Gallery image marked as rejected with remarks');
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Failed to disapprove image: ' . $e->getMessage());
         }
