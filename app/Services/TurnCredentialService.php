@@ -69,6 +69,21 @@ class TurnCredentialService
             ];
         }
 
+        // 3. Optional TLS fallback (TURNS over TCP 443)
+        $turnsUrl = config('services.turn.turns_server_url');
+        if ($turnsUrl) {
+            $cleanTurns = preg_replace('/\?transport=.*$/', '', $turnsUrl);
+            if ($username && $credential && empty($secret)) {
+                $iceServers[] = [
+                    'urls'       => $cleanTurns . '?transport=tcp',
+                    'username'   => $username,
+                    'credential' => $credential,
+                ];
+            } elseif ($secret) {
+                $iceServers[] = $this->buildTimeLimitedTurnServer($cleanTurns . '?transport=tcp', $secret, $ttl);
+            }
+        }
+
         return $iceServers;
     }
 

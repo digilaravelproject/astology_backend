@@ -52,13 +52,14 @@ return [
     |--------------------------------------------------------------------------
     */
     'turn' => [
-        'server_url' => env('TURN_SERVER_URL'),
-        'username'   => env('TURN_SERVER_USERNAME'),
-        'credential' => env('TURN_SERVER_CREDENTIAL'),
+        'server_url'       => env('TURN_SERVER_URL'),
+        'turns_server_url' => env('TURNS_SERVER_URL'),
+        'username'         => env('TURN_SERVER_USERNAME'),
+        'credential'       => env('TURN_SERVER_CREDENTIAL'),
 
-        'secret'     => env('TURN_SERVER_SECRET'),
+        'secret'           => env('TURN_SERVER_SECRET'),
 
-        'ttl'        => env('TURN_CREDENTIAL_TTL', 86400),
+        'ttl'              => env('TURN_CREDENTIAL_TTL', 86400),
     ],
 
     'exotel' => [

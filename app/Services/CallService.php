@@ -633,5 +633,57 @@ class CallService
             }
         }, 3);
     }
+
+    /**
+     * Clean up abandoned or hanging call sessions (e.g. app kill / network drop).
+     */
+    public function cleanupAbandonedSessions(): int
+    {
+        $now = now();
+        $cleaned = 0;
+
+        // 1. Ringing / waiting calls older than 90 seconds
+        $staleRinging = \App\Models\CallSession::whereIn('status', ['initiated', 'ringing', 'waiting'])
+            ->where('created_at', '<', $now->copy()->subSeconds(90))
+            ->get();
+
+        foreach ($staleRinging as $session) {
+            try {
+                $session->update([
+                    'status'   => 'missed',
+                    'ended_at' => $now,
+                ]);
+
+                $this->presenceService->setFree($session->consumer_id);
+                $this->presenceService->setFree($session->provider_id);
+
+                \App\Models\PackageSubSession::where('call_session_id', $session->id)
+                    ->whereNull('ended_at')
+                    ->update(['ended_at' => $now, 'session_state' => 'terminated']);
+
+                broadcast(new \App\Events\CallDismissed($session, null, 'timeout'));
+                $cleaned++;
+            } catch (\Exception $e) {
+                Log::error("Error cleaning up stale ringing session {$session->id}: {$e->getMessage()}");
+            }
+        }
+
+        // 2. Ongoing calls where updated_at is older than 3 hours (zombie protection)
+        $staleOngoing = \App\Models\CallSession::where('status', 'ongoing')
+            ->where('updated_at', '<', $now->copy()->subHours(3))
+            ->get();
+
+        foreach ($staleOngoing as $session) {
+            try {
+                $this->endCall($session->id, null);
+                broadcast(new \App\Events\CallEnded($session, null));
+                $cleaned++;
+            } catch (\Exception $e) {
+                Log::error("Error terminating zombie ongoing session {$session->id}: {$e->getMessage()}");
+            }
+        }
+
+        return $cleaned;
+    }
 }
 
