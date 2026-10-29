@@ -105,8 +105,10 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    @if($gallery->status === 'active')
-                                        <span class="px-2.5 py-1 bg-success/10 text-success text-[10px] font-black rounded-lg uppercase tracking-widest border border-success/20">Active</span>
+                                    @if(in_array($gallery->status, ['active', 'approved']))
+                                        <span class="px-2.5 py-1 bg-success/10 text-success text-[10px] font-black rounded-lg uppercase tracking-widest border border-success/20">Approved</span>
+                                    @elseif($gallery->status === 'rejected')
+                                        <span class="px-2.5 py-1 bg-danger/10 text-danger text-[10px] font-black rounded-lg uppercase tracking-widest border border-danger/20">Rejected</span>
                                     @else
                                         <span class="px-2.5 py-1 bg-accent/10 text-accent text-[10px] font-black rounded-lg uppercase tracking-widest border border-accent/20">Pending</span>
                                     @endif
@@ -128,14 +130,16 @@
                                 <td class="px-6 py-4 text-xs font-semibold text-gray">{{ $gallery->created_at->format('d M Y H:i') }}</td>
                                 <td class="px-6 py-4 text-right">
                                     <div class="flex justify-end gap-2 translate-x-2 group-hover:translate-x-0 transition-transform">
-                                        @if($gallery->status === 'pending')
+                                        @if(!in_array($gallery->status, ['active', 'approved']))
                                             <form action="{{ route('admin.astrologers.gallery.approve', $gallery->id) }}" method="POST" style="display:inline;">
                                                 @csrf
                                                 <button type="submit" class="w-9 h-9 rounded-xl bg-success/10 text-success hover:bg-success hover:text-white transition-all flex items-center justify-center transform active:scale-90" title="Approve">
                                                     <i class="fas fa-check text-xs"></i>
                                                 </button>
                                             </form>
-                                            <button type="button" @click="openModal = {{ $gallery->id }}" class="w-9 h-9 rounded-xl bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all flex items-center justify-center transform active:scale-90" title="Disapprove">
+                                        @endif
+                                        @if($gallery->status !== 'rejected')
+                                            <button type="button" @click="openModal = {{ $gallery->id }}" class="w-9 h-9 rounded-xl bg-accent/10 text-accent hover:bg-accent hover:text-white transition-all flex items-center justify-center transform active:scale-90" title="Reject / Disapprove">
                                                 <i class="fas fa-times text-xs"></i>
                                             </button>
                                         @endif
