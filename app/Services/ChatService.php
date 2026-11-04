@@ -266,8 +266,11 @@ class ChatService
                 // Start billing ticker ONLY if consumer does NOT have an active prepaid package for this astrologer.
                 if ($isPrepaid) {
                     $subSession = \App\Models\PackageSubSession::where('chat_session_id', $sessionId)->first();
-                    if ($subSession && is_null($subSession->started_at)) {
-                        app(\App\Services\SessionTimerService::class)->activateSubSessionTimer($subSession->id);
+                    if ($subSession) {
+                        $subSession->update(['chat_status' => 'active']);
+                        if (is_null($subSession->started_at)) {
+                            app(\App\Services\SessionTimerService::class)->activateSubSessionTimer($subSession->id);
+                        }
                     }
                 } else {
                     ChatBillingTickJob::dispatch($sessionId)->delay(now()->addMinute());

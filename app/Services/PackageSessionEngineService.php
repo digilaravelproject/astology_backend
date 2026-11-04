@@ -257,33 +257,34 @@ class PackageSessionEngineService
                     $question = $options['question'] ?? null;
                     $linkedChat = $this->chatService->initiateChat($userId, $astrologerId, $question, true);
 
-                    // Auto-activate chat session immediately
+                    // Keep in 'initiated' state so Astrologer receives incoming request/ringing screen to accept!
                     $linkedChat->update([
-                        'status'      => 'ongoing',
-                        'started_at'  => $subSession->started_at ?? now(),
-                        'accepted_at' => now(),
+                        'status'      => 'initiated',
+                        'started_at'  => null,
+                        'accepted_at' => null,
                     ]);
 
                     $subSession->chat_session_id = $linkedChat->id;
-                    $subSession->chat_status = 'active';
+                    $subSession->chat_status = 'idle';
                     $newSessionData['chat_session'] = $linkedChat->fresh();
                     $newSessionData['chat_session_id'] = $linkedChat->id;
 
                     $linkedChat->load(['provider.astrologer', 'consumer']);
-                    broadcast(new ChatAccepted($linkedChat, $linkedChat->provider));
                     if ($user) {
                         broadcast(new ChatInitiated($linkedChat, $user));
-                        broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'ongoing'));
+                        broadcast(new ChatQueueUpdated($linkedChat->provider_id, $linkedChat, 'initiated'));
                     }
                 } else {
-                    $subSession->chat_status = 'active';
+                    $subSession->chat_status = 'idle';
                     $chat = ChatSession::find($subSession->chat_session_id);
                     if ($chat) {
-                        if ($chat->status !== 'ongoing' && $chat->status !== 'accepted') {
-                            $chat->update(['status' => 'ongoing', 'ended_at' => null]);
-                        }
-                        $newSessionData['chat_session'] = $chat;
+                        $chat->update(['status' => 'initiated', 'ended_at' => null]);
+                        $newSessionData['chat_session'] = $chat->fresh();
                         $newSessionData['chat_session_id'] = $chat->id;
+                        if ($user) {
+                            broadcast(new ChatInitiated($chat, $user));
+                            broadcast(new ChatQueueUpdated($chat->provider_id, $chat, 'initiated'));
+                        }
                     }
                 }
                 $subSession->mode = 'chat';
