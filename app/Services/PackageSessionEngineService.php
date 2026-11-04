@@ -212,19 +212,43 @@ class PackageSessionEngineService
             if ($toChannel === 'call') {
                 if (!$subSession->call_session_id || in_array($subSession->call_status, ['idle', 'disconnected', 'none'])) {
                     $linkedCall = $this->callService->initiateCall($userId, $astrologerId, true);
+                    if (!empty($options['offer']) && $options['offer'] !== 'audio') {
+                        $linkedCall->update(['consumer_sdp' => $options['offer']]);
+                    }
                     $subSession->call_session_id = $linkedCall->id;
                     $subSession->call_status = 'ringing';
-                    $newSessionData['call_session'] = $linkedCall;
+                    $newSessionData['call_session'] = $linkedCall->fresh();
 
                     if ($user) {
                         broadcast(new CallInitiated($linkedCall, [
                             'id'             => $user->id,
                             'name'           => $user->name,
                             'profile_photo'  => MediaHelper::getFullUrl($user->profile_photo),
-                            'offer'          => $options['offer'] ?? 'audio',
+                            'offer'          => (!empty($options['offer']) && $options['offer'] !== 'audio') ? $options['offer'] : 'audio',
                             'is_package'     => true,
                             'sub_session_id' => $subSession->id,
                         ]));
+                    }
+                } else {
+                    $subSession->call_status = 'ringing';
+                    $call = CallSession::find($subSession->call_session_id);
+                    if ($call) {
+                        if (!empty($options['offer']) && $options['offer'] !== 'audio') {
+                            $call->update(['consumer_sdp' => $options['offer'], 'status' => 'initiated']);
+                        } else {
+                            $call->update(['status' => 'initiated']);
+                        }
+                        $newSessionData['call_session'] = $call->fresh();
+                        if ($user) {
+                            broadcast(new CallInitiated($call, [
+                                'id'             => $user->id,
+                                'name'           => $user->name,
+                                'profile_photo'  => MediaHelper::getFullUrl($user->profile_photo),
+                                'offer'          => (!empty($options['offer']) && $options['offer'] !== 'audio') ? $options['offer'] : 'audio',
+                                'is_package'     => true,
+                                'sub_session_id' => $subSession->id,
+                            ]));
+                        }
                     }
                 }
                 $subSession->mode = 'call';
