@@ -22,7 +22,8 @@ services:
         reservations:
           memory: 4G
     networks:
-      - astrology_network
+      astrology_network:
+        ipv4_address: 172.28.0.2
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "dbadmin", "-pDbAdmin@2026!"]
       interval: 10s
@@ -47,7 +48,8 @@ services:
         reservations:
           memory: 512M
     networks:
-      - astrology_network
+      astrology_network:
+        ipv4_address: 172.28.0.3
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -79,7 +81,8 @@ services:
         reservations:
           memory: 1G
     networks:
-      - astrology_network
+      astrology_network:
+        ipv4_address: 172.28.0.10
 
   # 4. Laravel Reverb Real-time WebSockets
   astrology-reverb:
@@ -105,7 +108,8 @@ services:
         reservations:
           memory: 512M
     networks:
-      - astrology_network
+      astrology_network:
+        ipv4_address: 172.28.0.11
 
   # 5. Background Queue Worker & Laravel Scheduler Daemon
   astrology-worker:
@@ -133,7 +137,8 @@ services:
         reservations:
           memory: 512M
     networks:
-      - astrology_network
+      astrology_network:
+        ipv4_address: 172.28.0.12
 
   # 6. LiveKit WebRTC SFU Media Server (Direct Host Network for 10Gbps/1Gbps WebRTC UDP Performance)
   astrology-livekit:
@@ -160,6 +165,7 @@ services:
     network_mode: host
     volumes:
       - ./docker/coturn/turnserver.conf:/etc/turnserver.conf:ro
+      - ./docker/ssl:/etc/letsencrypt:ro
     deploy:
       resources:
         limits:
@@ -195,7 +201,8 @@ services:
         reservations:
           memory: 256M
     networks:
-      - astrology_network
+      astrology_network:
+        ipv4_address: 172.28.0.20
 
   # 9. Automated SSL Certbot Daemon (Renews in background)
   certbot:
@@ -208,11 +215,17 @@ services:
     entrypoint: "/bin/sh"
     command: ["-c", "trap exit TERM; while true; do sleep 12d; certbot renew --webroot -w /var/www/certbot; done"]
     networks:
-      - astrology_network
+      astrology_network:
+        ipv4_address: 172.28.0.30
 
 networks:
   astrology_network:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1
 
 volumes:
   mysql_data:
