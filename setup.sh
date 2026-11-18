@@ -210,14 +210,18 @@ docker exec astrology-app php artisan event:cache || true
 # ------------------------------------------------------------------------------
 echo -e "\n${BLUE}[8/8] Verifying Live Let's Encrypt SSL Certificates...${NC}"
 echo -e "${YELLOW}Attempting automatic Let's Encrypt SSL issuance for domains...${NC}"
-docker compose run --rm --entrypoint "certbot" certbot certonly --webroot -w /var/www/certbot \
+docker rm -f astrology-certbot 2>/dev/null || true
+
+docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
     -d suryapathkundli.com -d www.suryapathkundli.com -d live.suryapathkundli.com \
     --email admin@suryapathkundli.com --agree-tos --no-eff-email --non-interactive 2>/dev/null && {
         echo -e "${GREEN}✓ Let's Encrypt SSL issued successfully! Reloading Nginx...${NC}"
         docker compose exec astrology-nginx nginx -s reload
     } || {
-        echo -e "${YELLOW}Notice: Using temporary SSL for HTTPS operation.${NC}"
+        echo -e "${YELLOW}Notice: Temporary SSL is keeping HTTPS operational.${NC}"
     }
+
+docker compose up -d certbot 2>/dev/null || true
 
 # ------------------------------------------------------------------------------
 # SUMMARY & STATUS REPORT

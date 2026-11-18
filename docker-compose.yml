@@ -197,7 +197,7 @@ services:
     networks:
       - astrology_network
 
-  # 9. Automated SSL Certbot Daemon (Renews every 12 days automatically)
+  # 9. Automated SSL Certbot Daemon (Renews in background)
   certbot:
     image: certbot/certbot:latest
     container_name: astrology-certbot
@@ -205,7 +205,7 @@ services:
     volumes:
       - certbot_etc:/etc/letsencrypt
       - certbot_var:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12d & wait $${!}; done;'"
+    command: ["sh", "-c", "while true; do sleep 12d; certbot renew --webroot -w /var/www/certbot; done"]
     networks:
       - astrology_network
 
