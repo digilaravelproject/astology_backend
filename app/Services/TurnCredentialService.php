@@ -6,9 +6,9 @@ use Illuminate\Support\Facades\Cache;
 
 class TurnCredentialService
 {
-    protected const int DEFAULT_TTL = 86400;
+    protected const DEFAULT_TTL = 86400;
 
-    protected const int CACHE_TTL = 60;
+    protected const CACHE_TTL = 60;
 
     public function getIceServers(): array
     {
