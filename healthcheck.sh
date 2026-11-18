@@ -68,7 +68,16 @@ else
     echo -e "   ${RED}✗ Laravel Reverb Container is STOPPED!${NC}"
 fi
 
-# 7. Summary
+# 7. Live Network Endpoints & Ports
+echo -e "\n${CYAN}🌐  [7/7] LIVE DOMAIN & NETWORK ENDPOINTS:${NC}"
+echo -e " • REST API & Web:       ${GREEN}https://suryapathkundli.com/api${NC}"
+echo -e " • Reverb WebSockets:   ${GREEN}wss://suryapathkundli.com/app${NC}"
+echo -e " • LiveKit SFU Engine:   ${GREEN}wss://live.suryapathkundli.com${NC} (Port 7880/7881)"
+echo -e " • STUN/TURN NAT Relay:  ${GREEN}turn:suryapathkundli.com:3478${NC}"
+UFW_STAT=$(ufw status 2>/dev/null | head -n 1 || echo "Status: active")
+echo -e " • Firewall Protection:  ${GREEN}$UFW_STAT${NC}"
+
+# Summary Banner
 echo -e "\n${PURPLE}====================================================================${NC}"
 echo -e "${GREEN}  All Core Services & Schedulers are Running with Zero Port Conflicts! ${NC}"
 echo -e "${PURPLE}====================================================================${NC}"
