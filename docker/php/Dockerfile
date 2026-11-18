@@ -1,5 +1,5 @@
-# Multi-purpose lightweight PHP 8.2 Alpine image for Laravel 12 (App, Worker, Reverb)
-FROM php:8.2-fpm-alpine
+# Multi-purpose lightweight PHP 8.3 Alpine image for Laravel 12 (App, Worker, Reverb)
+FROM php:8.3-fpm-alpine
 
 # Set working directory
 WORKDIR /var/www/html
