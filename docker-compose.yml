@@ -182,8 +182,8 @@ services:
       - storage_data:/var/www/html/storage/app/public:ro
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
-      - certbot_etc:/etc/letsencrypt
-      - certbot_var:/var/www/certbot
+      - ./docker/ssl:/etc/letsencrypt
+      - ./docker/certbot-www:/var/www/certbot
     depends_on:
       - astrology-app
       - astrology-reverb
@@ -203,8 +203,8 @@ services:
     container_name: astrology-certbot
     restart: unless-stopped
     volumes:
-      - certbot_etc:/etc/letsencrypt
-      - certbot_var:/var/www/certbot
+      - ./docker/ssl:/etc/letsencrypt
+      - ./docker/certbot-www:/var/www/certbot
     command: ["sh", "-c", "while true; do sleep 12d; certbot renew --webroot -w /var/www/certbot; done"]
     networks:
       - astrology_network

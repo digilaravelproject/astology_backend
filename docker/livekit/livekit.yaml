@@ -18,13 +18,9 @@ redis:
 keys:
   devkey: d8f1056b9524b66d2fdbe1c38e057138
 
+# Embedded TURN is disabled because dedicated Coturn container handles port 3478
 turn:
-  enabled: true
-  domain: suryapathkundli.com
-  tls_port: 3478
-  udp_port: 3478
-  secret: livekit_secret_2024
-  external_tls: true
+  enabled: false
 
 audio:
   # High-priority Opus Codec for crystal clear calls on 4G/5G (24-32 kbps)

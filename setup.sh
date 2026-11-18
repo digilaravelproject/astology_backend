@@ -136,18 +136,16 @@ chmod -R 777 storage bootstrap/cache
 # STEP 5: SSL Placeholder Generation (Prevents Nginx boot failure)
 # ------------------------------------------------------------------------------
 echo -e "\n${BLUE}[5/8] Preparing SSL Certificates...${NC}"
-docker volume create certbot_etc >/dev/null
-docker volume create certbot_var >/dev/null
+mkdir -p docker/ssl/live/suryapathkundli.com docker/certbot-www
 
-CERT_DIR="/var/lib/docker/volumes/certbot_etc/_data/live/suryapathkundli.com"
-mkdir -p "$CERT_DIR"
+CERT_DIR="docker/ssl/live/suryapathkundli.com"
 if [ ! -f "$CERT_DIR/fullchain.pem" ]; then
     echo -e "${YELLOW}Generating temporary self-signed SSL so Nginx boots smoothly...${NC}"
-    openssl req -x509 -nodes -newkey rsa:2048 -days 30 \
+    openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
         -keyout "$CERT_DIR/privkey.pem" \
         -out "$CERT_DIR/fullchain.pem" \
         -subj "/CN=suryapathkundli.com" >/dev/null 2>&1
-    echo -e "${GREEN}✓ Temporary certificates generated.${NC}"
+    echo -e "${GREEN}✓ SSL certificates generated in $CERT_DIR.${NC}"
 fi
 
 # ------------------------------------------------------------------------------
@@ -209,16 +207,16 @@ docker exec astrology-app php artisan event:cache || true
 # STEP 8: Attempt Let's Encrypt SSL Generation
 # ------------------------------------------------------------------------------
 echo -e "\n${BLUE}[8/8] Verifying Live Let's Encrypt SSL Certificates...${NC}"
-echo -e "${YELLOW}Attempting automatic Let's Encrypt SSL issuance for domains...${NC}"
 docker rm -f astrology-certbot 2>/dev/null || true
 
+echo -e "${YELLOW}Attempting automatic Let's Encrypt SSL issuance for domains...${NC}"
 docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
     -d suryapathkundli.com -d www.suryapathkundli.com -d live.suryapathkundli.com \
     --email admin@suryapathkundli.com --agree-tos --no-eff-email --non-interactive 2>/dev/null && {
         echo -e "${GREEN}✓ Let's Encrypt SSL issued successfully! Reloading Nginx...${NC}"
-        docker compose exec astrology-nginx nginx -s reload
+        docker compose exec astrology-nginx nginx -s reload 2>/dev/null || true
     } || {
-        echo -e "${YELLOW}Notice: Temporary SSL is keeping HTTPS operational.${NC}"
+        echo -e "${YELLOW}Notice: Temporary SSL is keeping HTTPS operational with Cloudflare.${NC}"
     }
 
 docker compose up -d certbot 2>/dev/null || true
