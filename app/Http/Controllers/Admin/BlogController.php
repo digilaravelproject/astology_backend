@@ -67,9 +67,11 @@ class BlogController extends Controller
         ]);
 
         if ($request->hasFile('blog_image')) {
-            $file = $request->file('blog_image');
-            $filename = 'blog_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $data['blog_image'] = Storage::disk('public')->putFileAs('blogs/images', $file, $filename);
+            $data['blog_image'] = \App\Helpers\MediaHelper::optimizeAndStoreImage(
+                $request->file('blog_image'),
+                'blogs/images',
+                'blog'
+            );
         }
 
         $data['blog_tags'] = $request->input('blog_tags', []);
@@ -109,9 +111,11 @@ class BlogController extends Controller
             if ($blog->blog_image && Storage::disk('public')->exists($blog->blog_image)) {
                 Storage::disk('public')->delete($blog->blog_image);
             }
-            $file = $request->file('blog_image');
-            $filename = 'blog_' . time() . '_' . uniqid() . '.' . $file->getClientOriginalExtension();
-            $data['blog_image'] = Storage::disk('public')->putFileAs('blogs/images', $file, $filename);
+            $data['blog_image'] = \App\Helpers\MediaHelper::optimizeAndStoreImage(
+                $request->file('blog_image'),
+                'blogs/images',
+                'blog'
+            );
         }
 
         $data['blog_tags'] = $request->input('blog_tags', []);
