@@ -56,6 +56,7 @@ services:
 
   # 3. Main Laravel 12 API Backend (PHP-FPM)
   astrology-app:
+    image: astrology-php:8.3
     build:
       context: .
       dockerfile: docker/php/Dockerfile
@@ -82,6 +83,7 @@ services:
 
   # 4. Laravel Reverb Real-time WebSockets
   astrology-reverb:
+    image: astrology-php:8.3
     build:
       context: .
       dockerfile: docker/php/Dockerfile
@@ -107,6 +109,7 @@ services:
 
   # 5. Background Queue Worker & Laravel Scheduler Daemon
   astrology-worker:
+    image: astrology-php:8.3
     build:
       context: .
       dockerfile: docker/php/Dockerfile
@@ -202,7 +205,8 @@ services:
     volumes:
       - ./docker/ssl:/etc/letsencrypt
       - ./docker/certbot-www:/var/www/certbot
-    command: ["sh", "-c", "while true; do sleep 12d; certbot renew --webroot -w /var/www/certbot; done"]
+    entrypoint: "/bin/sh"
+    command: ["-c", "trap exit TERM; while true; do sleep 12d; certbot renew --webroot -w /var/www/certbot; done"]
     networks:
       - astrology_network
 
