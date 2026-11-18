@@ -19,8 +19,8 @@ docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 
 # 2. Check Database Connectivity & Table Count
 echo -e "\n${BLUE}[2/6] Checking MySQL Database...${NC}"
-if docker exec astrology-mysql mysqladmin ping -h localhost -u dbadmin -pDbAdmin@2026! --silent 2>/dev/null; then
-    TABLE_COUNT=$(docker exec astrology-mysql mysql -u dbadmin -pDbAdmin@2026! -e "USE astrology_db; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'astrology_db';" -s -N 2>/dev/null)
+if docker exec astrology-mysql mysqladmin ping -h localhost -u root -pRootPassword@2026! --silent 2>/dev/null; then
+    TABLE_COUNT=$(docker exec astrology-mysql mysql -u root -pRootPassword@2026! -e "USE astrology_db; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'astrology_db';" -s -N 2>/dev/null)
     echo -e "${GREEN}✓ MySQL Database is HEALTHY! Active Tables: $TABLE_COUNT${NC}"
 else
     echo -e "${RED}✗ MySQL Database is UNREACHABLE!${NC}"

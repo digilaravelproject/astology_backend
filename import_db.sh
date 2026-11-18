@@ -33,31 +33,41 @@ if ! docker ps | grep -q "astrology-mysql"; then
 fi
 
 echo -e "${BLUE}[2/4] Waiting for MySQL to be ready...${NC}"
-until docker exec astrology-mysql mysqladmin ping -h localhost -u dbadmin -pDbAdmin@2026! --silent 2>/dev/null; do
+until docker exec astrology-mysql mysqladmin ping -h localhost -u root -pRootPassword@2026! --silent 2>/dev/null; do
     echo -n "."
     sleep 2
 done
 echo -e "\n${GREEN}MySQL is ready and healthy.${NC}"
 
-echo -e "${BLUE}[3/4] Importing '$SQL_FILE' into 'astrology_db'...${NC}"
-echo -e "${YELLOW}(This might take 30-90 seconds depending on file size. Please wait...)${NC}"
+# Ensure database exists and grant permissions to dbadmin on both % and localhost
+docker exec -i astrology-mysql mysql -u root -pRootPassword@2026! <<EOF
+CREATE DATABASE IF NOT EXISTS astrology_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'dbadmin'@'%' IDENTIFIED BY 'DbAdmin@2026!';
+CREATE USER IF NOT EXISTS 'dbadmin'@'localhost' IDENTIFIED BY 'DbAdmin@2026!';
+GRANT ALL PRIVILEGES ON astrology_db.* TO 'dbadmin'@'%';
+GRANT ALL PRIVILEGES ON astrology_db.* TO 'dbadmin'@'localhost';
+FLUSH PRIVILEGES;
+EOF
 
-# Import with foreign key checks temporarily disabled for seamless import
-docker exec -i astrology-mysql mysql -u dbadmin -pDbAdmin@2026! astrology_db <<EOF
+echo -e "${BLUE}[3/4] Importing '$SQL_FILE' into 'astrology_db'...${NC}"
+echo -e "${YELLOW}(File size is large (~1.2GB). Importing with root privileges, please wait 1-2 minutes...)${NC}"
+
+# Import with root user and foreign key checks disabled for seamless import
+docker exec -i astrology-mysql mysql -u root -pRootPassword@2026! astrology_db <<EOF
 SET FOREIGN_KEY_CHECKS=0;
 SET SQL_MODE='NO_AUTO_VALUE_ON_ZERO,NO_ENGINE_SUBSTITUTION';
 EOF
 
-docker exec -i astrology-mysql mysql -u dbadmin -pDbAdmin@2026! astrology_db < "$SQL_FILE"
+docker exec -i astrology-mysql mysql -u root -pRootPassword@2026! astrology_db < "$SQL_FILE"
 
-docker exec -i astrology-mysql mysql -u dbadmin -pDbAdmin@2026! astrology_db <<EOF
+docker exec -i astrology-mysql mysql -u root -pRootPassword@2026! astrology_db <<EOF
 SET FOREIGN_KEY_CHECKS=1;
 EOF
 
 echo -e "${GREEN}Database import completed successfully!${NC}"
 
 echo -e "${BLUE}[4/4] Verifying imported tables...${NC}"
-TABLE_COUNT=$(docker exec astrology-mysql mysql -u dbadmin -pDbAdmin@2026! -e "USE astrology_db; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'astrology_db';" -s -N)
+TABLE_COUNT=$(docker exec astrology-mysql mysql -u root -pRootPassword@2026! -e "USE astrology_db; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'astrology_db';" -s -N)
 
 echo -e "${GREEN}====================================================================${NC}"
 echo -e "${GREEN}  SUCCESS: Imported $TABLE_COUNT tables into 'astrology_db'!         ${NC}"

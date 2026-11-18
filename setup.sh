@@ -111,8 +111,12 @@ echo -e "${GREEN}✓ Docker version: $(docker --version)${NC}"
 # STEP 4: Production .env Setup
 # ------------------------------------------------------------------------------
 echo -e "\n${BLUE}[4/8] Initializing Environment (.env)...${NC}"
-SERVER_IP=$(curl -s --max-time 5 https://ifconfig.me || curl -s --max-time 5 https://api.ipify.org || echo "189.72.157.135")
-echo -e "${GREEN}✓ Detected VPS Public IP: $SERVER_IP${NC}"
+SERVER_IP=$(curl -4 -s --max-time 5 https://ifconfig.me || curl -4 -s --max-time 5 https://api.ipify.org || echo "189.72.157.135")
+# Ensure IPv4
+if echo "$SERVER_IP" | grep -q ":"; then
+    SERVER_IP="189.72.157.135"
+fi
+echo -e "${GREEN}✓ Detected VPS Public IPv4: $SERVER_IP${NC}"
 
 if [ ! -f .env ]; then
     cp .env.docker.example .env
@@ -120,7 +124,8 @@ if [ ! -f .env ]; then
     sed -i "s|TURN_SERVER_URL=.*|TURN_SERVER_URL=turn:${SERVER_IP}:3478|g" .env
     echo -e "${GREEN}✓ Created .env with public IP $SERVER_IP configured!${NC}"
 else
-    echo -e "${YELLOW}✓ Existing .env detected. Keeping it safe.${NC}"
+    echo -e "${YELLOW}✓ Existing .env detected. Ensuring IPv4 configured.${NC}"
+    sed -i "s|TURN_SERVER_URL=.*|TURN_SERVER_URL=turn:${SERVER_IP}:3478|g" .env
 fi
 
 # Ensure necessary host directories and permissions
@@ -152,7 +157,7 @@ echo -e "\n${BLUE}[6/8] Starting MySQL & Redis Infrastructure...${NC}"
 docker compose up -d astrology-mysql astrology-redis
 
 echo -e "${YELLOW}Waiting for MySQL container to become healthy...${NC}"
-until docker exec astrology-mysql mysqladmin ping -h localhost -u dbadmin -pDbAdmin@2026! --silent 2>/dev/null; do
+until docker exec astrology-mysql mysqladmin ping -h localhost -u root -pRootPassword@2026! --silent 2>/dev/null; do
     echo -n "."
     sleep 2
 done
@@ -169,7 +174,7 @@ fi
 chmod +x import_db.sh healthcheck.sh backup_db.sh 2>/dev/null || true
 
 # Check if tables already exist
-TABLE_COUNT=$(docker exec astrology-mysql mysql -u dbadmin -pDbAdmin@2026! -e "USE astrology_db; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'astrology_db';" -s -N 2>/dev/null || echo 0)
+TABLE_COUNT=$(docker exec astrology-mysql mysql -u root -pRootPassword@2026! -e "USE astrology_db; SELECT count(*) FROM information_schema.tables WHERE table_schema = 'astrology_db';" -s -N 2>/dev/null || echo 0)
 
 if [ "$TABLE_COUNT" -gt 0 ]; then
     echo -e "${GREEN}✓ Database 'astrology_db' already has $TABLE_COUNT tables. Preserving existing data!${NC}"
