@@ -1,0 +1,42 @@
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 55000
+  use_external_ip: true
+  enable_loopback_candidate: false
+
+redis:
+  address: "127.0.0.1:6379"
+  username: ""
+  password: ""
+  db: 0
+
+keys:
+  devkey: d8f1056b9524b66d2fdbe1c38e057138
+
+turn:
+  enabled: true
+  domain: suryapathkundli.com
+  tls_port: 3478
+  udp_port: 3478
+  secret: livekit_secret_2024
+  external_tls: true
+
+audio:
+  # High-priority Opus Codec for crystal clear calls on 4G/5G (24-32 kbps)
+  codec: opus
+
+room:
+  empty_timeout: 300
+  max_participants: 0
+
+limit:
+  max_num_tracks: 10000
+
+logging:
+  json: false
+  level: info

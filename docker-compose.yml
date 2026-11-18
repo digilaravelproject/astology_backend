@@ -1,0 +1,226 @@
+services:
+  # 1. MySQL 8.0 Database Container
+  astrology-mysql:
+    image: mysql:8.0
+    container_name: astrology-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: RootPassword@2026!
+      MYSQL_DATABASE: astrology_db
+      MYSQL_USER: dbadmin
+      MYSQL_PASSWORD: DbAdmin@2026!
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+    ports:
+      - "127.0.0.1:3306:3306"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 8G
+        reservations:
+          memory: 4G
+    networks:
+      - astrology_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "dbadmin", "-pDbAdmin@2026!"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  # 2. Redis 7 Cache & Queue Broker
+  astrology-redis:
+    image: redis:7-alpine
+    container_name: astrology-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "2gb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2G
+        reservations:
+          memory: 512M
+    networks:
+      - astrology_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 3. Main Laravel 12 API Backend (PHP-FPM)
+  astrology-app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: astrology-app
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./:/var/www/html
+      - storage_data:/var/www/html/storage/app/public
+    depends_on:
+      astrology-mysql:
+        condition: service_healthy
+      astrology-redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 6G
+        reservations:
+          memory: 1G
+    networks:
+      - astrology_network
+
+  # 4. Laravel Reverb Real-time WebSockets
+  astrology-reverb:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: astrology-reverb
+    restart: unless-stopped
+    command: ["php", "artisan", "reverb:start", "--host=0.0.0.0", "--port=8080"]
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      astrology-app:
+        condition: service_started
+      astrology-redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          memory: 512M
+    networks:
+      - astrology_network
+
+  # 5. Background Queue Worker & Laravel Scheduler Daemon
+  astrology-worker:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: astrology-worker
+    restart: unless-stopped
+    command: ["/usr/bin/supervisord", "-c", "/var/www/html/docker/supervisor/supervisord.conf"]
+    volumes:
+      - ./:/var/www/html
+      - storage_data:/var/www/html/storage/app/public
+    depends_on:
+      astrology-app:
+        condition: service_started
+      astrology-redis:
+        condition: service_healthy
+      astrology-mysql:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          memory: 512M
+    networks:
+      - astrology_network
+
+  # 6. LiveKit WebRTC SFU Media Server (Direct Host Network for 10Gbps/1Gbps WebRTC UDP Performance)
+  astrology-livekit:
+    image: livekit/livekit-server:latest
+    container_name: astrology-livekit
+    restart: unless-stopped
+    network_mode: host
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./docker/livekit/livekit.yaml:/etc/livekit.yaml:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 8G
+        reservations:
+          memory: 2G
+
+  # 7. Coturn STUN / TURN NAT Traversal Relay (Direct Host Network for Large UDP Range 55001-65535)
+  astrology-coturn:
+    image: coturn/coturn:latest
+    container_name: astrology-coturn
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./docker/coturn/turnserver.conf:/etc/turnserver.conf:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+        reservations:
+          memory: 512M
+
+  # 8. Nginx Alpine Reverse Proxy & SSL Gateway
+  astrology-nginx:
+    image: nginx:alpine
+    container_name: astrology-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./:/var/www/html:ro
+      - storage_data:/var/www/html/storage/app/public:ro
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/www/certbot
+    depends_on:
+      - astrology-app
+      - astrology-reverb
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          memory: 256M
+    networks:
+      - astrology_network
+
+  # 9. Automated SSL Certbot Daemon (Renews every 12 days automatically)
+  certbot:
+    image: certbot/certbot:latest
+    container_name: astrology-certbot
+    restart: unless-stopped
+    volumes:
+      - certbot_etc:/etc/letsencrypt
+      - certbot_var:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12d & wait $${!}; done;'"
+    networks:
+      - astrology_network
+
+networks:
+  astrology_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+  storage_data:
+    driver: local
+  certbot_etc:
+    driver: local
+  certbot_var:
+    driver: local
