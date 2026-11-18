@@ -128,9 +128,20 @@ else
     sed -i "s|TURN_SERVER_URL=.*|TURN_SERVER_URL=turn:${SERVER_IP}:3478|g" .env
 fi
 
-# Ensure necessary host directories and permissions
-mkdir -p storage/app/public storage/framework/{cache,sessions,views} storage/logs bootstrap/cache
-chmod -R 777 storage bootstrap/cache
+# ------------------------------------------------------------------------------
+# STEP 9: Automated Nightly Database Backup Cron Setup
+# ------------------------------------------------------------------------------
+echo -e "\n${BLUE}[9/9] Configuring Automated Nightly Database Backups...${NC}"
+BACKUP_CMD="$SCRIPT_DIR/backup_db.sh >/dev/null 2>&1"
+if ! crontab -l 2>/dev/null | grep -q "backup_db.sh"; then
+    (crontab -l 2>/dev/null; echo "0 2 * * * $BACKUP_CMD") | crontab -
+    echo -e "${GREEN}✓ Automated daily database backup scheduled at 2:00 AM (7-day retention).${NC}"
+else
+    echo -e "${GREEN}✓ Automated database backup cron already active.${NC}"
+fi
+
+# Ensure storage permissions for uploaded media
+chmod -R 777 storage bootstrap/cache 2>/dev/null || true
 
 # ------------------------------------------------------------------------------
 # STEP 5: SSL Placeholder Generation (Prevents Nginx boot failure)
