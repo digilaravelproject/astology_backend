@@ -281,6 +281,22 @@ class ChatController extends Controller
                 $type = $type ?: 'text';
             }
 
+            // Idempotency: Prevent duplicate message within 2 seconds (e.g. rapid double-tap or network retry)
+            $existingMessage = Message::where('chat_session_id', $sessionId)
+                ->where('sender_id', $userId)
+                ->where('message', $sanitizedMessage)
+                ->where('attachment_url', $attachmentUrl)
+                ->where('created_at', '>=', now()->subSeconds(2))
+                ->latest('id')
+                ->first();
+
+            if ($existingMessage) {
+                if ($existingMessage->reply_to_id) {
+                    $existingMessage->load('replyTo');
+                }
+                return ApiResponse::success(['message' => $existingMessage], 'Message sent');
+            }
+
             $message = Message::create([
                 'chat_session_id' => $sessionId,
                 'sender_id'       => $userId,

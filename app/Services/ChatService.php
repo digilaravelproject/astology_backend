@@ -183,6 +183,12 @@ class ChatService
                 $provider = User::where('id', $providerId)->lockForUpdate()->first();
 
                 $session = \App\Models\ChatSession::where('id', $sessionId)->lockForUpdate()->first();
+
+                // Idempotent: If already accepted by this provider and currently ongoing, return gracefully
+                if ($session && $session->provider_id == $providerId && in_array($session->status, ['accepted', 'ongoing'])) {
+                    return $session;
+                }
+
                 if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'waiting'])) {
                     throw new Exception("Chat cannot be accepted. Session might have expired.");
                 }
@@ -389,6 +395,11 @@ class ChatService
 
                 if ($session->provider_id != $providerId) {
                     throw new Exception("You are not authorized to reject this chat.");
+                }
+
+                // Idempotent: If already rejected, return gracefully
+                if ($session->status === 'rejected') {
+                    return $session;
                 }
 
                 if (!in_array($session->status, ['initiated', 'waiting'])) {
@@ -684,8 +695,9 @@ class ChatService
                     throw new Exception("You are not authorized to cancel this chat.", 403);
                 }
 
+                // Idempotent: If already cancelled, rejected or completed, return gracefully
                 if (in_array($session->status, ['cancelled', 'rejected', 'completed'])) {
-                    throw new Exception("This chat is already {$session->status}.");
+                    return $session;
                 }
 
                 if (!in_array($session->status, ['initiated', 'waiting'])) {
