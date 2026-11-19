@@ -107,6 +107,17 @@ class ChatService
                         throw new Exception("You are already in an active session.");
                     }
 
+                    // Idempotency: If the same consumer already initiated a chat with this same provider within the last 10 seconds, return it
+                    $recentSameChat = \App\Models\ChatSession::where('consumer_id', $consumerId)
+                        ->where('provider_id', $providerId)
+                        ->whereIn('status', ['initiated', 'waiting'])
+                        ->where('created_at', '>=', now()->subSeconds(10))
+                        ->latest('id')
+                        ->first();
+                    if ($recentSameChat) {
+                        return $recentSameChat;
+                    }
+
                     // Prevent duplicate pending or waiting requests
                     $existingChatPending = \App\Models\ChatSession::where('consumer_id', $consumerId)
                         ->whereIn('status', ['initiated', 'waiting'])

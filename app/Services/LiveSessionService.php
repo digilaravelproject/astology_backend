@@ -327,6 +327,16 @@ class LiveSessionService
         ];
 
         if ($isInstant) {
+            // Idempotency: If astrologer tapped "Go Live" twice in rapid succession (within 5s), return existing session
+            $recentOngoing = LiveSession::where('astrologer_id', $astrologerId)
+                ->where('status', 'ongoing')
+                ->where('created_at', '>=', now()->subSeconds(5))
+                ->latest('id')
+                ->first();
+            if ($recentOngoing) {
+                return $this->formatSession($recentOngoing);
+            }
+
             // Auto-complete any previous ongoing session of this astrologer to prevent duplicate active cards
             LiveSession::where('astrologer_id', $astrologerId)
                 ->where('status', 'ongoing')
@@ -496,6 +506,11 @@ class LiveSessionService
 
         if (!$liveSession) {
             throw new \Exception('Live session not found');
+        }
+
+        // Idempotency: If session is already ongoing, return it gracefully
+        if ($liveSession->status === 'ongoing') {
+            return $this->formatSession($liveSession);
         }
 
         if ($liveSession->status !== 'upcoming') {

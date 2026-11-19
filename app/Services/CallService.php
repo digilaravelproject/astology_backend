@@ -132,6 +132,17 @@ class CallService
                         throw new Exception("You are already in an active session.");
                     }
 
+                    // Idempotency: If the same consumer already initiated a call with this same provider within the last 10 seconds, return it
+                    $recentSameCall = \App\Models\CallSession::where('consumer_id', $consumerId)
+                        ->where('provider_id', $providerId)
+                        ->whereIn('status', ['initiated', 'ringing', 'waiting'])
+                        ->where('created_at', '>=', now()->subSeconds(10))
+                        ->latest('id')
+                        ->first();
+                    if ($recentSameCall) {
+                        return $recentSameCall;
+                    }
+
                     // Prevent duplicate pending or waiting requests
                     $existingChatPending = \App\Models\ChatSession::where('consumer_id', $consumerId)
                         ->whereIn('status', ['initiated', 'waiting'])

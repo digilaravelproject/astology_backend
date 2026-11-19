@@ -281,12 +281,32 @@ class ChatController extends Controller
                 $type = $type ?: 'text';
             }
 
-            // Idempotency: Prevent duplicate message within 2 seconds (e.g. rapid double-tap or network retry)
+            // Idempotency: Support client-provided UUID/idempotency key OR 1-second fallback window
+            $idempotencyKey = $request->input('idempotency_key')
+                ?? $request->input('client_message_id')
+                ?? $request->input('uuid')
+                ?? $request->header('X-Idempotency-Key')
+                ?? $request->header('X-Client-Message-Id');
+
+            if ($idempotencyKey) {
+                $cachedMsgId = \Illuminate\Support\Facades\Cache::get("chat_idemp:{$userId}:{$idempotencyKey}");
+                if ($cachedMsgId) {
+                    $cachedMsg = Message::find($cachedMsgId);
+                    if ($cachedMsg) {
+                        if ($cachedMsg->reply_to_id) {
+                            $cachedMsg->load('replyTo');
+                        }
+                        return ApiResponse::success(['message' => $cachedMsg], 'Message sent');
+                    }
+                }
+            }
+
+            // Fallback for clients without UUID: Rapid double-tap suppression within 1 second
             $existingMessage = Message::where('chat_session_id', $sessionId)
                 ->where('sender_id', $userId)
                 ->where('message', $sanitizedMessage)
                 ->where('attachment_url', $attachmentUrl)
-                ->where('created_at', '>=', now()->subSeconds(2))
+                ->where('created_at', '>=', now()->subSeconds(1))
                 ->latest('id')
                 ->first();
 
@@ -306,6 +326,10 @@ class ChatController extends Controller
                 'type'            => $type,
                 'reply_to_id'     => $request->input('reply_to_id'),
             ]);
+
+            if ($idempotencyKey) {
+                \Illuminate\Support\Facades\Cache::put("chat_idemp:{$userId}:{$idempotencyKey}", $message->id, now()->addMinutes(5));
+            }
 
             if ($message->reply_to_id) {
                 $message->load('replyTo');
