@@ -210,6 +210,11 @@ class CallService
                 // Lock the session row FIRST (prevents deadlock with missedCall/endCall/rejectCall)
                 $session = \App\Models\CallSession::where('id', $sessionId)->lockForUpdate()->first();
 
+                // Idempotent: If already accepted by this provider and currently ongoing, return gracefully
+                if ($session && $session->provider_id == $providerId && in_array($session->status, ['accepted', 'ongoing'])) {
+                    return $session;
+                }
+
                 if (!$session || $session->provider_id != $providerId || !in_array($session->status, ['initiated', 'ringing', 'waiting'])) {
                     throw new Exception("The call session is no longer valid or has been cancelled.");
                 }
@@ -290,6 +295,11 @@ class CallService
 
                 if ($session->provider_id != $providerId) {
                     throw new Exception("You are not authorized to reject this call.");
+                }
+
+                // Idempotent: If already rejected, return gracefully
+                if ($session->status === 'rejected') {
+                    return $session;
                 }
 
                 if (!in_array($session->status, ['initiated', 'ringing', 'waiting'])) {

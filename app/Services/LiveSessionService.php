@@ -556,6 +556,11 @@ class LiveSessionService
             throw new \Exception('Live session not found');
         }
 
+        // Idempotent: If already completed/stopped, return existing session gracefully
+        if ($liveSession->status === 'completed') {
+            return $this->formatSession($liveSession);
+        }
+
         if ($liveSession->status !== 'ongoing') {
             throw new \Exception('Only ongoing sessions can be stopped');
         }
