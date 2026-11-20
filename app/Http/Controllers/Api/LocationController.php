@@ -14,7 +14,7 @@ class LocationController extends Controller
 {
     /**
      * Search locations/places via Google Places API (New) & Geocoding API.
-     * Restricts output cleanly to City, State, Country format.
+     * Strictly restricts search & output to City, State, Country (no establishments/shops/bungalows).
      *
      * @param Request $request
      * @return JsonResponse
@@ -28,60 +28,56 @@ class LocationController extends Controller
         }
 
         try {
-            $cacheKey = 'location_search_v2:' . md5(strtolower($query));
+            $cacheKey = 'location_search_v3:' . md5(strtolower($query));
 
             $results = CacheHelper::remember($cacheKey, 86400, function () use ($query) {
                 $apiKey = config('services.google_maps.api_key', env('GOOGLE_MAPS_API_KEY', 'AIzaSyD5yjQ3qESYKjD86CkCL4rPR0wQpJ0yyc8'));
                 $formattedList = [];
                 $seen = [];
 
-                // 1. Primary: Google Places API (New) Text Search
+                // 1. Primary: Google Places API (New) Text Search with strict locality bias
                 try {
                     $placesResponse = Http::timeout(8)
                         ->withHeaders([
                             'Content-Type'     => 'application/json',
                             'X-Goog-Api-Key'   => $apiKey,
-                            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents',
+                            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents,places.types',
                         ])
                         ->post('https://places.googleapis.com/v1/places:searchText', [
-                            'textQuery' => $query,
+                            'textQuery'    => $query,
+                            'includedType' => 'locality',
                         ]);
 
                     if ($placesResponse->successful()) {
                         $placesData = $placesResponse->json();
                         if (!empty($placesData['places']) && is_array($placesData['places'])) {
                             foreach ($placesData['places'] as $place) {
-                                $name = $place['displayName']['text'] ?? '';
-                                $formattedAddress = $place['formattedAddress'] ?? '';
-                                $lat = $place['location']['latitude'] ?? null;
-                                $lng = $place['location']['longitude'] ?? null;
-                                $components = $place['addressComponents'] ?? [];
+                                $this->processPlaceItem($place, $formattedList, $seen);
+                            }
+                        }
+                    }
 
-                                if ($lat !== null && $lng !== null) {
-                                    $cleanAddress = $this->formatCityStateCountry($components, $formattedAddress ?: $name);
-                                    if (empty($cleanAddress)) {
-                                        $cleanAddress = $formattedAddress ?: $name;
-                                    }
+                    // Fallback for regions/states/countries if locality filter returned no results
+                    if (empty($formattedList)) {
+                        $placesResponse2 = Http::timeout(8)
+                            ->withHeaders([
+                                'Content-Type'     => 'application/json',
+                                'X-Goog-Api-Key'   => $apiKey,
+                                'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents,places.types',
+                            ])
+                            ->post('https://places.googleapis.com/v1/places:searchText', [
+                                'textQuery' => $query,
+                            ]);
 
-                                    $lower = strtolower(trim($cleanAddress));
-                                    if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
-                                        $lat = 19.0760;
-                                        $lng = 72.8774;
-                                    }
-
-                                    // Deduplicate to avoid repeating identical city/state/country results
-                                    if (isset($seen[$lower])) {
+                        if ($placesResponse2->successful()) {
+                            $placesData2 = $placesResponse2->json();
+                            if (!empty($placesData2['places']) && is_array($placesData2['places'])) {
+                                foreach ($placesData2['places'] as $place) {
+                                    $types = $place['types'] ?? [];
+                                    if ($this->isEstablishmentOnly($types)) {
                                         continue;
                                     }
-                                    $seen[$lower] = true;
-
-                                    $formattedList[] = [
-                                        'display_name' => $cleanAddress,
-                                        'address'      => $cleanAddress,
-                                        'latitude'     => (float) $lat,
-                                        'longitude'    => (float) $lng,
-                                        'place_id'     => $place['id'] ?? null,
-                                    ];
+                                    $this->processPlaceItem($place, $formattedList, $seen);
                                 }
                             }
                         }
@@ -94,45 +90,35 @@ class LocationController extends Controller
                 if (empty($formattedList)) {
                     try {
                         $geoResponse = Http::timeout(8)->get('https://maps.googleapis.com/maps/api/geocode/json', [
-                            'address' => $query,
-                            'key'     => $apiKey,
+                            'address'     => $query,
+                            'key'         => $apiKey,
+                            'result_type' => 'locality|administrative_area_level_1|administrative_area_level_2|administrative_area_level_3|country',
                         ]);
 
                         if ($geoResponse->successful()) {
                             $geoData = $geoResponse->json();
-                            $status = $geoData['status'] ?? '';
-
-                            if ($status === 'OK' && !empty($geoData['results']) && is_array($geoData['results'])) {
+                            if (($geoData['status'] ?? '') === 'OK' && !empty($geoData['results']) && is_array($geoData['results'])) {
                                 foreach ($geoData['results'] as $item) {
-                                    $formattedAddress = $item['formatted_address'] ?? '';
-                                    $lat = $item['geometry']['location']['lat'] ?? null;
-                                    $lng = $item['geometry']['location']['lng'] ?? null;
-                                    $components = $item['address_components'] ?? [];
+                                    $this->processGeocodingItem($item, $formattedList, $seen);
+                                }
+                            }
+                        }
 
-                                    if ($formattedAddress && $lat !== null && $lng !== null) {
-                                        $cleanAddress = $this->formatCityStateCountry($components, $formattedAddress);
-                                        if (empty($cleanAddress)) {
-                                            $cleanAddress = $formattedAddress;
-                                        }
+                        if (empty($formattedList)) {
+                            $geoResponse2 = Http::timeout(8)->get('https://maps.googleapis.com/maps/api/geocode/json', [
+                                'address' => $query,
+                                'key'     => $apiKey,
+                            ]);
 
-                                        $lower = strtolower(trim($cleanAddress));
-                                        if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
-                                            $lat = 19.0760;
-                                            $lng = 72.8774;
-                                        }
-
-                                        if (isset($seen[$lower])) {
+                            if ($geoResponse2->successful()) {
+                                $geoData2 = $geoResponse2->json();
+                                if (($geoData2['status'] ?? '') === 'OK' && !empty($geoData2['results']) && is_array($geoData2['results'])) {
+                                    foreach ($geoData2['results'] as $item) {
+                                        $types = $item['types'] ?? [];
+                                        if ($this->isEstablishmentOnly($types)) {
                                             continue;
                                         }
-                                        $seen[$lower] = true;
-
-                                        $formattedList[] = [
-                                            'display_name' => $cleanAddress,
-                                            'address'      => $cleanAddress,
-                                            'latitude'     => (float) $lat,
-                                            'longitude'    => (float) $lng,
-                                            'place_id'     => $item['place_id'] ?? null,
-                                        ];
+                                        $this->processGeocodingItem($item, $formattedList, $seen);
                                     }
                                 }
                             }
@@ -154,6 +140,108 @@ class LocationController extends Controller
 
             return ApiResponse::error('Unable to fetch location details', 500);
         }
+    }
+
+    /**
+     * Process a single place item from Google Places API (New).
+     */
+    private function processPlaceItem(array $place, array &$formattedList, array &$seen): void
+    {
+        $name = $place['displayName']['text'] ?? '';
+        $formattedAddress = $place['formattedAddress'] ?? '';
+        $lat = $place['location']['latitude'] ?? null;
+        $lng = $place['location']['longitude'] ?? null;
+        $components = $place['addressComponents'] ?? [];
+
+        if ($lat !== null && $lng !== null) {
+            $cleanAddress = $this->formatCityStateCountry($components, $formattedAddress ?: $name);
+            if (empty($cleanAddress)) {
+                $cleanAddress = $this->cleanFallbackAddress($formattedAddress ?: $name);
+            }
+
+            $lower = strtolower(trim($cleanAddress));
+            if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
+                $lat = 19.0760;
+                $lng = 72.8774;
+            }
+
+            if (isset($seen[$lower])) {
+                return;
+            }
+            $seen[$lower] = true;
+
+            $formattedList[] = [
+                'display_name' => $cleanAddress,
+                'address'      => $cleanAddress,
+                'latitude'     => (float) $lat,
+                'longitude'    => (float) $lng,
+                'place_id'     => $place['id'] ?? null,
+            ];
+        }
+    }
+
+    /**
+     * Process a single item from Google Geocoding API.
+     */
+    private function processGeocodingItem(array $item, array &$formattedList, array &$seen): void
+    {
+        $formattedAddress = $item['formatted_address'] ?? '';
+        $lat = $item['geometry']['location']['lat'] ?? null;
+        $lng = $item['geometry']['location']['lng'] ?? null;
+        $components = $item['address_components'] ?? [];
+
+        if ($formattedAddress && $lat !== null && $lng !== null) {
+            $cleanAddress = $this->formatCityStateCountry($components, $formattedAddress);
+            if (empty($cleanAddress)) {
+                $cleanAddress = $this->cleanFallbackAddress($formattedAddress);
+            }
+
+            $lower = strtolower(trim($cleanAddress));
+            if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
+                $lat = 19.0760;
+                $lng = 72.8774;
+            }
+
+            if (isset($seen[$lower])) {
+                return;
+            }
+            $seen[$lower] = true;
+
+            $formattedList[] = [
+                'display_name' => $cleanAddress,
+                'address'      => $cleanAddress,
+                'latitude'     => (float) $lat,
+                'longitude'    => (float) $lng,
+                'place_id'     => $item['place_id'] ?? null,
+            ];
+        }
+    }
+
+    /**
+     * Determine if a place is strictly an establishment/POI (e.g. shop, salon, hotel, bungalow)
+     * and not a city, administrative area, or political division.
+     */
+    private function isEstablishmentOnly(array $types): bool
+    {
+        $geoTypes = [
+            'locality',
+            'sublocality',
+            'sublocality_level_1',
+            'administrative_area_level_1',
+            'administrative_area_level_2',
+            'administrative_area_level_3',
+            'country',
+            'postal_town',
+            'political',
+        ];
+
+        foreach ($types as $type) {
+            if (in_array($type, $geoTypes, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
