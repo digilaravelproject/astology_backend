@@ -14,6 +14,7 @@ class LocationController extends Controller
 {
     /**
      * Search locations/places via Google Places API (New) & Geocoding API.
+     * Restricts output cleanly to City, State, Country format.
      *
      * @param Request $request
      * @return JsonResponse
@@ -27,11 +28,12 @@ class LocationController extends Controller
         }
 
         try {
-            $cacheKey = 'location_search:' . md5(strtolower($query));
+            $cacheKey = 'location_search_v2:' . md5(strtolower($query));
 
             $results = CacheHelper::remember($cacheKey, 86400, function () use ($query) {
                 $apiKey = config('services.google_maps.api_key', env('GOOGLE_MAPS_API_KEY', 'AIzaSyD5yjQ3qESYKjD86CkCL4rPR0wQpJ0yyc8'));
                 $formattedList = [];
+                $seen = [];
 
                 // 1. Primary: Google Places API (New) Text Search
                 try {
@@ -39,7 +41,7 @@ class LocationController extends Controller
                         ->withHeaders([
                             'Content-Type'     => 'application/json',
                             'X-Goog-Api-Key'   => $apiKey,
-                            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.location',
+                            'X-Goog-FieldMask' => 'places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents',
                         ])
                         ->post('https://places.googleapis.com/v1/places:searchText', [
                             'textQuery' => $query,
@@ -53,18 +55,29 @@ class LocationController extends Controller
                                 $formattedAddress = $place['formattedAddress'] ?? '';
                                 $lat = $place['location']['latitude'] ?? null;
                                 $lng = $place['location']['longitude'] ?? null;
+                                $components = $place['addressComponents'] ?? [];
 
                                 if ($lat !== null && $lng !== null) {
-                                    $displayName = $formattedAddress ?: $name;
-                                    $lower = strtolower(trim($displayName));
+                                    $cleanAddress = $this->formatCityStateCountry($components, $formattedAddress ?: $name);
+                                    if (empty($cleanAddress)) {
+                                        $cleanAddress = $formattedAddress ?: $name;
+                                    }
+
+                                    $lower = strtolower(trim($cleanAddress));
                                     if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
                                         $lat = 19.0760;
                                         $lng = 72.8774;
                                     }
 
+                                    // Deduplicate to avoid repeating identical city/state/country results
+                                    if (isset($seen[$lower])) {
+                                        continue;
+                                    }
+                                    $seen[$lower] = true;
+
                                     $formattedList[] = [
-                                        'display_name' => $displayName,
-                                        'address'      => $formattedAddress ?: $name,
+                                        'display_name' => $cleanAddress,
+                                        'address'      => $cleanAddress,
                                         'latitude'     => (float) $lat,
                                         'longitude'    => (float) $lng,
                                         'place_id'     => $place['id'] ?? null,
@@ -94,17 +107,28 @@ class LocationController extends Controller
                                     $formattedAddress = $item['formatted_address'] ?? '';
                                     $lat = $item['geometry']['location']['lat'] ?? null;
                                     $lng = $item['geometry']['location']['lng'] ?? null;
+                                    $components = $item['address_components'] ?? [];
 
                                     if ($formattedAddress && $lat !== null && $lng !== null) {
-                                        $lower = strtolower(trim($formattedAddress));
+                                        $cleanAddress = $this->formatCityStateCountry($components, $formattedAddress);
+                                        if (empty($cleanAddress)) {
+                                            $cleanAddress = $formattedAddress;
+                                        }
+
+                                        $lower = strtolower(trim($cleanAddress));
                                         if ($lower === 'mumbai, maharashtra, india' || $lower === 'mumbai') {
                                             $lat = 19.0760;
                                             $lng = 72.8774;
                                         }
 
+                                        if (isset($seen[$lower])) {
+                                            continue;
+                                        }
+                                        $seen[$lower] = true;
+
                                         $formattedList[] = [
-                                            'display_name' => $formattedAddress,
-                                            'address'      => $formattedAddress,
+                                            'display_name' => $cleanAddress,
+                                            'address'      => $cleanAddress,
                                             'latitude'     => (float) $lat,
                                             'longitude'    => (float) $lng,
                                             'place_id'     => $item['place_id'] ?? null,
@@ -130,5 +154,95 @@ class LocationController extends Controller
 
             return ApiResponse::error('Unable to fetch location details', 500);
         }
+    }
+
+    /**
+     * Format address components into "City, State, Country".
+     *
+     * @param array $components
+     * @param string $fallback
+     * @return string
+     */
+    private function formatCityStateCountry(array $components, string $fallback = ''): string
+    {
+        if (empty($components)) {
+            return $this->cleanFallbackAddress($fallback);
+        }
+
+        $city = '';
+        $sublocality = '';
+        $state = '';
+        $country = '';
+
+        foreach ($components as $comp) {
+            $name = $comp['longText'] ?? $comp['long_name'] ?? '';
+            $types = $comp['types'] ?? [];
+
+            if (empty($name) || !is_array($types)) {
+                continue;
+            }
+
+            // City detection
+            if (in_array('locality', $types, true) || in_array('postal_town', $types, true)) {
+                $city = $name;
+            } elseif (empty($city) && (in_array('administrative_area_level_3', $types, true) || in_array('administrative_area_level_2', $types, true))) {
+                $city = $name;
+            } elseif (empty($sublocality) && (in_array('sublocality', $types, true) || in_array('sublocality_level_1', $types, true))) {
+                $sublocality = $name;
+            }
+
+            // State / Region
+            if (in_array('administrative_area_level_1', $types, true)) {
+                $state = $name;
+            }
+
+            // Country
+            if (in_array('country', $types, true)) {
+                $country = $name;
+            }
+        }
+
+        if (empty($city) && !empty($sublocality)) {
+            $city = $sublocality;
+        }
+
+        $parts = [];
+        if (!empty($city)) {
+            $parts[] = $city;
+        }
+        if (!empty($state) && !in_array($state, $parts, true)) {
+            $parts[] = $state;
+        }
+        if (!empty($country) && !in_array($country, $parts, true)) {
+            $parts[] = $country;
+        }
+
+        if (!empty($parts)) {
+            return implode(', ', $parts);
+        }
+
+        return $this->cleanFallbackAddress($fallback);
+    }
+
+    /**
+     * Clean fallback address by removing postal codes and extra punctuation.
+     *
+     * @param string $address
+     * @return string
+     */
+    private function cleanFallbackAddress(string $address): string
+    {
+        if (empty($address)) {
+            return '';
+        }
+
+        // Remove postal / pin codes (4 to 10 digits)
+        $clean = preg_replace('/\b\d{4,10}\b/', '', $address);
+        // Normalize commas and whitespaces
+        $clean = preg_replace('/\s*,\s*/', ', ', $clean);
+        $clean = preg_replace('/,{2,}/', ',', $clean);
+        $clean = trim($clean, ", \t\n\r\0\x0B");
+
+        return $clean ?: $address;
     }
 }
