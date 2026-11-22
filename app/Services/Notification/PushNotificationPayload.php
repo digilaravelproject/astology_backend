@@ -93,6 +93,8 @@ class PushNotificationPayload
             'caller_name'   => $callerName,
             'caller_avatar' => $callerAvatar ?? '',
             'call_type'     => $callType,
+            'sent_at'       => (string) now()->timestamp,
+            'expires_at'    => (string) (now()->timestamp + 30),
             'created_at'    => now()->toIso8601String(),
         ], $extra);
 
@@ -113,6 +115,44 @@ class PushNotificationPayload
             senderId: (string) $callerId,
             senderName: $callerName,
             senderAvatar: $callerAvatar,
+            channelId: 'call_channel'
+        );
+    }
+
+    /**
+     * Build an urgent background signal to dismiss CallKit / incoming call ringing on astrologer device.
+     */
+    public static function forCallDismissed(
+        int $sessionId,
+        int $userId = 0,
+        string $reason = 'cancelled'
+    ): self {
+        $data = [
+            'entity_type'   => 'call',
+            'entity_id'     => (string) $sessionId,
+            'action'        => 'DISMISS_CALL',
+            'type'          => 'CALL_DISMISSED',
+            'session_id'    => (string) $sessionId,
+            'reason'        => $reason,
+            'sent_at'       => (string) now()->timestamp,
+            'created_at'    => now()->toIso8601String(),
+        ];
+
+        return new self(
+            title: 'Call Cancelled',
+            body: 'Incoming call was cancelled or timed out',
+            type: 'call_dismissed',
+            referenceId: (string) $sessionId,
+            imageUrl: null,
+            clickAction: null,
+            sound: 'silent',
+            priority: 'high',
+            customData: $data,
+            isDataOnly: true,
+            entityType: 'call',
+            entityId: (string) $sessionId,
+            action: 'DISMISS_CALL',
+            senderId: (string) $userId,
             channelId: 'call_channel'
         );
     }

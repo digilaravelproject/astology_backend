@@ -219,6 +219,18 @@ class CallController extends Controller
             // CallDismissed broadcasts to user.{id} and call.{id} so astrologer's ring screen closes
             broadcast(new CallDismissed($session, $consumerId, 'cancelled'));
 
+            // Send instant synchronous DISMISS_CALL FCM data push to dismiss CallKit on astrologer's device
+            try {
+                $dismissPayload = \App\Services\Notification\PushNotificationPayload::forCallDismissed(
+                    sessionId: (int) $session->id,
+                    userId: (int) $consumerId,
+                    reason: 'cancelled'
+                );
+                \App\Services\NotificationService::sendToUser((int) $session->provider_id, $dismissPayload, saveInApp: false, sync: true);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Failed to send synchronous DISMISS_CALL FCM push: {$e->getMessage()}");
+            }
+
             if ($session->live_session_id || $session->isLive()) {
                 try {
                     broadcast(new LiveSessionCallStatusUpdated((int) $session->live_session_id, [
@@ -259,6 +271,18 @@ class CallController extends Controller
             if ($wasRinging) {
                 // If caller hung up before astrologer answered, dismiss the incoming call screen
                 broadcast(new CallDismissed($session, $userId, 'cancelled'));
+
+                try {
+                    $dismissPayload = \App\Services\Notification\PushNotificationPayload::forCallDismissed(
+                        sessionId: (int) $session->id,
+                        userId: (int) $userId,
+                        reason: 'cancelled'
+                    );
+                    $targetRecipient = ((int) $userId === (int) $session->consumer_id) ? (int) $session->provider_id : (int) $session->consumer_id;
+                    \App\Services\NotificationService::sendToUser($targetRecipient, $dismissPayload, saveInApp: false, sync: true);
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning("Failed to send synchronous DISMISS_CALL FCM push on endCall: {$e->getMessage()}");
+                }
             } else {
                 // Notify participants their call has ended
                 broadcast(new CallEnded($session, $userId));

@@ -21,7 +21,7 @@ class NotificationService
      * @param bool $saveInApp
      * @return AppNotification|null
      */
-    public static function sendToUser(int $userId, PushNotificationPayload $payload, bool $saveInApp = true): ?AppNotification
+    public static function sendToUser(int $userId, PushNotificationPayload $payload, bool $saveInApp = true, bool $sync = false): ?AppNotification
     {
         $appNotification = null;
 
@@ -73,7 +73,17 @@ class NotificationService
         }
 
         if (!empty($tokens)) {
-            SendPushNotificationJob::dispatch($tokens, $payload);
+            // For calls and dismissals, dispatch synchronously to eliminate queue worker latency
+            if ($sync || in_array($payload->type, ['call', 'call_dismissed'])) {
+                try {
+                    SendPushNotificationJob::dispatchSync($tokens, $payload);
+                } catch (\Throwable $e) {
+                    Log::error("NotificationService: Synchronous dispatch failed: {$e->getMessage()}. Falling back to async queue.");
+                    SendPushNotificationJob::dispatch($tokens, $payload);
+                }
+            } else {
+                SendPushNotificationJob::dispatch($tokens, $payload);
+            }
         } else {
             Log::warning("NotificationService: No active FCM tokens found for User ID [{$userId}]. Push skipped.");
         }
@@ -187,8 +197,8 @@ class NotificationService
             extra: $extra
         );
 
-        // Call alert is data-only (wake-up alert) so saveInApp is false
-        self::sendToUser($receiverUserId, $payload, saveInApp: false);
+        // Call alert is data-only (wake-up alert) so saveInApp is false. Dispatched synchronously for zero delay.
+        self::sendToUser($receiverUserId, $payload, saveInApp: false, sync: true);
     }
 
     /**

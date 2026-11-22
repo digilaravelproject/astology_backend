@@ -422,9 +422,12 @@ class FcmChannelDriver
         }
 
         // Android configuration
+        $isCallRelated = in_array($payload->type, ['call', 'call_dismissed']) || ($payload->entityType === 'call');
+        $ttl = $isCallRelated ? '30s' : '86400s';
+
         $message['android'] = [
-            'priority' => ($payload->priority === 'high' || $payload->type === 'call') ? 'HIGH' : 'HIGH',
-            'ttl'      => $payload->type === 'call' ? '60s' : '86400s',
+            'priority' => ($payload->priority === 'high' || $isCallRelated) ? 'HIGH' : 'HIGH',
+            'ttl'      => $ttl,
         ];
 
         if (!$payload->isDataOnly) {
@@ -475,11 +478,16 @@ class FcmChannelDriver
             $apsPayload['sound'] = $sound === 'default' ? 'default' : "{$sound}.caf";
         }
 
+        $apnsHeaders = [
+            'apns-priority'  => ($payload->priority === 'high' || $isCallRelated) ? '10' : '10',
+            'apns-push-type' => $payload->isDataOnly ? 'background' : 'alert',
+        ];
+        if ($isCallRelated) {
+            $apnsHeaders['apns-expiration'] = (string) (time() + 30);
+        }
+
         $message['apns'] = [
-            'headers' => [
-                'apns-priority'  => ($payload->priority === 'high' || $payload->type === 'call') ? '10' : '10',
-                'apns-push-type' => $payload->isDataOnly ? 'background' : 'alert',
-            ],
+            'headers' => $apnsHeaders,
             'payload' => [
                 'aps' => $apsPayload,
             ],

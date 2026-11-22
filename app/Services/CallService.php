@@ -628,6 +628,10 @@ class CallService
                 }
 
                 if (!in_array($session->status, ['initiated', 'ringing'])) {
+                    // Gracefully return if session was already cancelled/missed/ended (handles timeout & manual cancel concurrency)
+                    if (in_array($session->status, ['missed', 'rejected', 'completed', 'cancelled'])) {
+                        return $session;
+                    }
                     throw new Exception('Only ringing calls can be cancelled.');
                 }
 
